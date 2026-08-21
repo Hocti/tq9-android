@@ -1,0 +1,1416 @@
+♟	activity	black chess pawn
+♠	activity	black spade suit
+♣	activity	black club suit
+♥	activity	black heart suit
+♦	activity	black diamond suit
+♨	activity	hot springs
+⚽	activity	soccer ball 足球
+⚾	activity	baseball 棒球
+⛷	activity	skier
+⛸	activity	ice skate
+⛹	activity	person with ball
+🎀	activity	ribbon
+🎁	activity	wrapped present 禮物
+🎂	activity	birthday cake 生日蛋糕
+🎃	activity	jack o lantern
+🎄	activity	christmas tree
+🎆	activity	fireworks
+🎇	activity	firework sparkler
+🎈	activity	balloon 氣球
+🎉	activity	party popper 慶祝
+🎊	activity	confetti ball 慶祝
+🎋	activity	tanabata tree
+🎌	activity	crossed flags
+🎍	activity	pine decoration
+🎎	activity	japanese dolls
+🎏	activity	carp streamer
+🎐	activity	wind chime
+🎑	activity	moon viewing ceremony
+🎒	activity	school satchel 書包
+🎓	activity	graduation cap
+🎞	activity	film frames
+🎟	activity	admission tickets
+🎠	activity	carousel horse
+🎡	activity	ferris wheel
+🎢	activity	roller coaster
+🎣	activity	fishing pole and fish
+🎤	activity	microphone 唱歌 咪
+🎥	activity	movie camera
+🎦	activity	cinema
+🎧	activity	headphone 耳機
+🎨	activity	artist palette
+🎩	activity	top hat
+🎪	activity	circus tent
+🎫	activity	ticket
+🎬	activity	clapper board
+🎭	activity	performing arts
+🎮	activity	video game 打機
+🎯	activity	direct hit 目標
+🎰	activity	slot machine
+🎱	activity	billiards 桌球
+🎲	activity	game die 骰
+🎳	activity	bowling
+🎴	activity	flower playing cards
+🎵	activity	musical note 音樂
+🎶	activity	multiple musical notes 音樂
+🎷	activity	saxophone
+🎸	activity	guitar 結他
+🎹	activity	musical keyboard 琴
+🎺	activity	trumpet
+🎻	activity	violin
+🎼	activity	musical score
+🎽	activity	running shirt with sash
+🎾	activity	tennis racquet and ball 網球
+🎿	activity	ski and ski boot
+🏀	activity	basketball and hoop 籃球
+🏁	activity	chequered flag
+🏂	activity	snowboarder
+🏃	activity	runner
+🏄	activity	surfer
+🏅	activity	sports medal
+🏆	activity	trophy 獎盃 冠軍
+🏇	activity	horse racing
+🏈	activity	american football 欖球
+🏉	activity	rugby football
+🏊	activity	swimmer
+🏋	activity	weight lifter
+🏌	activity	golfer
+🏍	activity	racing motorcycle
+🏎	activity	racing car
+🏏	activity	cricket bat and ball
+🏐	activity	volleyball 排球
+🏑	activity	field hockey stick and ball
+🏒	activity	ice hockey stick and puck
+🏓	activity	table tennis paddle and ball
+🏔	activity	snow capped mountain
+🏕	activity	camping
+🏖	activity	beach with umbrella
+🏗	activity	building construction
+🏘	activity	house buildings
+🏙	activity	cityscape
+🏚	activity	derelict house building
+🏛	activity	classical building
+🏜	activity	desert
+🏝	activity	desert island
+🏞	activity	national park
+🏟	activity	stadium
+🏠	activity	house building 屋 家
+🏡	activity	house with garden
+🏢	activity	office building 大廈
+🏣	activity	japanese post office
+🏤	activity	european post office
+🏥	activity	hospital 醫院
+🏦	activity	bank 銀行
+🏧	activity	automated teller machine
+🏨	activity	hotel
+🏩	activity	love hotel
+🏪	activity	convenience store
+🏫	activity	school 學校
+🏬	activity	department store
+🏭	activity	factory
+🏮	activity	izakaya lantern
+🏯	activity	japanese castle
+🏰	activity	european castle
+🏳	activity	waving white flag
+🏴	activity	waving black flag
+🏵	activity	rosette
+🏸	activity	badminton racquet and shuttlecock
+🏹	activity	bow and arrow
+🏺	activity	amphora
+🤿	activity	diving mask
+🥀	activity	wilted flower
+🥁	activity	drum with drumsticks
+🥂	activity	clinking glasses
+🥃	activity	tumbler glass
+🥄	activity	spoon
+🥅	activity	goal net
+🥇	activity	first place medal 金牌
+🥈	activity	second place medal 銀牌
+🥉	activity	third place medal 銅牌
+🥊	activity	boxing glove
+🥋	activity	martial arts uniform
+🥌	activity	curling stone
+🧧	activity	red gift envelope
+🧨	activity	firecracker
+🧩	activity	jigsaw puzzle piece
+🧪	activity	test tube 試管
+🧫	activity	petri dish
+🧬	activity	dna double helix
+🧭	activity	compass
+🧮	activity	abacus
+🧯	activity	fire extinguisher
+🪀	activity	yo yo
+🪁	activity	kite
+🪂	activity	parachute
+🪃	activity	boomerang
+🪄	activity	magic wand
+🪅	activity	pinata
+🪆	activity	nesting dolls
+🪇	activity	maracas
+🪈	activity	flute
+🪐	activity	ringed planet
+🪑	activity	chair
+🪒	activity	razor
+🪓	activity	axe
+🪔	activity	diya lamp
+🪕	activity	banjo
+🌰	animal	chestnut
+🌱	animal	seedling
+🌲	animal	evergreen tree 樹
+🌳	animal	deciduous tree
+🌴	animal	palm tree
+🌵	animal	cactus
+🌶	animal	hot pepper
+🌷	animal	tulip 鬱金香
+🌸	animal	cherry blossom 櫻花
+🌹	animal	rose 玫瑰 花
+🌺	animal	hibiscus
+🌻	animal	sunflower 太陽花
+🌼	animal	blossom
+🌽	animal	ear of maize
+🌾	animal	ear of rice
+🌿	animal	herb
+🍀	animal	four leaf clover 四葉草 好運
+🍁	animal	maple leaf 楓葉
+🍂	animal	fallen leaf
+🍃	animal	leaf fluttering in wind
+🍄	animal	mushroom
+🐀	animal	rat
+🐁	animal	mouse
+🐂	animal	ox
+🐃	animal	water buffalo
+🐄	animal	cow
+🐅	animal	tiger
+🐆	animal	leopard
+🐇	animal	rabbit
+🐈	animal	cat
+🐉	animal	dragon
+🐊	animal	crocodile
+🐋	animal	whale
+🐌	animal	snail 蝸牛
+🐍	animal	snake 蛇
+🐎	animal	horse
+🐏	animal	ram
+🐐	animal	goat
+🐑	animal	sheep
+🐒	animal	monkey
+🐓	animal	rooster
+🐔	animal	chicken 雞
+🐕	animal	dog
+🐖	animal	pig
+🐗	animal	boar
+🐘	animal	elephant 大象
+🐙	animal	octopus 八爪魚
+🐚	animal	spiral shell
+🐛	animal	bug 蟲
+🐜	animal	ant
+🐝	animal	honeybee 蜜蜂
+🐞	animal	lady beetle
+🐟	animal	fish 魚
+🐠	animal	tropical fish
+🐡	animal	blowfish
+🐢	animal	turtle 龜
+🐣	animal	hatching chick
+🐤	animal	baby chick
+🐥	animal	front facing baby chick
+🐦	animal	bird 雀
+🐧	animal	penguin 企鵝
+🐨	animal	koala
+🐩	animal	poodle
+🐪	animal	dromedary camel
+🐫	animal	bactrian camel
+🐬	animal	dolphin 海豚
+🐭	animal	mouse face 老鼠
+🐮	animal	cow face 牛
+🐯	animal	tiger face 老虎
+🐰	animal	rabbit face 兔
+🐱	animal	cat face 貓
+🐲	animal	dragon face
+🐳	animal	spouting whale 鯨
+🐴	animal	horse face 馬
+🐵	animal	monkey face 馬騮
+🐶	animal	dog face 狗
+🐷	animal	pig face 豬
+🐸	animal	frog face 青蛙
+🐹	animal	hamster face
+🐺	animal	wolf face
+🐻	animal	bear face 熊
+🐼	animal	panda face 熊貓
+🐽	animal	pig nose
+🐾	animal	paw prints
+🐿	animal	chipmunk
+💐	animal	bouquet
+🕊	animal	dove of peace
+🦀	animal	crab
+🦁	animal	lion face 獅子
+🦂	animal	scorpion
+🦃	animal	turkey
+🦄	animal	unicorn face 獨角獸
+🦅	animal	eagle 鷹
+🦆	animal	duck 鴨
+🦇	animal	bat
+🦈	animal	shark 鯊魚
+🦉	animal	owl
+🦊	animal	fox face 狐狸
+🦋	animal	butterfly 蝴蝶
+🦌	animal	deer
+🦍	animal	gorilla
+🦎	animal	lizard
+🦏	animal	rhinoceros
+🦐	animal	shrimp
+🦑	animal	squid
+🦒	animal	giraffe face
+🦓	animal	zebra face
+🦔	animal	hedgehog
+🦕	animal	sauropod
+🦖	animal	t rex
+🦗	animal	cricket
+🦘	animal	kangaroo
+🦙	animal	llama
+🦚	animal	peacock
+🦛	animal	hippopotamus
+🦜	animal	parrot
+🦝	animal	raccoon
+🦞	animal	lobster
+🦟	animal	mosquito
+🦠	animal	microbe
+🦡	animal	badger
+🦢	animal	swan
+🦣	animal	mammoth
+🦤	animal	dodo
+🦥	animal	sloth
+🦦	animal	otter
+🦧	animal	orangutan
+🦨	animal	skunk
+🦩	animal	flamingo
+🦪	animal	oyster
+🦫	animal	beaver
+🦬	animal	bison
+🦭	animal	seal
+🦮	animal	guide dog
+🪰	animal	fly
+🪱	animal	worm
+🪲	animal	beetle
+🪳	animal	cockroach
+🪴	animal	potted plant
+🪵	animal	wood
+🪶	animal	feather
+🪷	animal	lotus
+🪸	animal	coral
+🪹	animal	empty nest
+🪺	animal	nest with eggs
+🪻	animal	hyacinth
+🪼	animal	jellyfish
+🪽	animal	wing
+🪿	animal	goose
+☹	face	white frowning face
+☺	face	white smiling face
+👻	face	ghost 鬼
+👼	face	baby angel
+👽	face	extraterrestrial alien 外星人
+👾	face	alien monster
+👿	face	imp 魔鬼
+💀	face	skull 死 骷髏
+💩	face	pile of poo 屎
+😀	face	grinning face 笑 開心
+😁	face	grinning face with smiling eyes 笑 開心
+😂	face	face with tears of joy 笑喊 喊
+😃	face	smiling face with open mouth 笑 開心
+😄	face	smiling face with open mouth and smiling eyes 笑 開心
+😅	face	smiling face with open mouth and cold sweat 苦笑 汗
+😆	face	smiling face with open mouth and tightly closed eyes 大笑
+😇	face	smiling face with halo 天使
+😈	face	smiling face with horns 奸
+😉	face	winking face 眨眼
+😊	face	smiling face with smiling eyes 微笑 害羞
+😋	face	face savouring delicious food 好味 舐
+😌	face	relieved face
+😍	face	smiling face with heart shaped eyes 心心 鍾意
+😎	face	smiling face with sunglasses 型 太陽鏡
+😏	face	smirking face 奸笑
+😐	face	neutral face 無表情
+😑	face	expressionless face 無語
+😒	face	unamused face 無癮 唔想
+😓	face	face with cold sweat 流汗
+😔	face	pensive face 失望 唔開心
+😕	face	confused face 唔明
+😖	face	confounded face 辛苦
+😗	face	kissing face 錫
+😘	face	face throwing a kiss 錫 飛吻
+😙	face	kissing face with smiling eyes
+😚	face	kissing face with closed eyes
+😛	face	face with stuck out tongue 伸脷
+😜	face	face with stuck out tongue and winking eye 扮鬼臉
+😝	face	face with stuck out tongue and tightly closed eyes 扮鬼臉
+😞	face	disappointed face 失望
+😟	face	worried face 擔心
+😠	face	angry face 嬲
+😡	face	pouting face 嬲 火滾
+😢	face	crying face 喊 傷心
+😣	face	persevering face 辛苦
+😤	face	face with look of triumph 嬲
+😥	face	disappointed but relieved face 失望
+😦	face	frowning face with open mouth 驚
+😧	face	anguished face 驚
+😨	face	fearful face 驚
+😩	face	weary face 攰
+😪	face	sleepy face 眼瞓
+😫	face	tired face 攰
+😬	face	grimacing face 尷尬
+😭	face	loudly crying face 大喊 傷心
+😮	face	face with open mouth 哦 驚訝
+😯	face	hushed face 驚訝
+😰	face	face with open mouth and cold sweat 驚 汗
+😱	face	face screaming in fear 嚇死
+😲	face	astonished face 嚇親
+😳	face	flushed face 面紅 尷尬
+😴	face	sleeping face 瞓覺 眼瞓
+😵	face	dizzy face 暈
+😶	face	face without mouth 唔出聲
+😷	face	face with medical mask 口罩
+😸	face	grinning cat face with smiling eyes
+😹	face	cat face with tears of joy 貓笑
+😺	face	smiling cat face with open mouth 貓
+😻	face	smiling cat face with heart shaped eyes
+😼	face	cat face with wry smile
+😽	face	kissing cat face with closed eyes
+😾	face	pouting cat face
+😿	face	crying cat face
+🙀	face	weary cat face
+🙁	face	slightly frowning face 唔開心
+🙂	face	slightly smiling face 微笑
+🙃	face	upside down face 倒轉
+🙄	face	face with rolling eyes 反白眼
+🙈	face	see no evil monkey
+🙉	face	hear no evil monkey
+🙊	face	speak no evil monkey
+🤐	face	zipper mouth face 收聲
+🤑	face	money mouth face 錢 發達
+🤒	face	face with thermometer 病
+🤓	face	nerd face 書呆子
+🤔	face	thinking face 諗 思考
+🤕	face	face with head bandage 受傷
+🤖	face	robot face 機械人
+🤗	face	hugging face 攬 抱
+🤘	face	sign of the horns 搖滾
+🤙	face	call me hand call me
+🤚	face	raised back of hand 手
+🤛	face	left facing fist
+🤜	face	right facing fist
+🤝	face	handshake 握手 合作
+🤞	face	hand with index and middle fingers crossed 祝好運
+🤟	face	i love you hand sign 愛你
+🤠	face	face with cowboy hat 牛仔
+🤡	face	clown face 小丑
+🤢	face	nauseated face 作嘔
+🤣	face	rolling on the floor laughing 爆笑 笑到
+🤤	face	drooling face 流口水
+🤥	face	lying face 講大話
+🤦	face	face palm
+🤧	face	sneezing face 打乞嗤
+🤨	face	face with one eyebrow raised 懷疑
+🤩	face	grinning face with star eyes 星星眼 勁
+🤪	face	grinning face with one large and one small eye 癲
+🤫	face	face with finger covering closed lips 噓 靜
+🤬	face	serious face with symbols covering mouth 鬧 粗口
+🤭	face	smiling face with smiling eyes and hand covering mouth 掩嘴
+🤮	face	face with open mouth vomiting 嘔
+🤯	face	shocked face with exploding head 爆炸 震驚
+🥰	face	smiling face with smiling eyes and three hearts 心心 鍾意
+🥱	face	yawning face 打呵欠 悶
+🥲	face	smiling face with tear
+🥳	face	face with party horn and party hat 慶祝 生日
+🥴	face	face with uneven eyes and wavy mouth 暈
+🥵	face	overheated face 熱
+🥶	face	freezing face 凍
+🥷	face	ninja
+🥸	face	disguised face
+🥹	face	face holding back tears
+🥺	face	face with pleading eyes 求你 可憐
+🌭	food	hot dog 熱狗
+🌮	food	taco
+🌯	food	burrito
+🍅	food	tomato
+🍆	food	aubergine
+🍇	food	grapes 提子
+🍈	food	melon
+🍉	food	watermelon 西瓜
+🍊	food	tangerine
+🍋	food	lemon
+🍌	food	banana 香蕉
+🍍	food	pineapple 菠蘿
+🍎	food	red apple 蘋果
+🍏	food	green apple
+🍐	food	pear
+🍑	food	peach 桃
+🍒	food	cherries
+🍓	food	strawberry 士多啤梨
+🍔	food	hamburger 漢堡
+🍕	food	slice of pizza 薄餅
+🍖	food	meat on bone
+🍗	food	poultry leg
+🍘	food	rice cracker
+🍙	food	rice ball
+🍚	food	cooked rice 飯
+🍛	food	curry and rice
+🍜	food	steaming bowl 麵
+🍝	food	spaghetti
+🍞	food	bread 麵包
+🍟	food	french fries 薯條
+🍠	food	roasted sweet potato
+🍡	food	dango
+🍢	food	oden
+🍣	food	sushi 壽司
+🍤	food	fried shrimp 蝦
+🍥	food	fish cake with swirl design
+🍦	food	soft ice cream 雪糕
+🍧	food	shaved ice
+🍨	food	ice cream
+🍩	food	doughnut 冬甩
+🍪	food	cookie 曲奇
+🍫	food	chocolate bar 朱古力
+🍬	food	candy 糖
+🍭	food	lollipop
+🍮	food	custard
+🍯	food	honey pot
+🍰	food	shortcake 蛋糕
+🍱	food	bento box 便當
+🍲	food	pot of food
+🍳	food	cooking 煎蛋
+🍴	food	fork and knife
+🍵	food	teacup without handle 茶
+🍶	food	sake bottle and cup
+🍷	food	wine glass 酒
+🍸	food	cocktail glass
+🍹	food	tropical drink
+🍺	food	beer mug 啤酒
+🍻	food	clinking beer mugs 飲勝
+🍼	food	baby bottle 奶樽
+🍽	food	fork and knife with plate
+🍾	food	bottle with popping cork
+🍿	food	popcorn
+🥐	food	croissant
+🥑	food	avocado
+🥒	food	cucumber
+🥓	food	bacon
+🥔	food	potato
+🥕	food	carrot
+🥖	food	baguette bread
+🥗	food	green salad
+🥘	food	shallow pan of food
+🥙	food	stuffed flatbread
+🥚	food	egg 蛋
+🥛	food	glass of milk
+🥜	food	peanuts
+🥝	food	kiwifruit
+🥞	food	pancakes
+🥟	food	dumpling
+🥠	food	fortune cookie
+🥡	food	takeout box
+🥢	food	chopsticks
+🥣	food	bowl with spoon
+🥤	food	cup with straw 飲品
+🥥	food	coconut
+🥦	food	broccoli
+🥧	food	pie
+🥨	food	pretzel
+🥩	food	cut of meat
+🥪	food	sandwich
+🥫	food	canned food
+🥬	food	leafy green
+🥭	food	mango
+🥮	food	moon cake
+🥯	food	bagel
+🧀	food	cheese wedge 芝士
+🧁	food	cupcake
+🧂	food	salt shaker
+🧃	food	beverage box
+🧄	food	garlic
+🧅	food	onion
+🧆	food	falafel
+🧇	food	waffle
+🧈	food	butter
+🧉	food	mate drink
+🧊	food	ice cube
+🧋	food	bubble tea
+🧌	food	troll
+🫐	food	blueberries
+🫑	food	bell pepper
+🫒	food	olive
+🫓	food	flatbread
+🫔	food	tamale
+🫕	food	fondue
+🫖	food	teapot
+🫗	food	pouring liquid
+🫘	food	beans
+🫙	food	jar
+🫚	food	ginger root
+🫛	food	pea pod
+☝	hand	white up pointing index 上
+✊	hand	raised fist
+✋	hand	raised hand 手 停
+✌	hand	victory hand 耶 勝利
+✍	hand	writing hand 寫
+👀	hand	eyes 眼 望
+👁	hand	eye 眼
+👂	hand	ear 耳
+👃	hand	nose 鼻
+👄	hand	mouth 嘴
+👅	hand	tongue 脷
+👆	hand	white up pointing backhand index 上
+👇	hand	white down pointing backhand index 下
+👈	hand	white left pointing backhand index 左
+👉	hand	white right pointing backhand index 右
+👊	hand	fisted hand sign
+👋	hand	waving hand sign 拜拜 你好
+👌	hand	ok hand sign ok
+👍	hand	thumbs up sign good 讚 好
+👎	hand	thumbs down sign 差 唔好
+👏	hand	clapping hands sign 拍手 叻
+👐	hand	open hands sign 手
+💅	hand	nail polish 指甲
+💪	hand	flexed biceps 力 加油
+🖐	hand	raised hand with fingers splayed 手
+🖕	hand	reversed hand with middle finger extended 中指
+🖖	hand	raised hand with part between middle and ring fingers 手
+🤲	hand	palms up together 手
+🤳	hand	selfie
+🦴	hand	bone
+🦵	hand	leg
+🦶	hand	foot
+🦷	hand	tooth
+🦸	hand	superhero
+🦹	hand	supervillain
+🦺	hand	safety vest
+🦻	hand	ear with hearing aid
+🦼	hand	motorized wheelchair
+🦽	hand	manual wheelchair
+🦾	hand	mechanical arm
+🦿	hand	mechanical leg
+🧠	hand	brain 腦
+🫀	hand	anatomical heart
+🫁	hand	lungs
+🫂	hand	people hugging
+🫰	hand	hand with index finger and thumb crossed
+🫱	hand	rightwards hand
+🫲	hand	leftwards hand
+🫳	hand	palm down hand
+🫴	hand	palm up hand
+🫵	hand	index pointing at the viewer
+🫶	hand	heart hands
+🫷	hand	leftwards pushing hand
+🫸	hand	rightwards pushing hand
+⌚	object	watch 錶
+⌛	object	hourglass
+⏩	object	black right pointing double triangle
+⏪	object	black left pointing double triangle
+⏫	object	black up pointing double triangle
+⏬	object	black down pointing double triangle
+⏭	object	black right pointing double triangle with vertical bar
+⏮	object	black left pointing double triangle with vertical bar
+⏯	object	black right pointing triangle with double vertical bar
+⏰	object	alarm clock
+⏱	object	stopwatch
+⏲	object	timer clock
+⏳	object	hourglass with flowing sand
+⏸	object	double vertical bar
+⏹	object	black square for stop
+⏺	object	black circle for record
+⚒	object	hammer and pick
+⚓	object	anchor
+⚔	object	crossed swords
+⚕	object	staff of aesculapius
+⚖	object	scales
+⚗	object	alembic
+⚙	object	gear
+⛏	object	pick
+⛑	object	helmet with white cross
+👕	object	t shirt 衫
+👖	object	jeans 褲
+👗	object	dress 裙
+👘	object	kimono
+👙	object	bikini
+👚	object	womans clothes
+👛	object	purse
+👜	object	handbag
+👝	object	pouch
+👞	object	mans shoe 鞋
+👟	object	athletic shoe 鞋
+👠	object	high heeled shoe
+👡	object	womans sandal
+👢	object	womans boots
+💈	object	barber pole
+💉	object	syringe 針
+💊	object	pill 藥
+💋	object	kiss mark
+💌	object	love letter
+💍	object	ring 戒指
+💎	object	gem stone 鑽石
+💏	object	kiss
+💠	object	diamond shape with a dot inside
+💡	object	electric light bulb 燈膽 諗到
+💢	object	anger symbol 嬲
+💣	object	bomb
+💤	object	sleeping symbol 瞓 眼瞓
+💥	object	collision symbol 爆
+💦	object	splashing sweat symbol 水 汗
+💧	object	droplet
+💨	object	dash symbol 走 風
+💫	object	dizzy symbol 暈
+💬	object	speech balloon
+💭	object	thought balloon
+💮	object	white flower
+💯	object	hundred points symbol 一百分 滿分
+💰	object	money bag 錢
+💱	object	currency exchange
+💲	object	heavy dollar sign
+💳	object	credit card 信用卡
+💴	object	banknote with yen sign
+💵	object	banknote with dollar sign 錢
+💶	object	banknote with euro sign
+💷	object	banknote with pound sign
+💸	object	money with wings
+💹	object	chart with upwards trend and yen sign
+💺	object	seat
+💻	object	personal computer 電腦
+💼	object	briefcase
+💽	object	minidisc
+💾	object	floppy disk
+💿	object	optical disc
+📀	object	dvd
+📁	object	file folder
+📂	object	open file folder
+📃	object	page with curl
+📄	object	page facing up
+📅	object	calendar
+📆	object	tear off calendar
+📇	object	card index
+📈	object	chart with upwards trend
+📉	object	chart with downwards trend
+📊	object	bar chart
+📋	object	clipboard
+📌	object	pushpin 釘
+📍	object	round pushpin
+📎	object	paperclip 萬字夾
+📏	object	straight ruler
+📐	object	triangular ruler
+📑	object	bookmark tabs
+📒	object	ledger
+📓	object	notebook
+📔	object	notebook with decorative cover
+📕	object	closed book
+📖	object	open book 書
+📗	object	green book
+📘	object	blue book
+📙	object	orange book
+📚	object	books 書
+📛	object	name badge
+📜	object	scroll
+📝	object	memo 寫 筆記
+📞	object	telephone receiver 電話
+📟	object	pager
+📠	object	fax machine
+📡	object	satellite antenna
+📢	object	public address loudspeaker 宣布
+📣	object	cheering megaphone
+📤	object	outbox tray
+📥	object	inbox tray
+📦	object	package 包裹
+📧	object	e mail symbol 電郵
+📨	object	incoming envelope
+📩	object	envelope with downwards arrow above 訊息
+📪	object	closed mailbox with lowered flag
+📫	object	closed mailbox with raised flag
+📬	object	open mailbox with raised flag
+📭	object	open mailbox with lowered flag
+📮	object	postbox
+📯	object	postal horn
+📰	object	newspaper
+📱	object	mobile phone 電話 手機
+📲	object	mobile phone with rightwards arrow at left
+📳	object	vibration mode
+📴	object	mobile phone off
+📵	object	no mobile phones
+📶	object	antenna with bars
+📷	object	camera 相機
+📸	object	camera with flash
+📹	object	video camera
+📺	object	television 電視
+📻	object	radio
+📼	object	videocassette
+📽	object	film projector
+📿	object	prayer beads
+🔦	object	electric torch
+🔧	object	wrench 士巴拿
+🔨	object	hammer 鎚
+🔩	object	nut and bolt
+🔪	object	hocho
+🔫	object	pistol
+🔬	object	microscope 顯微鏡
+🖥	object	desktop computer
+🖨	object	printer 打印機
+🖱	object	three button mouse
+🖲	object	trackball
+🖼	object	frame with picture
+🗂	object	card index dividers
+🗃	object	card file box
+🗄	object	file cabinet
+🗑	object	wastebasket
+🗒	object	spiral note pad
+🗓	object	spiral calendar pad
+🗜	object	compression
+🗝	object	old key
+🗞	object	rolled up newspaper
+🗡	object	dagger knife
+🗣	object	speaking head in silhouette
+🗩	object	right speech bubble
+🗳	object	ballot box with ballot
+🧰	object	toolbox
+🧱	object	brick
+🧲	object	magnet
+🧳	object	luggage
+🧴	object	lotion bottle
+🧵	object	spool of thread
+🧶	object	ball of yarn
+🧷	object	safety pin
+🧸	object	teddy bear 公仔
+🧹	object	broom 掃
+🧺	object	basket 籃
+🧻	object	roll of paper
+🧼	object	bar of soap
+🧽	object	sponge
+🧾	object	receipt 單
+🧿	object	nazar amulet
+🩰	object	ballet shoes
+🩱	object	one piece swimsuit
+🩲	object	briefs
+🩳	object	shorts
+🩴	object	thong sandal
+🩵	object	light blue heart
+🩶	object	grey heart
+🩷	object	pink heart
+🩸	object	drop of blood
+🩹	object	adhesive bandage
+🩺	object	stethoscope 醫生
+🩻	object	x ray
+🩼	object	crutch
+🎅	people	father christmas
+👤	people	bust in silhouette
+👥	people	busts in silhouette
+👦	people	boy
+👧	people	girl
+👨	people	man
+👩	people	woman
+👪	people	family
+👫	people	man and woman holding hands
+👬	people	two men holding hands
+👭	people	two women holding hands
+👮	people	police officer
+👯	people	woman with bunny ears
+👰	people	bride with veil
+👱	people	person with blond hair
+👲	people	man with gua pi mao
+👳	people	man with turban
+👴	people	older man
+👵	people	older woman
+👶	people	baby
+👷	people	construction worker
+👸	people	princess
+👹	people	japanese ogre
+👺	people	japanese goblin
+💁	people	information desk person
+💂	people	guardsman
+💃	people	dancer
+💄	people	lipstick 唇膏
+💆	people	face massage
+💇	people	haircut
+🕴	people	man in business suit levitating
+🕵	people	sleuth or spy
+🕶	people	dark sunglasses
+🕷	people	spider
+🕸	people	spider web
+🕹	people	joystick
+🕺	people	man dancing
+🙅	people	face with no good gesture
+🙆	people	face with ok gesture
+🙇	people	person bowing deeply
+🙋	people	happy person raising one hand
+🙌	people	person raising both hands in celebration 萬歲
+🙍	people	person frowning
+🙎	people	person with pouting face
+🙏	people	person with folded hands 唔該 拜託 祈禱
+🚴	people	bicyclist
+🚵	people	mountain bicyclist
+🚶	people	pedestrian
+🛀	people	bath
+🛌	people	sleeping accommodation
+🤰	people	pregnant woman
+🤱	people	breast feeding
+🤼	people	wrestlers
+🤽	people	water polo
+🤾	people	handball
+🧍	people	standing person
+🧎	people	kneeling person
+🧏	people	deaf person
+🧐	people	face with monocle 研究
+🧑	people	adult
+🧒	people	child
+🧓	people	older adult
+🧔	people	bearded person
+🧕	people	person with headscarf
+🧖	people	person in steamy room
+🧗	people	person climbing
+🧘	people	person in lotus position
+🧙	people	mage
+🧚	people	fairy
+🧛	people	vampire
+🧜	people	merperson
+🧝	people	elf
+🧞	people	genie
+🧟	people	zombie
+©	symbol	copyright sign
+®	symbol	registered sign
+‼	symbol	double exclamation mark
+⁉	symbol	exclamation question mark
+™	symbol	trade mark sign
+ℹ	symbol	information source
+↔	symbol	left right arrow
+↕	symbol	up down arrow
+↖	symbol	north west arrow
+↗	symbol	north east arrow
+↘	symbol	south east arrow
+↙	symbol	south west arrow
+↩	symbol	leftwards arrow with hook
+↪	symbol	rightwards arrow with hook
+Ⓜ	symbol	circled latin capital letter m
+▪	symbol	black small square
+▫	symbol	white small square
+▶	symbol	black right pointing triangle
+◀	symbol	black left pointing triangle
+◻	symbol	white medium square
+◼	symbol	black medium square
+◽	symbol	white medium small square
+◾	symbol	black medium small square
+☀	symbol	black sun with rays 太陽 晴
+☁	symbol	cloud 雲 陰
+☂	symbol	umbrella 遮
+☃	symbol	snowman
+☄	symbol	comet
+☎	symbol	black telephone
+☑	symbol	ballot box with check
+☔	symbol	umbrella with rain drops
+☕	symbol	hot beverage 咖啡
+☘	symbol	shamrock
+☠	symbol	skull and crossbones
+☢	symbol	radioactive sign
+☣	symbol	biohazard sign
+☦	symbol	orthodox cross
+☪	symbol	star and crescent
+☮	symbol	peace symbol
+☯	symbol	yin yang
+☸	symbol	wheel of dharma
+♀	symbol	female sign
+♂	symbol	male sign
+♈	symbol	aries
+♉	symbol	taurus
+♊	symbol	gemini
+♋	symbol	cancer
+♌	symbol	leo
+♍	symbol	virgo
+♎	symbol	libra
+♏	symbol	scorpius
+♐	symbol	sagittarius
+♑	symbol	capricorn
+♒	symbol	aquarius
+♓	symbol	pisces
+♻	symbol	black universal recycling symbol 回收
+♾	symbol	permanent paper sign
+♿	symbol	wheelchair symbol
+⚛	symbol	atom symbol
+⚜	symbol	fleur de lis
+⚠	symbol	warning sign 小心 警告
+⚡	symbol	high voltage sign 閃電
+⚧	symbol	male with stroke and male and female sign
+⚪	symbol	medium white circle
+⚫	symbol	medium black circle
+⚰	symbol	coffin
+⚱	symbol	funeral urn
+⛄	symbol	snowman without snow 雪人
+⛅	symbol	sun behind cloud
+⛈	symbol	thunder cloud and rain 雷雨
+⛎	symbol	ophiuchus
+⛓	symbol	chains
+⛔	symbol	no entry
+✂	symbol	black scissors 剪刀
+✅	symbol	white heavy check mark 啱 得
+✏	symbol	pencil 鉛筆
+✒	symbol	black nib
+✔	symbol	heavy check mark
+✖	symbol	heavy multiplication x
+✝	symbol	latin cross
+✡	symbol	star of david
+✨	symbol	sparkles 閃 靚
+✳	symbol	eight spoked asterisk
+✴	symbol	eight pointed black star
+❄	symbol	snowflake 雪 凍
+❇	symbol	sparkle
+❌	symbol	cross mark 錯 唔得
+❎	symbol	negative squared cross mark
+❓	symbol	black question mark ornament 問號
+❔	symbol	white question mark ornament
+❕	symbol	white exclamation mark ornament
+❗	symbol	heavy exclamation mark symbol 感嘆號
+❣	symbol	heavy heart exclamation mark ornament
+❤	symbol	heavy black heart 心 愛
+➕	symbol	heavy plus sign
+➖	symbol	heavy minus sign
+➗	symbol	heavy division sign
+➡	symbol	black rightwards arrow 右 箭嘴
+➰	symbol	curly loop
+➿	symbol	double curly loop
+⤴	symbol	arrow pointing rightwards then curving upwards
+⤵	symbol	arrow pointing rightwards then curving downwards
+⬅	symbol	leftwards black arrow 左 箭嘴
+⬆	symbol	upwards black arrow 上 箭嘴
+⬇	symbol	downwards black arrow 下 箭嘴
+⬛	symbol	black large square
+⬜	symbol	white large square
+⭐	symbol	white medium star 星
+⭕	symbol	heavy large circle
+〰	symbol	wavy dash
+〽	symbol	part alternation mark
+㊗	symbol	circled ideograph congratulation
+㊙	symbol	circled ideograph secret
+🀄	symbol	mahjong tile red dragon
+🃏	symbol	playing card black joker
+🅰	symbol	negative squared latin capital letter a
+🅱	symbol	negative squared latin capital letter b
+🅾	symbol	negative squared latin capital letter o
+🅿	symbol	negative squared latin capital letter p
+🆎	symbol	negative squared ab
+🆑	symbol	squared cl
+🆒	symbol	squared cool
+🆓	symbol	squared free 免費
+🆔	symbol	squared id
+🆕	symbol	squared new 新
+🆖	symbol	squared ng
+🆗	symbol	squared ok ok
+🆘	symbol	squared sos
+🆙	symbol	squared up with exclamation mark
+🆚	symbol	squared vs
+🈁	symbol	squared katakana koko
+🈂	symbol	squared katakana sa
+🈚	symbol	squared cjk unified ideograph 7121
+🈯	symbol	squared cjk unified ideograph 6307
+🈲	symbol	squared cjk unified ideograph 7981 禁
+🈳	symbol	squared cjk unified ideograph 7a7a
+🈴	symbol	squared cjk unified ideograph 5408
+🈵	symbol	squared cjk unified ideograph 6e80
+🈶	symbol	squared cjk unified ideograph 6709
+🈷	symbol	squared cjk unified ideograph 6708
+🈸	symbol	squared cjk unified ideograph 7533
+🈹	symbol	squared cjk unified ideograph 5272
+🈺	symbol	squared cjk unified ideograph 55b6
+🉐	symbol	circled ideograph advantage 得
+🉑	symbol	circled ideograph accept
+👑	symbol	crown 皇冠
+👒	symbol	womans hat
+👓	symbol	eyeglasses 眼鏡
+👔	symbol	necktie
+👣	symbol	footprints
+💑	symbol	couple with heart
+💒	symbol	wedding
+💓	symbol	beating heart 心
+💔	symbol	broken heart 心碎 失戀
+💕	symbol	two hearts 心 愛
+💖	symbol	sparkling heart 心
+💗	symbol	growing heart 心
+💘	symbol	heart with arrow 心
+💙	symbol	blue heart 心
+💚	symbol	green heart 心
+💛	symbol	yellow heart 心
+💜	symbol	purple heart 心
+💝	symbol	heart with ribbon 心 禮物
+💞	symbol	revolving hearts 心
+💟	symbol	heart decoration
+🔀	symbol	twisted rightwards arrows
+🔁	symbol	clockwise rightwards and leftwards open circle arrows
+🔂	symbol	clockwise rightwards and leftwards open circle arrows with circled one overlay
+🔃	symbol	clockwise downwards and upwards open circle arrows
+🔄	symbol	anticlockwise downwards and upwards open circle arrows 重新
+🔅	symbol	low brightness symbol
+🔆	symbol	high brightness symbol
+🔇	symbol	speaker with cancellation stroke 靜音
+🔈	symbol	speaker
+🔉	symbol	speaker with one sound wave
+🔊	symbol	speaker with three sound waves 大聲
+🔋	symbol	battery 電池
+🔌	symbol	electric plug 插頭
+🔍	symbol	left pointing magnifying glass 搵 搜尋
+🔎	symbol	right pointing magnifying glass 搵 搜尋
+🔏	symbol	lock with ink pen
+🔐	symbol	closed lock with key
+🔑	symbol	key 鎖匙
+🔒	symbol	lock 鎖
+🔓	symbol	open lock
+🔔	symbol	bell 鐘 通知
+🔕	symbol	bell with cancellation stroke 靜音
+🔖	symbol	bookmark
+🔗	symbol	link symbol
+🔘	symbol	radio button
+🔙	symbol	back with leftwards arrow above
+🔚	symbol	end with leftwards arrow above
+🔛	symbol	on with exclamation mark with left right arrow above
+🔜	symbol	soon with rightwards arrow above
+🔝	symbol	top with upwards arrow above
+🔞	symbol	no one under eighteen symbol 十八禁
+🔟	symbol	keycap ten
+🔠	symbol	input symbol for latin capital letters
+🔡	symbol	input symbol for latin small letters
+🔢	symbol	input symbol for numbers
+🔣	symbol	input symbol for symbols
+🔤	symbol	input symbol for latin letters
+🔥	symbol	fire 火 勁
+🔭	symbol	telescope
+🔮	symbol	crystal ball
+🔯	symbol	six pointed star with middle dot
+🔰	symbol	japanese symbol for beginner
+🔱	symbol	trident emblem
+🔲	symbol	black square button
+🔳	symbol	white square button
+🔴	symbol	large red circle
+🔵	symbol	large blue circle
+🔶	symbol	large orange diamond
+🔷	symbol	large blue diamond
+🔸	symbol	small orange diamond
+🔹	symbol	small blue diamond
+🔺	symbol	up pointing red triangle
+🔻	symbol	down pointing red triangle
+🔼	symbol	up pointing small red triangle
+🔽	symbol	down pointing small red triangle
+🕉	symbol	om symbol
+🕋	symbol	kaaba
+🕌	symbol	mosque
+🕍	symbol	synagogue
+🕎	symbol	menorah with nine branches
+🕐	symbol	clock face one oclock 時間
+🕑	symbol	clock face two oclock
+🕒	symbol	clock face three oclock
+🕓	symbol	clock face four oclock
+🕔	symbol	clock face five oclock
+🕕	symbol	clock face six oclock
+🕖	symbol	clock face seven oclock
+🕗	symbol	clock face eight oclock
+🕘	symbol	clock face nine oclock
+🕙	symbol	clock face ten oclock
+🕚	symbol	clock face eleven oclock
+🕛	symbol	clock face twelve oclock
+🕜	symbol	clock face one thirty
+🕝	symbol	clock face two thirty
+🕞	symbol	clock face three thirty
+🕟	symbol	clock face four thirty
+🕠	symbol	clock face five thirty
+🕡	symbol	clock face six thirty
+🕢	symbol	clock face seven thirty
+🕣	symbol	clock face eight thirty
+🕤	symbol	clock face nine thirty
+🕥	symbol	clock face ten thirty
+🕦	symbol	clock face eleven thirty
+🕧	symbol	clock face twelve thirty
+🕰	symbol	mantelpiece clock
+🕳	symbol	hole 窿
+🖤	symbol	black heart 黑心
+🟠	symbol	large orange circle
+🟡	symbol	large yellow circle
+🟢	symbol	large green circle
+🟣	symbol	large purple circle
+🟤	symbol	large brown circle
+🟥	symbol	large red square
+🟦	symbol	large blue square
+🟧	symbol	large orange square
+🟨	symbol	large yellow square
+🟩	symbol	large green square
+🟪	symbol	large purple square
+🟫	symbol	large brown square
+🤌	symbol	pinched fingers
+🤍	symbol	white heart 白心
+🤎	symbol	brown heart
+🤏	symbol	pinching hand
+🤴	symbol	prince
+🤵	symbol	man in tuxedo
+🤶	symbol	mother christmas
+🤷	symbol	shrug
+🤸	symbol	person doing cartwheel
+🤹	symbol	juggling
+🤺	symbol	fencer
+🥍	symbol	lacrosse stick and ball
+🥎	symbol	softball
+🥏	symbol	flying disc
+🥻	symbol	sari
+🥼	symbol	lab coat
+🥽	symbol	goggles
+🥾	symbol	hiking boot
+🥿	symbol	flat shoe
+🦯	symbol	probing cane
+🧡	symbol	orange heart 心
+🧢	symbol	billed cap 帽
+🧣	symbol	scarf
+🧤	symbol	gloves
+🧥	symbol	coat
+🧦	symbol	socks
+🪖	symbol	military helmet
+🪗	symbol	accordion
+🪘	symbol	long drum
+🪙	symbol	coin
+🪚	symbol	carpentry saw
+🪛	symbol	screwdriver
+🪜	symbol	ladder
+🪝	symbol	hook
+🪞	symbol	mirror
+🪟	symbol	window
+🪠	symbol	plunger
+🪡	symbol	sewing needle
+🪢	symbol	knot
+🪣	symbol	bucket
+🪤	symbol	mouse trap
+🪥	symbol	toothbrush
+🪦	symbol	headstone
+🪧	symbol	placard
+🪨	symbol	rock
+🪩	symbol	mirror ball
+🪪	symbol	identification card
+🪫	symbol	low battery
+🪬	symbol	hamsa
+🪭	symbol	folding hand fan
+🪮	symbol	hair pick
+🪯	symbol	khanda
+🫃	symbol	pregnant man
+🫄	symbol	pregnant person
+🫅	symbol	person with crown
+🫎	symbol	moose
+🫏	symbol	donkey
+🫠	symbol	melting face
+🫡	symbol	saluting face
+🫢	symbol	face with open eyes and hand over mouth
+🫣	symbol	face with peeking eye
+🫤	symbol	face with diagonal mouth
+🫥	symbol	dotted line face
+🫦	symbol	biting lip
+🫧	symbol	bubbles
+🫨	symbol	shaking face
+⛩	travel	shinto shrine
+⛪	travel	church 教堂
+⛰	travel	mountain
+⛱	travel	umbrella on ground
+⛲	travel	fountain
+⛳	travel	flag in hole
+⛴	travel	ferry
+⛵	travel	sailboat
+⛺	travel	tent
+⛽	travel	fuel pump
+✈	travel	airplane 飛機
+✉	travel	envelope
+🌀	travel	cyclone
+🌁	travel	foggy
+🌂	travel	closed umbrella
+🌃	travel	night with stars
+🌄	travel	sunrise over mountains
+🌅	travel	sunrise
+🌆	travel	cityscape at dusk
+🌇	travel	sunset over buildings
+🌈	travel	rainbow 彩虹
+🌉	travel	bridge at night
+🌊	travel	water wave 海 浪
+🌋	travel	volcano
+🌌	travel	milky way
+🌍	travel	earth globe europe africa 地球
+🌎	travel	earth globe americas
+🌏	travel	earth globe asia australia
+🌐	travel	globe with meridians
+🌑	travel	new moon symbol
+🌒	travel	waxing crescent moon symbol
+🌓	travel	first quarter moon symbol
+🌔	travel	waxing gibbous moon symbol
+🌕	travel	full moon symbol
+🌖	travel	waning gibbous moon symbol
+🌗	travel	last quarter moon symbol
+🌘	travel	waning crescent moon symbol
+🌙	travel	crescent moon 月
+🌚	travel	new moon with face
+🌛	travel	first quarter moon with face
+🌜	travel	last quarter moon with face
+🌝	travel	full moon with face
+🌞	travel	sun with face
+🌟	travel	glowing star 星
+🌠	travel	shooting star
+🌡	travel	thermometer
+🌤	travel	white sun with small cloud
+🌥	travel	white sun behind cloud
+🌦	travel	white sun behind cloud with rain
+🌧	travel	cloud with rain 落雨
+🌨	travel	cloud with snow
+🌩	travel	cloud with lightning
+🌪	travel	cloud with tornado
+🌫	travel	fog
+🌬	travel	wind blowing face
+🗺	travel	world map
+🗻	travel	mount fuji
+🗼	travel	tokyo tower 塔
+🗽	travel	statue of liberty
+🗾	travel	silhouette of japan
+🗿	travel	moyai
+🚀	travel	rocket 火箭
+🚁	travel	helicopter 直升機
+🚂	travel	steam locomotive 火車
+🚃	travel	railway car
+🚄	travel	high speed train
+🚅	travel	high speed train with bullet nose
+🚆	travel	train
+🚇	travel	metro 地鐵
+🚈	travel	light rail
+🚉	travel	station
+🚊	travel	tram
+🚋	travel	tram car
+🚌	travel	bus 巴士
+🚍	travel	oncoming bus
+🚎	travel	trolleybus
+🚏	travel	bus stop
+🚐	travel	minibus
+🚑	travel	ambulance 救護車
+🚒	travel	fire engine 消防車
+🚓	travel	police car
+🚔	travel	oncoming police car
+🚕	travel	taxi 的士
+🚖	travel	oncoming taxi
+🚗	travel	automobile 車
+🚘	travel	oncoming automobile
+🚙	travel	recreational vehicle
+🚚	travel	delivery truck
+🚛	travel	articulated lorry
+🚜	travel	tractor
+🚝	travel	monorail
+🚞	travel	mountain railway
+🚟	travel	suspension railway
+🚠	travel	mountain cableway
+🚡	travel	aerial tramway
+🚢	travel	ship 船
+🚣	travel	rowboat
+🚤	travel	speedboat
+🚥	travel	horizontal traffic light
+🚦	travel	vertical traffic light 紅綠燈
+🚧	travel	construction sign
+🚨	travel	police cars revolving light
+🚩	travel	triangular flag on post
+🚪	travel	door
+🚫	travel	no entry sign 禁止
+🚬	travel	smoking symbol
+🚭	travel	no smoking symbol
+🚮	travel	put litter in its place symbol
+🚯	travel	do not litter symbol
+🚰	travel	potable water symbol
+🚱	travel	non potable water symbol
+🚲	travel	bicycle 單車
+🚳	travel	no bicycles
+🚷	travel	no pedestrians
+🚸	travel	children crossing
+🚹	travel	mens symbol
+🚺	travel	womens symbol
+🚻	travel	restroom
+🚼	travel	baby symbol
+🚽	travel	toilet
+🚾	travel	water closet
+🚿	travel	shower
+🛁	travel	bathtub
+🛂	travel	passport control
+🛃	travel	customs
+🛄	travel	baggage claim
+🛅	travel	left luggage
+🛋	travel	couch and lamp
+🛍	travel	shopping bags
+🛎	travel	bellhop bell
+🛏	travel	bed
+🛐	travel	place of worship
+🛑	travel	octagonal sign
+🛒	travel	shopping trolley 買嘢
+🛕	travel	hindu temple
+🛖	travel	hut
+🛗	travel	elevator
+🛜	travel	wireless
+🛝	travel	playground slide
+🛞	travel	wheel
+🛟	travel	ring buoy
+🛠	travel	hammer and wrench
+🛡	travel	shield
+🛢	travel	oil drum
+🛣	travel	motorway
+🛤	travel	railway track
+🛥	travel	motor boat
+🛩	travel	small airplane
+🛫	travel	airplane departure
+🛬	travel	airplane arriving
+🛰	travel	satellite
+🛳	travel	passenger ship
+🛴	travel	scooter
+🛵	travel	motor scooter 綿羊仔
+🛶	travel	canoe
+🛷	travel	sled
+🛸	travel	flying saucer
+🛹	travel	skateboard
+🛺	travel	auto rickshaw
+🛻	travel	pickup truck
+🛼	travel	roller skate
+🇭🇰	flag	flag hk hong kong 香港 旗
+🇹🇼	flag	flag tw taiwan 台灣 旗
+🇨🇳	flag	flag cn china 中國 旗
+🇯🇵	flag	flag jp japan 日本 旗
+🇰🇷	flag	flag kr korea 韓國 旗
+🇺🇸	flag	flag us united states america 美國 旗
+🇬🇧	flag	flag gb united kingdom britain 英國 旗
+🇫🇷	flag	flag fr france 法國 旗
+🇩🇪	flag	flag de germany 德國 旗
+🇮🇹	flag	flag it italy 意大利 旗
+🇪🇸	flag	flag es spain 西班牙 旗
+🇵🇹	flag	flag pt portugal 葡萄牙 旗
+🇳🇱	flag	flag nl netherlands 荷蘭 旗
+🇧🇪	flag	flag be belgium 旗
+🇨🇭	flag	flag ch switzerland 瑞士 旗
+🇸🇪	flag	flag se sweden 瑞典 旗
+🇳🇴	flag	flag no norway 旗
+🇩🇰	flag	flag dk denmark 旗
+🇫🇮	flag	flag fi finland 旗
+🇷🇺	flag	flag ru russia 俄羅斯 旗
+🇺🇦	flag	flag ua ukraine 旗
+🇨🇦	flag	flag ca canada 加拿大 旗
+🇲🇽	flag	flag mx mexico 旗
+🇧🇷	flag	flag br brazil 巴西 旗
+🇦🇷	flag	flag ar argentina 旗
+🇦🇺	flag	flag au australia 澳洲 旗
+🇳🇿	flag	flag nz new zealand 紐西蘭 旗
+🇮🇳	flag	flag in india 印度 旗
+🇮🇩	flag	flag id indonesia 印尼 旗
+🇲🇾	flag	flag my malaysia 馬來西亞 旗
+🇸🇬	flag	flag sg singapore 新加坡 旗
+🇹🇭	flag	flag th thailand 泰國 旗
+🇻🇳	flag	flag vn vietnam 越南 旗
+🇵🇭	flag	flag ph philippines 菲律賓 旗
+🇲🇴	flag	flag mo macau 澳門 旗
+🇹🇷	flag	flag tr turkey 旗
+🇬🇷	flag	flag gr greece 希臘 旗
+🇵🇱	flag	flag pl poland 旗
+🇮🇪	flag	flag ie ireland 旗
+🇦🇹	flag	flag at austria 旗
+🇨🇿	flag	flag cz czechia 旗
+🇮🇱	flag	flag il israel 旗
+🇸🇦	flag	flag sa saudi arabia 旗
+🇦🇪	flag	flag ae united arab emirates 旗
+🇪🇬	flag	flag eg egypt 埃及 旗
+🇿🇦	flag	flag za south africa 旗
+🇳🇬	flag	flag ng nigeria 旗
+🇰🇪	flag	flag ke kenya 旗
+🇵🇰	flag	flag pk pakistan 旗
+🇧🇩	flag	flag bd bangladesh 旗
+🇳🇵	flag	flag np nepal 旗
+🏳	flag	flag white 旗
+🏴	flag	flag black 旗
+🏁	flag	flag chequered checkered finish 終點 旗
+🚩	flag	flag triangular 旗

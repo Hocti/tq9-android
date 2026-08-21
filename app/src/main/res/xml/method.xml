@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<input-method xmlns:android="http://schemas.android.com/apk/res/android"
+    android:settingsActivity="hk.tq9.ui.SettingsActivity"
+    android:supportsSwitchingToNextInputMethod="true">
+    <!-- 中英數全部喺同一個鍵盤入面自己切，所以系統嗰度只出一個「九万」 -->
+    <subtype
+        android:label="@string/ime_name"
+        android:imeSubtypeLocale="zh_HK"
+        android:imeSubtypeMode="keyboard"
+        android:isAsciiCapable="true" />
+</input-method>

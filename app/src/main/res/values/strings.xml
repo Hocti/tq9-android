@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">九万輸入法</string>
+    <string name="ime_name">九万</string>
+    <string name="subtype_zh">九万中文</string>
+    <string name="subtype_en">TQ9 English</string>
+</resources>
