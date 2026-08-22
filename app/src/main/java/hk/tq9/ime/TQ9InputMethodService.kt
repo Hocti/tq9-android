@@ -39,11 +39,13 @@ import hk.tq9.core.BarMode
 import hk.tq9.core.ClipHistory
 import hk.tq9.core.EmojiDict
 import hk.tq9.core.EnDict
+import hk.tq9.core.NextWordModel
 import hk.tq9.core.Prefs
 import hk.tq9.core.Q9Db
 import hk.tq9.core.Q9Cmd
 import hk.tq9.core.Q9Engine
 import hk.tq9.core.UsageStats
+import hk.tq9.swipe.GestureDecoder
 import hk.tq9.ui.MicPermissionActivity
 import kotlin.math.abs
 import kotlin.math.roundToInt
@@ -81,6 +83,8 @@ class TQ9InputMethodService : android.inputmethodservice.InputMethodService(),
 
     private var emailField = false
     private var pinField = false
+    /** URL／email／密碼／關咗提示嘅欄：唔好自作聰明補空格（見 [autoSpaceAfterPunct]） */
+    private var noAutoSpaceField = false
     private var hasSelection = false
     private val latinComposing = StringBuilder()
     private var latinSuggestions: List<String> = emptyList()
@@ -98,6 +102,8 @@ class TQ9InputMethodService : android.inputmethodservice.InputMethodService(),
     private var latinSwiped = false
     /** 滑完之後夾硬出候選欄，等 user 揀第二個字（就算條 bar 本身係關住） */
     private var forceCandidates = false
+    /** 啱啱完成嘅上一個英文字，畀 [hk.tq9.core.NextWordModel] 估下一個字用 */
+    private var lastCommittedWord = ""
     private var lastShiftTapAt = 0L
 
     // 搵 emoji：打嘅字唔會入去個欄，淨係用嚟篩
@@ -208,7 +214,9 @@ class TQ9InputMethodService : android.inputmethodservice.InputMethodService(),
         latinComposing.setLength(0)
         latinSuggestions = emptyList()
         latinWordDone = false
+        latinSwiped = false
         forceCandidates = false
+        lastCommittedWord = ""
         endEmojiSearch()
         hideOverlay()
         engine.cancel()
@@ -223,9 +231,15 @@ class TQ9InputMethodService : android.inputmethodservice.InputMethodService(),
             variation == InputType.TYPE_TEXT_VARIATION_WEB_EMAIL_ADDRESS
         val isNumberPassword = cls == InputType.TYPE_CLASS_NUMBER &&
             variation == InputType.TYPE_NUMBER_VARIATION_PASSWORD
+        val isUri = variation == InputType.TYPE_TEXT_VARIATION_URI
+        val isPassword = variation == InputType.TYPE_TEXT_VARIATION_PASSWORD ||
+            variation == InputType.TYPE_TEXT_VARIATION_WEB_PASSWORD ||
+            variation == InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD
+        val noSuggestions = (info.inputType and InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS) != 0
 
         emailField = isEmail
         pinField = isNumberPassword
+        noAutoSpaceField = isUri || isEmail || isPassword || isNumberPassword || noSuggestions
         latinPad?.emailMode = isEmail
         numberPad?.pinMode = isNumberPassword
         hasSelection = currentInputConnection?.getSelectedText(0)?.isNotEmpty() == true
@@ -233,9 +247,7 @@ class TQ9InputMethodService : android.inputmethodservice.InputMethodService(),
         val want = when {
             cls == InputType.TYPE_CLASS_NUMBER || cls == InputType.TYPE_CLASS_PHONE ||
                 cls == InputType.TYPE_CLASS_DATETIME -> PadMode.NUMBER
-            isEmail || variation == InputType.TYPE_TEXT_VARIATION_URI ||
-                variation == InputType.TYPE_TEXT_VARIATION_PASSWORD ||
-                variation == InputType.TYPE_TEXT_VARIATION_WEB_PASSWORD -> PadMode.LATIN
+            isEmail || isUri || isPassword -> PadMode.LATIN
             else -> PadMode.CHINESE
         }
         switchMode(want, force = true)
@@ -300,6 +312,8 @@ class TQ9InputMethodService : android.inputmethodservice.InputMethodService(),
             PadMode.LATIN -> {
                 // 20 萬字嘅詞庫，見到英文 view 先至喺背景偷偷載，唔會阻住開鍵盤
                 EnDict.preloadAsync(this)
+                NextWordModel.preloadAsync(this)
+                preloadGestureDecoder()
                 (latinPad ?: LatinPadView(this).also {
                     it.host = this; it.latinHost = this; it.applyTheme(theme); latinPad = it
                 }).also { it.emailMode = emailField }
@@ -350,12 +364,28 @@ class TQ9InputMethodService : android.inputmethodservice.InputMethodService(),
     override fun charFreq(ch: String): Int = UsageStats.get(this).charFreq(ch)
     override fun bigramCount(pair: String): Int = UsageStats.get(this).bigramCount(pair)
 
+    /**
+     * 開關標點（長撳 `0`）。兩種情況唔同做法：
+     *
+     *  - **揀住咗一段字** → 「」係**包住**佢，唔係取代佢：`揀咗嘅字` → `「揀咗嘅字」`。
+     *    （`commitText` 本身係取代揀咗嗰段，所以要自己接返段字入中間。）
+     *  - **冇揀字** → 出一對「」，再將 caret 移返兩個標點**中間**，等打得落去。
+     */
     override fun commitPair(pair: String) {
         val ic = currentInputConnection ?: return
         val parts = Q9Db.splitGraphemes(pair)
         val open = parts.firstOrNull() ?: return
         val close = parts.drop(1).joinToString("")
         ic.beginBatchEdit()
+
+        val selected = ic.getSelectedText(0)?.toString().orEmpty()
+        if (selected.isNotEmpty()) {
+            // 包住揀咗嗰段，caret 擺喺收嗰個標點後面（成段嘢已經圈好，唔使再打）
+            ic.commitText(open + selected + close, 1)
+            ic.endBatchEdit()
+            return
+        }
+
         ic.commitText(open + close, 1)
         val et = ic.getExtractedText(ExtractedTextRequest(), 0)
         if (et != null && et.selectionStart >= close.length) {
@@ -392,7 +422,7 @@ class TQ9InputMethodService : android.inputmethodservice.InputMethodService(),
             KeyAction.HOMO -> engine.cmd(Q9Cmd.HOMO)
             KeyAction.TO_CHINESE -> switchMode(PadMode.CHINESE)
             KeyAction.TO_LATIN -> switchMode(PadMode.LATIN)
-            KeyAction.TO_SYMBOL -> switchMode(PadMode.SYMBOL)
+            KeyAction.TO_SYMBOL -> { switchMode(PadMode.SYMBOL); symbolPad?.page = 0 }
             KeyAction.TO_NUMBER -> switchMode(PadMode.NUMBER)
             KeyAction.TO_EMOJI -> openEmoji()
             KeyAction.PASTE -> paste()
@@ -451,6 +481,7 @@ class TQ9InputMethodService : android.inputmethodservice.InputMethodService(),
         val ic = currentInputConnection ?: return
         finishLatinComposing()
         latinWordDone = false
+        lastCommittedWord = ""
         ic.beginBatchEdit()
         repeat(abs(dx)) {
             sendDpad(if (dx > 0) KeyEvent.KEYCODE_DPAD_RIGHT else KeyEvent.KEYCODE_DPAD_LEFT)
@@ -490,13 +521,21 @@ class TQ9InputMethodService : android.inputmethodservice.InputMethodService(),
             if (pad.shift != ShiftState.OFF) s = s.uppercase()
             if (pad.shift == ShiftState.ON) { pad.shift = ShiftState.OFF; pad.rebuild() }
             latinWordDone = false
-            latinSwiped = false
             forceCandidates = false
-            // 新字開頭、前面貼住標點（. , ? !）冇隔空格：先補返個 space
-            if (latinComposing.isEmpty()) autoSpaceAfterPunct()
+            // 新字開頭：記低上一個字做 next-word context，再睇下要唔要補返個 space
+            if (latinComposing.isEmpty()) {
+                lastCommittedWord = wordCharsBefore()
+                autoSpaceAfterPunct()
+            }
+            if (latinSwiped) {
+                // 啱啱滑出嚟、仲未打過字母嗰個字，而家打緊字 → 唔係 swipe，
+                // 即刻取消 underline（composing）狀態，個字變返做普通已入嘅字
+                currentInputConnection?.finishComposingText()
+                latinSwiped = false
+            }
             latinComposing.append(s)
-            currentInputConnection?.setComposingText(latinComposing, 1)
-            latinSuggestions = EnDict.get()?.fromPrefix(latinComposing.toString()) ?: emptyList()
+            currentInputConnection?.commitText(s, 1)
+            latinSuggestions = latinTypingSuggestions()
             refreshBars()
             return
         }
@@ -506,11 +545,21 @@ class TQ9InputMethodService : android.inputmethodservice.InputMethodService(),
         if (mode == PadMode.CHINESE) engine.cancel().also { onStateChanged() }
     }
 
-    /** 前面貼住 `. , ? !` 又冇隔空格嘅話，打新字之前自己補一個 */
+    /**
+     * 前面貼住 `, ? !` 又冇隔空格嘅話，打新字之前自己補一個。
+     *
+     * **句號（`.`）故意唔喺呢個表入面。** 打網址（`google.com`）、小數、檔名、縮寫
+     * 全部都係「字母 + `.` + 字母」，同「句尾 + 新句」喺打嗰一刻**分唔開**
+     * （`google.` 同 `Hello.` 前面嗰橛一模一樣咁普通），試過用 token 內容去估都靠唔住。
+     * 補錯個空格會直接搞到網址打唔到，所以情願唔補 —— 想斷句就自己撳 ␣。
+     *
+     * URL／email／密碼欄再加多重保險，成個 auto-space 都熄埋（見 [noAutoSpaceField]）。
+     */
     private fun autoSpaceAfterPunct() {
+        if (noAutoSpaceField) return
         val ic = currentInputConnection ?: return
         val before = ic.getTextBeforeCursor(1, 0)?.toString().orEmpty()
-        if (before.isNotEmpty() && before[0] in ".,?!") ic.commitText(" ", 1)
+        if (before.isNotEmpty() && before[0] in ",?!") ic.commitText(" ", 1)
     }
 
     /**
@@ -549,14 +598,11 @@ class TQ9InputMethodService : android.inputmethodservice.InputMethodService(),
                 refreshBars()
                 return
             }
+            // 已經冇 underline（唔係啱啱滑出嚟未打過字），啲字已經直接 commit 咗入個欄，
+            // 剷返上一個字母淨係要刪返個字元，唔使再郁 composing
             latinComposing.setLength(latinComposing.length - 1)
-            if (latinComposing.isEmpty()) {
-                currentInputConnection?.finishComposingText()
-                latinSuggestions = emptyList()
-            } else {
-                currentInputConnection?.setComposingText(latinComposing, 1)
-                latinSuggestions = EnDict.get()?.fromPrefix(latinComposing.toString()) ?: emptyList()
-            }
+            currentInputConnection?.deleteSurroundingText(1, 0)
+            latinSuggestions = if (latinComposing.isEmpty()) emptyList() else latinTypingSuggestions()
             refreshBars()
             return
         }
@@ -572,9 +618,18 @@ class TQ9InputMethodService : android.inputmethodservice.InputMethodService(),
             return
         }
         if (emojiSearch) { emojiQuery.append(' '); syncEmojiComposing(); refreshEmojiResults(); return }
+        // 打緊嗰個字未 commit 就已經係「上一個字」；未打緊字就攞返個欄度貼住 caret 嗰個字
+        val prevWord = if (mode == PadMode.LATIN) {
+            (if (latinComposing.isNotEmpty()) latinComposing.toString() else wordCharsBefore())
+        } else ""
         finishLatinComposing()
         latinWordDone = false
         currentInputConnection?.commitText(" ", 1)
+        if (mode == PadMode.LATIN && prevWord.isNotEmpty()) {
+            lastCommittedWord = prevWord
+            latinSuggestions = NextWordModel.get()?.predictNext(prevWord) ?: emptyList()
+            refreshBars()
+        }
     }
 
     private fun enter() {
@@ -607,6 +662,17 @@ class TQ9InputMethodService : android.inputmethodservice.InputMethodService(),
         latinSuggestions = emptyList()
         forceCandidates = false
         latinSwiped = false
+    }
+
+    /**
+     * 打緊字嗰陣（[latinComposing] 唔係空）出嘅提示：先用 [lastCommittedWord] 做 context
+     * 揾 bigram 夾 prefix 嘅字（AOSP 標準嘅 N-gram 做法），唔夠先用 [EnDict] 補齊。
+     */
+    private fun latinTypingSuggestions(): List<String> {
+        val prefix = latinComposing.toString().lowercase()
+        val model = NextWordModel.get()
+        if (model != null) return model.suggestWithPrefix(lastCommittedWord, prefix)
+        return EnDict.get()?.fromPrefix(prefix) ?: emptyList()
     }
 
     private fun toggleSc() {
@@ -796,13 +862,25 @@ class TQ9InputMethodService : android.inputmethodservice.InputMethodService(),
             }
             else -> {
                 val w = latinSuggestions.getOrNull(index) ?: return
-                currentInputConnection?.commitText(w, 1)
+                val ic = currentInputConnection ?: return
+                // 未 swipe 過（冇 composing region）嘅字係逐個字母直接 commit 落個欄嘅，
+                // 揀候選要自己剷返成個字先夾得返（swipe 出嚟嗰陣仲有 composing，commitText 會自動取代）
+                val wasTypedPrefix = !latinSwiped && latinComposing.isNotEmpty()
+                // composing 係空、又未 swiped → 呢個係「下一個字」預測嘅提示，唔係補完緊打嘅字
+                val wasNextWordPick = mode == PadMode.LATIN && !latinSwiped && latinComposing.isEmpty()
+                if (wasTypedPrefix) ic.deleteSurroundingText(latinComposing.length, 0)
+                ic.commitText(w, 1)
+                if (wasNextWordPick) ic.commitText(" ", 1)
                 latinComposing.setLength(0)
                 latinSuggestions = emptyList()
                 // 揀咗個完整嘅字 → 下次滑就係下一個字（會自動加空格）
                 latinWordDone = true
                 latinSwiped = false
                 forceCandidates = false
+                if (mode == PadMode.LATIN) {
+                    lastCommittedWord = w
+                    latinSuggestions = NextWordModel.get()?.predictNext(w) ?: emptyList()
+                }
                 refreshBars()
             }
         }
@@ -915,24 +993,25 @@ class TQ9InputMethodService : android.inputmethodservice.InputMethodService(),
     // ---- LatinPadView.LatinHost -------------------------------------------
 
     /**
-     * 滑完一次。呢度做三件事：
+     * 滑完一次。呢度做四件事：
      *
      *  1. 上一個字係滑出嚟（或者喺候選欄揀咗）嘅話，今次就當**下一個字** ——
      *     自動加返個空格，唔會好似以前咁 `setComposingText` 蓋咗上一個字。
      *  2. 冇（1）嘅話就攞 caret **前後**已經打咗嘅字母做 context：
      *     個欄係 `dis|y`，滑 `p→l→a` 就搵到 `display`（唔使成個字滑晒）。
-     *  3. 出候選欄畀 user 揀第二個字，就算條 bar 本身係關住。
+     *  3. 用 [GestureDecoder] 將條原始軌跡同字典做形狀比對，揀最夾嘅幾個字。
+     *  4. 出候選欄畀 user 揀第二個字，就算條 bar 本身係關住。
      */
-    override fun onSwipeLetters(letters: List<Char>) {
-        if (letters.size < 2) return
+    override fun onSwipePath(path: List<Float>, keyCenter: (Char) -> Pair<Float, Float>?, keyWidth: Float) {
+        val decoder = gestureDecoder() ?: return
         if (emojiSearch) {
-            emojiQuery.append(letters.joinToString(""))
+            val word = decoder.decode(path, keyCenter, keyWidth).firstOrNull() ?: return
+            emojiQuery.append(word)
             syncEmojiComposing()
             refreshEmojiResults()
             return
         }
         val ic = currentInputConnection ?: return
-        val dict = EnDict.get()
         ic.beginBatchEdit()
         finishLatinComposing()
 
@@ -949,10 +1028,18 @@ class TQ9InputMethodService : android.inputmethodservice.InputMethodService(),
         }
 
         // context 夾唔到就一步步放寬，唔好因為前後有嘢就一個字都出唔到
-        var words = lookup(dict, letters, pre, suf)
-        if (words.isEmpty() && suf.isNotEmpty()) { suf = ""; words = lookup(dict, letters, pre, "") }
-        if (words.isEmpty() && pre.isNotEmpty()) { pre = ""; words = lookup(dict, letters, "", "") }
-        if (words.isEmpty()) words = listOf(letters.joinToString(""))
+        var words = decoder.decode(path, keyCenter, keyWidth, pre.lowercase(), suf.lowercase())
+        if (words.isEmpty() && suf.isNotEmpty()) {
+            suf = ""; words = decoder.decode(path, keyCenter, keyWidth, pre.lowercase(), "")
+        }
+        if (words.isEmpty() && pre.isNotEmpty()) {
+            pre = ""; words = decoder.decode(path, keyCenter, keyWidth, "", "")
+        }
+        if (words.isEmpty()) {
+            // 乜都揾唔到，唔好屈硬出啲嘢 —— 當呢次滑冇發生過
+            ic.endBatchEdit()
+            return
+        }
 
         // 攞咗前後嗰啲字母入個字度，就要喺個欄度剷返佢哋走
         if (pre.isNotEmpty() || suf.isNotEmpty()) ic.deleteSurroundingText(pre.length, suf.length)
@@ -965,6 +1052,7 @@ class TQ9InputMethodService : android.inputmethodservice.InputMethodService(),
         ic.endBatchEdit()
 
         latinSuggestions = shown
+        lastCommittedWord = first
         latinWordDone = true
         latinSwiped = true
         forceCandidates = true
@@ -972,8 +1060,27 @@ class TQ9InputMethodService : android.inputmethodservice.InputMethodService(),
         refreshBars()
     }
 
-    private fun lookup(dict: EnDict?, letters: List<Char>, pre: String, suf: String): List<String> =
-        dict?.fromGesture(letters, pre.lowercase(), suf.lowercase()).orEmpty()
+    @Volatile private var gestureDecoderCache: GestureDecoder? = null
+
+    private fun gestureDecoder(): GestureDecoder? {
+        gestureDecoderCache?.let { return it }
+        val dict = EnDict.get() ?: return null
+        return GestureDecoder(dict).also { gestureDecoderCache = it }
+    }
+
+    /** 見到英文 view 就喺背景砌埋（bucket index 要行成個詞庫），唔使等第一次滑先起 */
+    private fun preloadGestureDecoder() {
+        if (gestureDecoderCache != null) return
+        Thread({
+            var dict = EnDict.get()
+            var waited = 0L
+            while (dict == null && waited < 5000L) {
+                Thread.sleep(50); waited += 50
+                dict = EnDict.get()
+            }
+            dict?.let { gestureDecoderCache = GestureDecoder(it) }
+        }, "tq9-gesture-decoder").apply { priority = Thread.MIN_PRIORITY }.start()
+    }
 
     /** caret 前面貼住嘅英文字母（`dis|y` → `dis`） */
     private fun wordCharsBefore(): String {

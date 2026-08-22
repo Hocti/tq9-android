@@ -83,6 +83,28 @@ class GestureKeyTrackerTest {
     }
 
     @Test
+    fun `慢手由 7 一條直線拉去 9：中間嘅 8 一樣唔應該出`() {
+        // user 報過嘅誤觸：想撳 790，慢慢拉過 8 就白白多咗個 8 出嚟變咗 789。
+        // 留喺 8 度嘅時間遠超 dwellMs，但係速度由頭到尾一樣 —— 嗰個係「經過」唔係「撳」。
+        val path = ArrayList<Triple<Float, Float, Long>>()
+        path.add(Triple(center(7).first, center(7).second, 0L))
+        path.addAll(leg(center(7), center(9), 900, 0))
+        assertEquals(listOf(7, 9), run(path))
+    }
+
+    @Test
+    fun `慢手拉，但係喺 8 度真係停一停再走：呢個先至算撳咗 8`() {
+        // 同上面一模一樣咁慢，分別淨係喺 8 度有個清楚嘅「停低再加速」
+        val path = ArrayList<Triple<Float, Float, Long>>()
+        path.add(Triple(center(7).first, center(7).second, 0L))
+        path.addAll(leg(center(7), center(8), 400, 0))
+        var t = 400L
+        repeat(12) { t += 16; path.add(Triple(center(8).first, center(8).second, t)) }
+        path.addAll(leg(center(8), center(9), 400, t))
+        assertEquals(listOf(7, 8, 9), run(path))
+    }
+
+    @Test
     fun `喺 8 度停低：就算冇轉角都要出`() {
         val path = ArrayList<Triple<Float, Float, Long>>()
         path.add(Triple(center(7).first, center(7).second, 0L))

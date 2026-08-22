@@ -76,10 +76,11 @@ class LatinPadView(context: Context) : RowsPadView(context) {
 
     interface LatinHost {
         /**
-         * 滑完一次滑過嘅字母。**唔係**喺呢度查詞庫 —— host 要連 caret 前後
-         * 已經打咗嘅字母一齊計（`dis|y` 滑 `pla` = `display`），所以淨係交返啲字母出去。
+         * 滑完一次嘅原始軌跡（x,y 交替）連埋「邊個字母個鍵中心喺邊」一齊拋畀 host。
+         * **唔係**喺呢度查詞庫 —— host 要用 [hk.tq9.swipe.GestureDecoder] 做形狀比對，
+         * 仲要連 caret 前後已經打咗嘅字母一齊計（`dis|y` 滑 `pla` = `display`）。
          */
-        fun onSwipeLetters(letters: List<Char>)
+        fun onSwipePath(path: List<Float>, keyCenter: (Char) -> Pair<Float, Float>?, keyWidth: Float)
     }
 
     var latinHost: LatinHost? = null
@@ -94,8 +95,6 @@ class LatinPadView(context: Context) : RowsPadView(context) {
     /** 搵 emoji 嗰陣：打嘅字唔入去，而係篩上面條 bar 嘅 emoji */
     var emojiSearchMode: Boolean = false
         set(v) { if (field != v) { field = v; rebuild() } }
-
-    private val gestureLetters = ArrayList<Char>(24)
 
     /**
      * 長撳彈出嘅變體 list，第一個一定係 [c] 自己本身 —— 撳實唔郁直接放手
@@ -140,7 +139,11 @@ class LatinPadView(context: Context) : RowsPadView(context) {
         if (emojiSearchMode) r3.add(Key(KeyAction.TO_CHINESE, label = "中", weight = 1f))
         else r3.add(ch("/"))
         if (emailMode) {
-            r3.add(Key(KeyAction.CHAR, label = "@", text = "@", weight = 1f))
+            // 長撳 @：可以揀常用信箱域名，第一個照舊係 @ 本身
+            r3.add(Key(
+                KeyAction.CHAR, label = "@", text = "@", weight = 1f,
+                variants = listOf("@", "@gmail.com", "@hotmail.com")
+            ))
             r3.add(Key(KeyAction.SPACE, label = "␣", weight = 2.4f))
             // 長撳 .com：.com.hk、.net 呢啲常用尾巴，第一個照舊係 .com 本身
             r3.add(Key(
@@ -179,20 +182,30 @@ class LatinPadView(context: Context) : RowsPadView(context) {
         return if (c in 'a'..'z') c - 'a' else GestureKeyTracker.NO_KEY
     }
 
-    override fun onSwipeStart() {
-        gestureLetters.clear()
-        tracker.minSegPx = dp(10f)
-    }
-
-    /** 英文係放手先出字，所以呢度淨係 buffer */
-    override fun onGestureKey(index: Int) {
-        val c = ('a' + index)
-        if (gestureLetters.isEmpty() || gestureLetters.last() != c) gestureLetters.add(c)
-    }
-
     override fun onSwipeEnd() {
-        if (gestureLetters.size < 2) { gestureLetters.clear(); return }
-        latinHost?.onSwipeLetters(ArrayList(gestureLetters))
-        gestureLetters.clear()
+        if (tracker.points.size < 4) return // 至少要有兩個點先夾到條軌跡
+        latinHost?.onSwipePath(ArrayList(tracker.points), ::keyCenter, avgLetterKeyWidth())
+    }
+
+    /** 邊個字母個鍵中心喺邊，畀 [hk.tq9.swipe.GestureDecoder] 砌「理想路徑」用 */
+    private fun keyCenter(c: Char): Pair<Float, Float>? {
+        for (b in boxes) {
+            val k = b.key
+            if (k.action == KeyAction.CHAR && k.text.length == 1 && k.text[0] == c) return b.cx to b.cy
+        }
+        return null
+    }
+
+    /** 用嚟將軌跡距離正規化，唔同螢幕、唔同鍵盤大細都夾得返 */
+    private fun avgLetterKeyWidth(): Float {
+        var total = 0f
+        var n = 0
+        for (b in boxes) {
+            val k = b.key
+            if (k.action == KeyAction.CHAR && k.text.length == 1 && k.text[0] in 'a'..'z') {
+                total += b.w; n++
+            }
+        }
+        return if (n > 0) total / n else dp(40f)
     }
 }

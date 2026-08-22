@@ -4,6 +4,7 @@ import kotlin.math.abs
 import kotlin.math.atan2
 import kotlin.math.hypot
 import kotlin.math.max
+import kotlin.math.min
 
 /**
  * Swype 式滑動：除咗起點同終點之外，靠「軌跡」推斷中途撳過邊幾個鍵。
@@ -39,6 +40,12 @@ class GestureKeyTracker(
         private const val ACCEPT = 0.62f
         /** 計「入角 / 出角」時向後望幾耐，太短會俾手震影響，太長就變咗弦線方向 */
         private const val DIR_WINDOW_MS = 60L
+        /** 計即時速度嘅回望窗 */
+        private const val SPEED_WINDOW_MS = 50L
+        /** 喺格入面最慢嗰陣要慢過平均速度咁多倍，先當「真係停低咗」 */
+        private const val STOP_RATIO = 0.35f
+        /** 停低之後要再加速返咁多倍，先當「撳完再走」（唔係就淨係愈行愈慢） */
+        private const val REACCEL_RATIO = 2f
     }
 
     /** 角位判定至少要喺格內行過幾遠（由 view 按格大小設定） */
@@ -57,6 +64,8 @@ class GestureKeyTracker(
     ) {
         var lastX = enterX; var lastY = enterY; var lastT = enterT
         var pathLen = 0f
+        /** 喺呢格入面見過最慢嘅即時速度，未取樣過就係 [Float.MAX_VALUE] */
+        var minSpeed = Float.MAX_VALUE
     }
 
     private var cur: Visit? = null
@@ -105,6 +114,8 @@ class GestureKeyTracker(
         } else if (key == v.key || key == NO_KEY) {
             v.pathLen += step
             v.lastX = x; v.lastY = y; v.lastT = t
+            // 入咗格之後行夠一個 window 先取樣，唔係個 window 會望返上一格嗰段快速移動
+            if (t - v.enterT >= SPEED_WINDOW_MS) v.minSpeed = min(v.minSpeed, speedBack(t))
         } else {
             // 離開咗上一格 → 依家先決定佢算唔算撳過
             decideAndEmit(v, x, y, t)
@@ -127,6 +138,20 @@ class GestureKeyTracker(
         var i = times.size - 1
         while (i > 0 && now - times[i] < DIR_WINDOW_MS) i--
         return (cx - points[i * 2]) to (cy - points[i * 2 + 1])
+    }
+
+    /**
+     * 由 [now] 向後望 [SPEED_WINDOW_MS] 毫秒嘅**位移**速度（px/ms）。
+     * 用位移唔用路程：喺一格度打圈／震手，位移細，一樣當佢停低咗。
+     */
+    private fun speedBack(now: Long): Float {
+        if (times.size < 2) return 0f
+        val cx = points[points.size - 2]
+        val cy = points[points.size - 1]
+        var i = times.size - 1
+        while (i > 0 && now - times[i] < SPEED_WINDOW_MS) i--
+        val dt = max(1L, now - times[i])
+        return hypot(cx - points[i * 2], cy - points[i * 2 + 1]) / dt
     }
 
     /** 放手：最尾嗰格一定計；喺度停夠耐就當連撳兩下 */
@@ -160,14 +185,19 @@ class GestureKeyTracker(
         val dwell = max(0L, exitT - v.enterT)
         val elapsed = max(1L, exitT - startT)
         val refSpeed = totalPath / elapsed
-        val inSpeed = (v.pathLen + hypot(exitX - v.lastX, exitY - v.lastY)) / max(1L, dwell)
 
-        // 1) 停留 / 減速
-        var geo = (dwell.toFloat() / dwellMs).coerceIn(0f, 1f) * 0.6f
-        if (dwell >= dwellMs) geo = 1f
-        if (dwell >= dwellMs / 2 && refSpeed > 0f && inSpeed < 0.4f * refSpeed) {
-            geo = max(geo, 0.8f)
-        }
+        // 1) 真係喺呢格停低／明顯減速再加速走
+        //
+        //    **唔可以淨係睇喺格入面留咗幾耐** —— 慢慢地一條直線由 7 拉去 9，
+        //    喺 8 度一樣會留好耐，但嗰個係「經過」，唔係「撳」。以前純粹計時間
+        //    （留夠 dwellMs 就 1.0 分），慢手拉 7→9 就會白白多咗個 8 出嚟。
+        //    所以要見到速度真係「跌落去、再彈返上嚟」（V 形）先算數。
+        var geo = 0f
+        val exitSpeed = speedBack(exitT)
+        val dipped = v.minSpeed < Float.MAX_VALUE && refSpeed > 0f &&
+            v.minSpeed < STOP_RATIO * refSpeed
+        val reaccel = exitSpeed > v.minSpeed * REACCEL_RATIO
+        if (dipped && reaccel) geo = if (dwell >= dwellMs) 1f else 0.8f
 
         // 2) 轉角：比較「入格嘅即時方向」同「離格嘅即時方向」
         val travelled = v.pathLen + hypot(exitX - v.lastX, exitY - v.lastY)

@@ -93,14 +93,22 @@ ACTION_DOWN 用 `boxNear()`（搵唔到就攞 14dp 內最近嗰粒），
 ```
 core/   Q9Db       sqlite 存取、assets 安裝、換 db、weight prefix 統計
         Q9Engine   九万狀態機（Q9Form.cs 移植），唔掂 Android UI
-        EnDict     5 萬字英文詞庫（blob + starts + weight，慳記憶體）
+        EnDict     5 萬字英文詞庫（blob + starts + weight，慳記憶體），淨係
+                   `fromPrefix` 打字提示 + `word`/`charAt`/`weightAt` 呢幾個
+                   public accessor 畀 `GestureDecoder`／`EnTrie` 用
+        EnTrie     英文 unigram trie，每個節點快取住自己嗰個 prefix 之下
+                   常用度最高嘅幾個完整字（AOSP 標準做法）
+        NextWordModel 揀完一個字之後估下一個字：bigram（assets/en_bigram.txt）
+                   做主，冇 context／夾唔到 prefix 就跌落 EnTrie 嘅全域常用字
         EmojiDict  assets/emoji.txt，分類 + 用英文／中文關鍵字搵
         ClipHistory clipboard 歷史（JSON 存喺 Prefs）
         AiRewrite  Gemini generateContent，改寫揀咗嗰段字
         UsageStats 另一個 sqlite（usage_stats.db，同 dataset.db 分開）：
                    連續兩個中文字嘅 bigram 次數、每隻字打咗幾多次
         Prefs      全部設定
-swipe/  GestureKeyTracker   滑動中間鍵判定（純 Kotlin，有 unit test）
+swipe/  GestureKeyTracker   中文九宮格滑動中間鍵判定（純 Kotlin，有 unit test）
+        GestureDecoder      英文 swipe 認字：AOSP 手勢輸入嗰套概念嘅 Kotlin 版
+                   （軌跡 vs 候選字理想路徑做形狀比對，唔係逐格判斷撳咗邊粒鍵）
 ime/    TQ9InputMethodService   IME 主體，所有 view 嘅 host
         KeyboardBaseView        排版／畫鍵／掂觸／畫線／長撳 popup／長撳 ␣ 郁 caret
         ChinesePadView          九宮格（KeyboardBaseView）
@@ -229,15 +237,63 @@ ui/     SettingsActivity / MicPermissionActivity
 分數 = 幾何信心(0~1) + 0.35 × weight信心(-1~+1)  ≥ 0.62 就當撳咗
 ```
 
-- 幾何：停留耐 / 減速再加速、入格出格方向轉得夠多
+- 幾何：**明顯減速再加速**（V 形）、入格出格方向轉得夠多
 - weight：`mapped_table.weight` 砌成 prefix 權重表（`Q9Db.prefixPlausibility`），
   加咗呢一碼之後完全冇字就 -1 直接剔走，大路字碼就加分
 - **起點同終點永遠計**，唔會被 weight 否決
 
+#### 中間格**唔可以**淨係計「留咗幾耐」
+
+以前係「喺格入面留夠 `dwellMs` 就俾滿分」。呢個係錯嘅，user 報過：慢手由 `7`
+一條直線拉去 `9`，喺 `8` 度留嘅時間一樣過到 `dwellMs`，就白白多咗個 `8`，
+`790` 變咗 `789`。**留得耐 ≠ 撳咗** —— 慢慢經過都會留得耐。
+
+而家要見到速度真係「跌落去、再彈返上嚟」先算數（`decideAndEmit`）：
+
+```
+dipped  = 格入面最慢嘅即時速度 < STOP_RATIO(0.35) × 成個 gesture 嘅平均速度
+reaccel = 出格速度 > 最慢速度 × REACCEL_RATIO(2)
+兩個都成立先有分（停夠 dwellMs = 1.0，唔夠 = 0.8）
+```
+
+即時速度用 `speedBack()`（回望 50ms 嘅**位移**，唔係路程 —— 喺一格度打圈／
+震手位移細，一樣當停低咗）。`Visit.minSpeed` 喺入格夠 50ms 之後先開始取樣，
+唔係個 window 會望返上一格嗰段快速移動。改呢度一定要跑
+`GestureKeyTrackerTest`，入面有「慢手直線拉唔可以出中間格」同「慢手但真係
+停一停就要出」兩個對照 case。
+
+#### 滑動淨係喺打碼階段行
+
+入咗選字模式啲數字鍵已經唔再係碼，而係「揀第幾個字」同 `0` = 揭下一頁 ——
+user 報過滑 `7→9→0` 出到字之後，最尾嗰個 `0` 走咗去揭第二頁。兩邊一齊擋：
+
+- **未起手**：`ChinesePadView.canSwipe()` 要求 `!engine.selectMode`，
+  tracker 根本唔會 start，所以連條線都畫唔出。
+- **滑到一半先入選字模式**：`onGestureKey()` 見到 `engine.selectMode` 就叫
+  `abortSwipe()`。`KeyboardBaseView` 收到之後：`swipeDelegate` 唔再派鍵出去、
+  `drawTrail()` 即刻唔畫、ACTION_UP 亦都**唔會**行 `tracker.finish()`
+  （唔係最尾嗰格會補多下，一樣走咗去揀字／揭頁）。
+
+畫線同出鍵要一齊停 —— 得個線繼續行但係冇反應，user 會以為部嘢壞咗。
+
+#### 選字模式嘅 `0`：向左掃 = 上一頁
+
+`0` 撳一下係「下頁」，但係冇掣返上一頁。所以 `KeyboardBaseView` 有一套
+**flick**（同 swipe 分開，唔經 `GestureKeyTracker`）：`canFlick(key)` 講明邊粒鍵
+撳住左右掃有意思，`onFlick(key, dx)` 收方向。`ChinesePadView` 淨係喺選字模式
+嘅 `0` 開，`dx < 0` 就 `engine.cmd(Q9Cmd.PREV)`（`addPage(-1)` 會由第一頁捲返
+最後一頁）。向右冇特別意思，照當撳咗「下頁」。
+
+flick 鍵喺 ACTION_MOVE **唔會**「拖去隔離格」，亦都會 `cancelPending()` 熄咗
+長撳（唔係掃掃下會彈咗開關標點出嚟）；掃夠 `flickMinPx`（≥ 2 個 touch slop）
+同埋橫向大過縱向先算數。
+
 中文係**即時出碼**：離開一格就即刻 `engine.press()`，九宮格內容即刻變。
-滑 `7→9→3` 畫直角 = 順序撳咗三下。英文就相反，`onGestureKey` 只係 buffer，
-放手之後**由 IME service**（唔係 `LatinPadView`）查詞庫 —— 因為要連 caret
-前後啲字母一齊計。
+滑 `7→9→3` 畫直角 = 順序撳咗三下（`GestureKeyTracker` 逐格判斷）。**英文唔用呢套** —— `LatinPadView.onSwipeEnd()` 淨係將
+`tracker.points`（原始軌跡，`GestureKeyTracker` 一樣有 buffer，淨係唔理佢個
+per-key 判斷）連埋 `keyCenter` 拋畀 IME service，放手之後**由 IME service**
+（唔係 `LatinPadView`）用 `GestureDecoder` 查詞庫 —— 因為要連 caret 前後啲
+字母一齊計，亦要成條軌跡一次過同候選字比對，唔係逐格判斷。
 
 ### 長撳 = 連撳（九宮格）
 
@@ -252,18 +308,62 @@ ui/     SettingsActivity / MicPermissionActivity
 
 `0` 冇 `holdRepeat`，因為佢長撳係開關標點。
 
+## 開關標點（長撳 `0`）：包住 vs 移 caret
+
+`Q9Engine` 揀完一對標點係行 `host?.commitPair()`（**唔係** `commitText`），
+`TQ9InputMethodService.commitPair()` 分兩種情況：
+
+- **揀住咗一段字** → 「」**包住**佢：`揀咗嘅字` 變 `「揀咗嘅字」`。
+  注意 `commitText` 本身係**取代**揀咗嗰段，所以一定要自己
+  `getSelectedText()` 攞返段字接埋落中間，唔係就會蓋咗人哋段字。
+- **冇揀字** → 出一對「」，再將 caret 移返兩個標點**中間**（`setSelection`，
+  attach 唔到 `getExtractedText` 就跌落去發 DPAD_LEFT）。
+
+長撳 `0` 嗰下（`onLongPress` → `Q9Cmd.OPENCLOSE`）淨係改 engine 狀態，
+唔會 commit 任何嘢，所以 app 嗰邊揀住嘅字一路留到揀完標點先用得着。
+
+### 長撳變體 popup：永遠向上彈 + 絕對位置揀
+
+兩樣嘢都踩過坑，唔好改返轉頭：
+
+- **永遠向上彈**（`popupTop = max(0f, box.top - popupItemH - 6dp)`）。以前係
+  「頂行冇位就向下彈」，結果英文數字行（`numRow` 開咗嗰陣 digits 係第 0 行）
+  長撳 `0` 會向下彈到老遠蓋住第二行鍵，撳都撳唔到。頂行冇位就頂住個頂畫，
+  同粒鍵疊少少冇所謂 —— 手指左右兩邊嗰啲照見到。
+- **揀邊個 = 手指而家喺邊個格上面（絕對位置）**，唔係「行咗幾多步」。用相對
+  步數嗰陣，貼邊嘅鍵（`p`、`0`）成行變體會俾 `popupLeft` 嘅 clamp 迫住向左推，
+  睇到嘅高亮同手指位置完全對唔上，變成點拉都揀唔到。
+- 但係「長撳完唔郁直接放手 = 打返粒鍵本身」要保住：`popupMoved` 未行夠一個
+  `slop` 之前一律當第一個（`variants` 第一個永遠係粒鍵自己）。
+
 ### 英文滑動：空格、context、候選欄
 
-`onSwipeLetters()` 一次過處理三樣嘢，改其中一樣之前睇清楚另外兩樣：
+`TQ9InputMethodService.onSwipePath()` 一次過處理四樣嘢，改其中一樣之前睇清楚
+另外幾樣：
 
 - `latinWordDone`（啱啱滑完／喺候選欄揀完一個字）→ 今次係**下一個字**，
   補個空格，唔攞前面嗰個字做 context。冇咗佢就會變返以前嗰個 bug：
   `setComposingText` 蓋咗上一個字。
 - 唔係嘅話就攞 caret 前後貼住嘅字母做 `prefix` / `suffix`
-  （`EnDict.fromGesture(seq, prefix, suffix)`），出到字之後要
-  `deleteSurroundingText(pre.length, suf.length)` 剷返啲舊字母。
-  夾唔到就一步步放寬（先甩 suffix、再甩 prefix），唔好一次都出唔到。
+  （`GestureDecoder.decode(path, keyCenter, keyWidth, prefix, suffix)`），
+  出到字之後要 `deleteSurroundingText(pre.length, suf.length)` 剷返啲舊字母。
+  夾唔到就一步步放寬（先甩 suffix、再甩 prefix），乜都揾唔到就當呢次滑
+  冇發生過（唔會屈硬出啲垃圾字）。
 - `forceCandidates` 令 `refreshBars()` 夾硬出候選段，就算 `barMode` 係 OFF／TOOLS。
+- 滑出嚟嗰個字會即刻 `setComposingText`（underline），但**淨係呢個狀態**先有
+  underline —— 一打字（唔係 swipe）就即刻 `finishComposingText()` 取消，變返
+  普通已入嘅字（`typeChar()` 見到 `latinSwiped` 就即刻做）。
+
+### 自動補空格：句號（`.`）**唔可以**加返落去
+
+`autoSpaceAfterPunct()` 淨係喺 `, ? !` 後面補空格。**句號故意唔喺個表入面**：
+打網址（`google.com`）、小數、檔名、縮寫全部都係「字母 + `.` + 字母」，
+同「句尾 + 開新句」喺打嗰一刻**分唔開** —— `google.` 同 `Hello.` 前面嗰橛
+一模一樣咁普通，試過用 token 內容去估都靠唔住。補錯個空格會直接搞到網址
+打唔到（user 報過：「簡直打不了」）。想斷句就自己撳 ␣。
+
+URL／email／密碼／`TYPE_TEXT_FLAG_NO_SUGGESTIONS` 嘅欄再加多重保險：
+`noAutoSpaceField` 會令成個 auto-space 熄晒。
 
 ## 英文詞庫
 
@@ -276,16 +376,32 @@ ui/     SettingsActivity / MicPermissionActivity
   背景 thread 低優先次序，未載完 `EnDict.get()` 回 null，當冇提示就算，UI 唔會 lag。
 - 內部用一條 `blob: String` + `starts: IntArray` + `weight: FloatArray`，
   唔係一堆 String object。比對直接喺 blob 上面行，唔好加 substring。
-- `EnDict.fromGesture` 兩條路：
-  - **精準路徑**（`strictFromGesture`）：頭尾字母一定要啱、成串字母要係目標字嘅
-    subsequence，揀字 = `使用頻率(ln) - 長度差罰分`。滑得靚嗰陣好準。
-  - **鬆路徑**（`looseFromGesture`）：精準路徑乜都揾唔到（多數係中間掃錯／
-    多咗粒鍵，例如 `v` 畫咗喺 `b` 度）先至用——淨係信第一個字母，喺
-    `bucketsByFirst`（file 頭 2 萬個最常用字，按第一個字母分桶）度用 LCS
-    （`shapeScore`）計形狀夾唔夾，但**常用度為主**：weight 差幾多就要 shape
-    差成倍先追得返，情願估一個形狀差好遠但成日見嘅字，都好過估一個形狀啱晒
-    但未見過嘅怪字。改呢兩條路嘅分數公式之前，睇返 `EnDictRealDataTest` 用真
-    字典夾唔夾得到常見字。
+- `EnDict` 本身**冇** swipe 認字邏輯，淨係 `word`/`charAt`/`weightAt`/`wordLength`
+  呢幾個 public accessor 畀 `GestureDecoder` 用。
+
+### 英文 swipe 認字：`GestureDecoder`（AOSP 手勢輸入嗰套概念）
+
+唔再逐格判斷「撳咗邊粒鍵」（`GestureKeyTracker` 嗰套 dwell/轉角 heuristic 只有
+中文九宮格仲用緊）。改成成條手指軌跡（`tracker.points`）一次過同候選字嘅
+「理想路徑」（逐個字母嘅鍵中心連成線，連續重複字母收埋做一格）比對形狀＋位置：
+
+1. 首尾字母分桶粗篩候選（`byFirstLast`），夾唔到就放寬做淨係信第一個字母
+   （`byFirst`，file 頭 2 萬個常用字）。
+2. 兩條軌跡都用弧長重新取樣做固定 32 點（`resample`，$1 recognizer 嗰套做法），
+   逐點計距離攞平均（`pathCost`），再加埋首尾點距離嘅額外罰分（`ENDPOINT_WEIGHT`）。
+3. 距離用 `keyWidth` 正規化（唔同螢幕、唔同鍵盤大細都夾到），再同
+   `ln(頻率) × LM_WEIGHT` 夾埋做總分。
+4. 改呢個評分公式之前，睇返 `EnDictRealDataTest`（真字典 + 手震雜訊都要夾到）
+   同 `EnDictTest`（fake 座標，形狀＋常用度都要試到）。
+
+### 揀完一個字，估下一個字：`NextWordModel`
+
+`EnTrie`（unigram trie，bottom-up 快取每個節點嘅 top-K 常用字）+
+`assets/en_bigram.txt`（`word1 word2 頻率`，依家係人手揀嘅常見詞組種子數據，
+唔係真語料統計出嚟，之後要換成真 corpus 就跟同一個格式重新產生呢個檔就得）。
+`space()` / `onPickCandidate()` 揀完字就攞 `NextWordModel.predictNext(prevWord)`
+入 `latinSuggestions`；打緊下一個字就用 `suggestWithPrefix(prevWord, prefix)`
+—— bigram 夾 prefix 嘅擺前面，唔夠先用 `EnTrie.completions()` 補位。
 
 ---
 

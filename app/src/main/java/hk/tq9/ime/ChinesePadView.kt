@@ -6,6 +6,7 @@ import android.graphics.Rect
 import android.graphics.RectF
 import hk.tq9.core.PadFunc
 import hk.tq9.core.Prefs
+import hk.tq9.core.Q9Cmd
 import hk.tq9.core.Q9Engine
 import hk.tq9.swipe.GestureKeyTracker
 import kotlin.math.min
@@ -130,7 +131,12 @@ class ChinesePadView(context: Context, private val engine: Q9Engine) : KeyboardB
 
     // ---- 滑動 -------------------------------------------------------------
 
-    override fun canSwipe(key: Key) = key.action == KeyAction.DIGIT && Prefs.swipeEnabled(context)
+    /**
+     * **淨係打碼階段先至滑得**。入咗選字模式啲數字鍵已經唔再係碼，
+     * 而係「揀第幾個字」同埋 `0` = 揭下一頁，滑過去等於亂咁揀字揭頁。
+     */
+    override fun canSwipe(key: Key) =
+        key.action == KeyAction.DIGIT && Prefs.swipeEnabled(context) && !engine.selectMode
 
     override fun swipeKeyAt(x: Float, y: Float): Int {
         for (d in 0..9) {
@@ -145,9 +151,26 @@ class ChinesePadView(context: Context, private val engine: Q9Engine) : KeyboardB
     /**
      * 中文係即時出鍵：滑過 7→9→3 就等於順序撳咗三下，
      * 每出一碼九宮格嘅內容就會即刻變（唔係放手先一次過計）。
+     *
+     * 打夠碼入咗選字模式就 [abortSwipe] —— 唔係最尾嗰下（包括
+     * `GestureKeyTracker.finish()` 補嗰下）會變成揀字／揭頁。
+     * 例：滑 `7→9→0`，出到 `79` 已經夠碼出字，跟落嚟嗰個 `0` 唔可以攞去揭第二頁。
      */
     override fun onGestureKey(index: Int) {
+        if (engine.selectMode) { abortSwipe(); return }
         chineseHost?.pressDigit(index)
+        // 撳完呢一碼啱啱夠字出候選 → 之後嗰啲鍵唔可以再當碼用
+        if (engine.selectMode) abortSwipe()
+    }
+
+    /** 選字模式嘅 `0` 係「下頁」，向左掃就係返轉頭上一頁 */
+    override fun canFlick(key: Key) =
+        key.action == KeyAction.DIGIT && key.digit == 0 && engine.selectMode
+
+    override fun onFlick(key: Key, dx: Float): Boolean {
+        if (dx >= 0f) return false // 向右冇特別意思，照當撳咗「下頁」
+        engine.cmd(Q9Cmd.PREV)
+        return true
     }
 
     // ---- 畫面 -------------------------------------------------------------

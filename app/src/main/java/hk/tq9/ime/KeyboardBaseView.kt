@@ -15,9 +15,10 @@ import android.view.View
 import android.view.ViewConfiguration
 import hk.tq9.core.Prefs
 import hk.tq9.swipe.GestureKeyTracker
+import kotlin.math.abs
 import kotlin.math.hypot
+import kotlin.math.max
 import kotlin.math.min
-import kotlin.math.roundToInt
 
 /**
  * 所有鍵盤 view 嘅共同部份：排版、畫鍵、掂觸（撳／長撳／連撳／滑動畫線）。
@@ -68,6 +69,8 @@ abstract class KeyboardBaseView(context: Context) : View(context) {
     private var downY = 0f
     private var swiping = false
     private var longFired = false
+    /** 子類喺 gesture 中途叫咗停（見 [abortSwipe]）：唔再出鍵，連條線都唔畫 */
+    private var swipeAborted = false
     // 長撳 ␣ 之後入咗「郁 caret」模式
     private var cursorMode = false
     private var cursorX = 0f
@@ -84,6 +87,8 @@ abstract class KeyboardBaseView(context: Context) : View(context) {
     private var popupItemW = 0f
     private var popupItemH = 0f
     private var popupAnchorX = 0f
+    /** 手指行夠 [slop] 之後先至跟住揀，之前一律當第一個（見 [updateVariantPopup]） */
+    private var popupMoved = false
 
     private val longPressRunnable = Runnable {
         val b = pressed ?: return@Runnable
@@ -169,6 +174,7 @@ abstract class KeyboardBaseView(context: Context) : View(context) {
     }
 
     private fun drawTrail(canvas: Canvas) {
+        if (swipeAborted) return
         if (!swiping || tracker.points.size < 4) return
         trailPath.reset()
         val p = tracker.points
@@ -187,11 +193,10 @@ abstract class KeyboardBaseView(context: Context) : View(context) {
 
     /**
      * 好似一般英文鍵盤咁：長撳彈出一行變體，跟住唔好放手，左右拉去揀，放手先入。
-     * 頂行嘅鍵冇位向上彈就改為向下彈。
      *
-     * 揀邊個係按**手指行咗幾遠**，唔係按絕對位置 —— 變體多起上嚟成行會迫到貼邊，
-     * 絕對位置嘅話喺左右兩邊嘅鍵永遠揀唔到第一個。用相對移動就一定由第一個開始，
-     * 想要數字就長撳完直接放手，唔使拖。
+     * **永遠向上彈**，唔會向下 —— 向下彈嗰陣啲掣會跌咗落鍵盤外面（底行）或者
+     * 走去老遠蓋住第二行鍵（頂行），兩樣都撳唔到。頂行冇位就頂住個頂（`0`）畫，
+     * 寧願同粒鍵疊少少，手指左右兩邊嗰啲照見到。
      */
     private fun openVariantPopup(box: KeyBox) {
         val items = box.key.variants
@@ -201,16 +206,27 @@ abstract class KeyboardBaseView(context: Context) : View(context) {
         popupItemH = box.h * 0.92f
         val total = popupItemW * items.size
         popupLeft = (box.cx - popupItemW / 2f).coerceIn(0f, maxOf(0f, width - total))
-        val above = box.top - popupItemH - dp(6f)
-        popupTop = if (above >= 0f) above else box.bottom + dp(6f)
+        popupTop = max(0f, box.top - popupItemH - dp(6f))
         popupAnchorX = downX
         popupIndex = 0
+        popupMoved = false
     }
 
+    /**
+     * 揀邊個 = **手指而家喺邊個格上面**（絕對位置），唔係「行咗幾多步」——
+     * 用相對步數嗰陣，貼邊嘅鍵（例如 `p`、`0`）成行變體會被迫住向左推開，
+     * 睇到嘅高亮同手指喺邊完全對唔上，變成點拉都揀唔到，所以改咗做絕對位置。
+     *
+     * 但係「長撳完唔郁直接放手 = 打返粒鍵本身」呢個習慣要保住：手指未行夠
+     * 一個 [slop] 之前一律當第一個（＝粒鍵自己），行夠先至跟手指走。
+     */
     private fun updateVariantPopup(x: Float) {
         if (popupItems.isEmpty()) return
-        val steps = ((x - popupAnchorX) / popupItemW).roundToInt()
-        popupIndex = steps.coerceIn(0, popupItems.size - 1)
+        if (!popupMoved) {
+            if (abs(x - popupAnchorX) < slop) return
+            popupMoved = true
+        }
+        popupIndex = ((x - popupLeft) / popupItemW).toInt().coerceIn(0, popupItems.size - 1)
     }
 
     private fun closeVariantPopup(commit: Boolean) {
@@ -266,6 +282,7 @@ abstract class KeyboardBaseView(context: Context) : View(context) {
                 downX = x; downY = y
                 swiping = false
                 longFired = false
+                swipeAborted = false
                 cursorMode = false
                 host?.feedback(b.key)
                 handler.postDelayed(longPressRunnable, Prefs.longPressMs(context))
@@ -291,6 +308,10 @@ abstract class KeyboardBaseView(context: Context) : View(context) {
                         swiping = true
                         cancelPending()
                         onSwipeStart()
+                    } else if (pressed?.let { canFlick(it.key) } == true) {
+                        // 掃鍵（例如選字模式嘅 0）：唔好拖去隔離格，
+                        // 亦都唔好等長撳彈嘢出嚟，放手嗰陣先算方向
+                        cancelPending()
                     } else {
                         // 唔支援滑動嘅鍵：可以拖去隔離格
                         val b = boxNear(x, y)
@@ -324,14 +345,26 @@ abstract class KeyboardBaseView(context: Context) : View(context) {
                     return true
                 }
                 if (swiping) {
-                    tracker.move(x, y, t)
-                    tracker.finish(x, y, t)
-                    onSwipeEnd()
+                    // 中途叫咗停（例如中文入咗選字模式）就乜都唔做 ——
+                    // 連 finish() 補嗰下都唔可以出，唔係最尾嗰格會走咗去揀字／揭頁
+                    if (swipeAborted) {
+                        tracker.cancel()
+                    } else {
+                        tracker.move(x, y, t)
+                        tracker.finish(x, y, t)
+                        onSwipeEnd()
+                    }
                     swiping = false
                 } else {
                     tracker.cancel()
                     val b = pressed
-                    if (b != null && !longFired) host?.onKey(b.key)
+                    if (b != null && !longFired) {
+                        val dx = x - downX
+                        val dy = y - downY
+                        val flicked = canFlick(b.key) && abs(dx) >= flickMinPx &&
+                            abs(dx) > abs(dy) && onFlick(b.key, dx)
+                        if (!flicked) host?.onKey(b.key)
+                    }
                 }
                 pressed = null
                 invalidate()
@@ -417,10 +450,35 @@ abstract class KeyboardBaseView(context: Context) : View(context) {
     /** 滑動時只會考慮部份鍵（中文 0~9、英文 a~z），子類決定 */
     protected open fun swipeKeyAt(x: Float, y: Float): Int = GestureKeyTracker.NO_KEY
 
+    /**
+     * gesture 行到一半先知道唔應該再收（例如中文打夠碼入咗選字模式）：
+     * 之後嗰啲 [onGestureKey] 全部唔算，條線亦都即刻唔畫，放手嗰下亦都唔會補多下。
+     */
+    protected fun abortSwipe() {
+        if (swipeAborted) return
+        swipeAborted = true
+        invalidate()
+    }
+
+    /**
+     * 呢粒鍵撳住向左／右掃有冇特別意思（例如選字模式嘅 `0`：向左掃 = 上一頁）。
+     * 回 true 就唔會再當佢「拖去隔離格」，亦都唔會等長撳。
+     */
+    protected open fun canFlick(key: Key): Boolean = false
+
+    /** 掃咗。[dx] 負數 = 向左。回傳 true = 處理咗，唔使再當短撳 */
+    protected open fun onFlick(key: Key, dx: Float): Boolean = false
+
+    /** 掃幾遠先算數（唔好同普通手震撞） */
+    private val flickMinPx: Float get() = max(slop * 2f, dp(20f))
+
     private val swipeDelegate = object : GestureKeyTracker.Delegate {
         override fun keyAt(x: Float, y: Float) = swipeKeyAt(x, y)
         override fun plausibility(key: Int) = gesturePlausibility(key)
-        override fun onGestureKey(key: Int) = this@KeyboardBaseView.onGestureKey(key)
+        override fun onGestureKey(key: Int) {
+            if (swipeAborted) return
+            this@KeyboardBaseView.onGestureKey(key)
+        }
     }
 
     // ---- 畫鍵小工具 --------------------------------------------------------
