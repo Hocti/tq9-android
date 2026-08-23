@@ -32,13 +32,14 @@ class NumberPadView(context: Context) : RowsPadView(context) {
         }
         // 數字鍵長撳出符號（1 → !、4 → 各國銀紙），同英文鍵盤嗰行數字一樣
         fun d(n: Int) = digitKey(n.toString(), bigLabel = true)
+        // 底行左邊兩粒一定係「返去中文／英文」，⌫ 一定喺 ⏎ 上面 —— 全部鍵盤一樣
         return listOf(
-            listOf(d(1), d(2), d(3), Key(KeyAction.BACKSPACE, label = "⌫", repeatable = true)),
-            listOf(d(4), d(5), d(6), Key(KeyAction.CHAR, label = "-", text = "-")),
-            listOf(d(7), d(8), d(9), Key(KeyAction.CHAR, label = ".", text = ".")),
+            listOf(d(1), d(2), d(3), Key(KeyAction.CHAR, label = "-", text = "-")),
+            listOf(d(4), d(5), d(6), Key(KeyAction.CHAR, label = ".", text = ".")),
+            listOf(d(7), d(8), d(9), Key(KeyAction.BACKSPACE, label = "⌫", repeatable = true)),
             listOf(
-                Key(KeyAction.TO_LATIN, label = "ABC"), d(0),
                 Key(KeyAction.TO_CHINESE, label = "中", bigLabel = true),
+                Key(KeyAction.TO_LATIN, label = "ABC"), d(0),
                 Key(KeyAction.ENTER, label = "⏎", accent = true)
             )
         )

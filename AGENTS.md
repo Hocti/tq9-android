@@ -49,6 +49,16 @@ adb shell ime set    hk.tq9/.ime.TQ9InputMethodService
 左下角淨返粒 `🌐`（成格闊）—— `🎤` 搬咗上工具 bar，喺 `📋` 隔籬，
 亦都係左上角嗰粒鍵揀得嘅其中一個 `PadFunc`。
 
+### 底行嘅規矩（英文／符號／純數字）
+
+- **左下兩粒一定係「返去中文／英文」**（`中`、`ABC`）—— 中文九宮格例外，
+  佢自己就係中文，左下角係 `Eng`。
+- **`⏎` 上面嗰粒一定係 `⌫`**。所以符號頁嘅分頁掣（`=\<`／`?123`）同 `⌫`
+  都喺倒數第二行嘅最左同最右，純數字頁嘅 `⌫` 亦都由右上角搬咗去 `⏎` 上面。
+- 讓返出嚟嘅位：符號第一頁底行 space 右邊順住排 `, . ? ; /` 五粒（本來散喺
+  上面兩行）；第二頁唔要標點，space 同 `⏎` 拉長，`numpad` 掣再升多一行。
+- 英文底行 space 同 `.` 中間加咗粒 `?`。
+
 ### mapped_table 嘅 id 有特別意思
 
 | id | 係乜 |
@@ -111,6 +121,7 @@ swipe/  GestureKeyTracker   中文九宮格滑動中間鍵判定（純 Kotlin，
                    （軌跡 vs 候選字理想路徑做形狀比對，唔係逐格判斷撳咗邊粒鍵）
 ime/    TQ9InputMethodService   IME 主體，所有 view 嘅 host
         KeyboardBaseView        排版／畫鍵／掂觸／畫線／長撳 popup／長撳 ␣ 郁 caret
+        KeyPopup                浮喺鍵盤外面嗰啲窗（長撳變體行、滑動 hover 提示）
         ChinesePadView          九宮格（KeyboardBaseView）
         RowsPadView             一行行按 weight 分闊度嘅底
         LatinPadView / SymbolPadView / NumberPadView（RowsPadView）
@@ -231,6 +242,18 @@ ui/     SettingsActivity / MicPermissionActivity
 
 ---
 
+### 英文滑動要行夠一整格先算
+
+`swipeStartDistPx(box)` 講明拖幾遠先當「真係喺度滑」（開始畫線、放手會查詞庫）。
+預設係一個 touch slop（中文九宮格滑去隔離格就係下一碼，要即刻收），
+`LatinPadView` override 成 `max(box.w, box.h) * 1.2`：單撳嗰陣手指好易帶少少，
+一帶就變咗條好短嘅 swipe，打乜都出錯字。qwerty 上面又冇兩個字母貼住嘅英文詞，
+所以**拉到隔離格咁遠就放手，一律當誤觸**，照出返粒鍵本身。
+
+行夠一個 slop 就會 `cancelPending()`（唔好再彈長撳嗰啲嘢出嚟），但係
+`swiping` 要行夠 `swipeStartDistPx` 先至 true。`GestureKeyTracker` 由 DOWN
+嗰下就一路收埋成條軌跡，所以夠距離之後條線／認字係由**起點**計起，冇甩頭。
+
 ## 滑動判定（三個線索）
 
 ```
@@ -322,19 +345,34 @@ per-key 判斷）連埋 `keyCenter` 拋畀 IME service，放手之後**由 IME s
 長撳 `0` 嗰下（`onLongPress` → `Q9Cmd.OPENCLOSE`）淨係改 engine 狀態，
 唔會 commit 任何嘢，所以 app 嗰邊揀住嘅字一路留到揀完標點先用得着。
 
-### 長撳變體 popup：永遠向上彈 + 絕對位置揀
+### 長撳變體 popup：PopupWindow，永遠向上彈 + 絕對位置揀
 
-兩樣嘢都踩過坑，唔好改返轉頭：
+**用 `KeyPopup`（`PopupWindow`）畫，唔係喺 `KeyboardBaseView.onDraw` 度畫。**
+喺 view 入面畫一定俾 view 邊界剪走，最頂嗰行就永遠彈唔出鍵盤外面。`KeyPopup`
+開咗 `isClippingEnabled = false` + `isAttachedInDecor = false`，個窗出得 IME
+window 範圍，彈上 app 嗰邊；`isTouchable = false`，所以 touch 一路都係
+`KeyboardBaseView` 收，長撳完照樣拉得去揀。
 
-- **永遠向上彈**（`popupTop = max(0f, box.top - popupItemH - 6dp)`）。以前係
+幾樣踩過坑，唔好改返轉頭：
+
+- **永遠向上彈**（`popupTop = box.top - popupItemH - 8dp`，負數都照）。以前係
   「頂行冇位就向下彈」，結果英文數字行（`numRow` 開咗嗰陣 digits 係第 0 行）
-  長撳 `0` 會向下彈到老遠蓋住第二行鍵，撳都撳唔到。頂行冇位就頂住個頂畫，
-  同粒鍵疊少少冇所謂 —— 手指左右兩邊嗰啲照見到。
+  長撳 `0` 會向下彈到老遠蓋住第二行鍵，撳都撳唔到。之後改成頂住鍵盤個頂畫，
+  又變成同粒鍵疊埋一舊俾手指遮住 —— 而家有咗 `KeyPopup` 就真係彈到鍵盤上面。
+- **字大 30%**（`KeyPopup.TEXT_RATIO = 0.53`，本來 0.40×格高），格本身亦都
+  闊咗少少（`box.w * 1.1`，最少 50dp）。手指遮住一半嗰陣要睇得清楚。
 - **揀邊個 = 手指而家喺邊個格上面（絕對位置）**，唔係「行咗幾多步」。用相對
   步數嗰陣，貼邊嘅鍵（`p`、`0`）成行變體會俾 `popupLeft` 嘅 clamp 迫住向左推，
   睇到嘅高亮同手指位置完全對唔上，變成點拉都揀唔到。
 - 但係「長撳完唔郁直接放手 = 打返粒鍵本身」要保住：`popupMoved` 未行夠一個
   `slop` 之前一律當第一個（`variants` 第一個永遠係粒鍵自己）。
+
+### 滑動 hover 提示
+
+滑動途中手指底下嗰粒鍵一定俾自己隻手遮住，所以 `updateHoverPopup()` 用同一個
+`KeyPopup` 喺**粒鍵上面**浮個大字出嚟（`hoverLabel(box)`，淨係 `LatinPadView`
+有實作，a~z 先出）。跨咗去另一粒鍵先郁個窗（`hoverBox` 擋住）—— 每次
+`PopupWindow.update()` 都係一次 window relayout，逐個 MOVE event 郁就會 lag。
 
 ### 英文滑動：空格、context、候選欄
 

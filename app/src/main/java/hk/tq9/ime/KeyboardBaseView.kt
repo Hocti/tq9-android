@@ -78,6 +78,12 @@ abstract class KeyboardBaseView(context: Context) : View(context) {
     private val slop = ViewConfiguration.get(context).scaledTouchSlop.toFloat()
     private val trailPath = Path()
 
+    /** 長撳變體、滑動 hover 兩個浮窗，兩者都出得鍵盤範圍外面（見 [KeyPopup]） */
+    private val variantPopup by lazy { KeyPopup(context) }
+    private val hoverPopup by lazy { KeyPopup(context) }
+    /** hover 浮窗而家指住邊粒鍵：同一粒就唔好再郁個窗（每次 update 都係一次 relayout） */
+    private var hoverBox: KeyBox? = null
+
     // 長撳變體 popup
     private var popupBox: KeyBox? = null
     private var popupItems: List<String> = emptyList()
@@ -170,7 +176,6 @@ abstract class KeyboardBaseView(context: Context) : View(context) {
         val down = pressed
         for (b in boxes) drawKey(canvas, b, b === down && !swiping)
         drawTrail(canvas)
-        drawVariantPopup(canvas)
     }
 
     private fun drawTrail(canvas: Canvas) {
@@ -194,22 +199,25 @@ abstract class KeyboardBaseView(context: Context) : View(context) {
     /**
      * 好似一般英文鍵盤咁：長撳彈出一行變體，跟住唔好放手，左右拉去揀，放手先入。
      *
-     * **永遠向上彈**，唔會向下 —— 向下彈嗰陣啲掣會跌咗落鍵盤外面（底行）或者
-     * 走去老遠蓋住第二行鍵（頂行），兩樣都撳唔到。頂行冇位就頂住個頂（`0`）畫，
-     * 寧願同粒鍵疊少少，手指左右兩邊嗰啲照見到。
+     * **永遠向上彈**，唔會向下 —— 向下彈就一定俾手指遮住。最頂嗰行都照樣向上彈：
+     * 用 [KeyPopup]（PopupWindow）畫，出得鍵盤範圍外面，彈上 app 嗰邊，
+     * 所以唔使再夾硬 `max(0f, …)` 頂住鍵盤個頂同粒鍵疊埋一舊。
      */
     private fun openVariantPopup(box: KeyBox) {
         val items = box.key.variants
         popupBox = box
         popupItems = items
-        popupItemW = maxOf(box.w, dp(46f))
-        popupItemH = box.h * 0.92f
+        popupItemW = maxOf(box.w * 1.1f, dp(50f))
+        popupItemH = box.h
         val total = popupItemW * items.size
         popupLeft = (box.cx - popupItemW / 2f).coerceIn(0f, maxOf(0f, width - total))
-        popupTop = max(0f, box.top - popupItemH - dp(6f))
+        popupTop = box.top - popupItemH - dp(8f)
         popupAnchorX = downX
         popupIndex = 0
         popupMoved = false
+        dismissHover()
+        variantPopup.setStyle(theme, fontScale)
+        variantPopup.showRow(this, items, popupIndex, popupLeft, popupTop, popupItemW, popupItemH)
     }
 
     /**
@@ -227,6 +235,7 @@ abstract class KeyboardBaseView(context: Context) : View(context) {
             popupMoved = true
         }
         popupIndex = ((x - popupLeft) / popupItemW).toInt().coerceIn(0, popupItems.size - 1)
+        variantPopup.highlight(popupIndex)
     }
 
     private fun closeVariantPopup(commit: Boolean) {
@@ -234,37 +243,11 @@ abstract class KeyboardBaseView(context: Context) : View(context) {
         val box = popupBox
         popupBox = null
         popupItems = emptyList()
+        variantPopup.dismiss()
         if (commit && box != null && popupIndex in items.indices) {
             val v = items[popupIndex]
             host?.onKey(Key(KeyAction.CHAR, label = v, text = v))
         }
-    }
-
-    private val popupRect = RectF()
-
-    private fun drawVariantPopup(canvas: Canvas) {
-        val items = popupItems
-        if (items.isEmpty()) return
-        val total = popupItemW * items.size
-        popupRect.set(popupLeft - dp(3f), popupTop - dp(3f),
-            popupLeft + total + dp(3f), popupTop + popupItemH + dp(3f))
-        bg.color = theme.keyFaceAlt
-        bg.style = Paint.Style.FILL
-        canvas.drawRoundRect(popupRect, radius, radius, bg)
-        for (i in items.indices) {
-            val l = popupLeft + i * popupItemW
-            popupRect.set(l + dp(2f), popupTop + dp(2f),
-                l + popupItemW - dp(2f), popupTop + popupItemH - dp(2f))
-            bg.color = if (i == popupIndex) theme.keyAccent else theme.keyFace
-            canvas.drawRoundRect(popupRect, radius, radius, bg)
-            textPaint.isFakeBoldText = i == popupIndex
-            textPaint.color = if (i == popupIndex) theme.onAccentText else theme.text
-            textPaint.textSize = popupItemH * 0.44f * fontScale
-            val fm = textPaint.fontMetrics
-            canvas.drawText(items[i], (popupRect.left + popupRect.right) / 2f,
-                (popupRect.top + popupRect.bottom) / 2f - (fm.ascent + fm.descent) / 2f, textPaint)
-        }
-        textPaint.isFakeBoldText = false
     }
 
     // ---- 掂觸 -------------------------------------------------------------
@@ -305,9 +288,13 @@ abstract class KeyboardBaseView(context: Context) : View(context) {
                 val moved = hypot(x - downX, y - downY)
                 if (!swiping && moved > slop) {
                     if (tracker.active) {
-                        swiping = true
+                        // 郁咗手就唔好再彈長撳嗰啲嘢出嚟，但係未行夠 [swipeStartDistPx]
+                        // 都仲當普通撳（放手照出粒鍵），唔算滑動
                         cancelPending()
-                        onSwipeStart()
+                        if (moved >= swipeStartDistPx(pressed)) {
+                            swiping = true
+                            onSwipeStart()
+                        }
                     } else if (pressed?.let { canFlick(it.key) } == true) {
                         // 掃鍵（例如選字模式嘅 0）：唔好拖去隔離格，
                         // 亦都唔好等長撳彈嘢出嚟，放手嗰陣先算方向
@@ -325,12 +312,13 @@ abstract class KeyboardBaseView(context: Context) : View(context) {
                 }
                 if (tracker.active) {
                     tracker.move(x, y, t)
-                    if (swiping) invalidate()
+                    if (swiping) { updateHoverPopup(x, y); invalidate() }
                 }
             }
 
             MotionEvent.ACTION_UP -> {
                 cancelPending()
+                dismissHover()
                 if (popupItems.isNotEmpty()) {
                     closeVariantPopup(commit = true)
                     pressed = null
@@ -372,6 +360,7 @@ abstract class KeyboardBaseView(context: Context) : View(context) {
 
             MotionEvent.ACTION_CANCEL -> {
                 cancelPending()
+                dismissHover()
                 closeVariantPopup(commit = false)
                 tracker.cancel()
                 swiping = false
@@ -382,6 +371,41 @@ abstract class KeyboardBaseView(context: Context) : View(context) {
         }
         return true
     }
+
+    /**
+     * 拖夠幾遠先當**真係喺度滑**（開始畫線、放手會出成個字）。
+     *
+     * 預設 = [slop]（中文九宮格：滑去隔離格就係下一碼，要即刻收）。英文就要成粒鍵
+     * 咁遠先算，見 [LatinPadView.swipeStartDistPx] —— 單撳輕輕帶咗一下好易變咗
+     * 短 swipe，而英文根本冇兩個字母喺 qwerty 上面貼住嘅詞，所以拉到隔離格咁遠
+     * 就放手，一律當誤觸、照出粒鍵本身。
+     */
+    protected open fun swipeStartDistPx(box: KeyBox?): Float = slop
+
+    /**
+     * 滑動嗰陣，手指底下嗰粒鍵會俾自己隻手遮住，所以喺上面浮返個大字出嚟話你知
+     * 而家掃緊邊粒（同長撳個變體 popup 一樣用 [KeyPopup]，出得鍵盤範圍外面）。
+     */
+    private fun updateHoverPopup(x: Float, y: Float) {
+        if (swipeAborted) { dismissHover(); return }
+        val b = boxAt(x, y)
+        val label = if (b == null) null else hoverLabel(b)
+        if (b == null || label.isNullOrEmpty()) { dismissHover(); return }
+        if (b === hoverBox) return
+        hoverBox = b
+        val w = maxOf(b.w * 1.1f, dp(50f))
+        val h = b.h
+        hoverPopup.setStyle(theme, fontScale)
+        hoverPopup.showOne(this, label, b.cx, b.top - h - dp(8f), w, h)
+    }
+
+    private fun dismissHover() {
+        hoverBox = null
+        hoverPopup.dismiss()
+    }
+
+    /** 滑動經過呢粒鍵嗰陣，浮窗要寫乜（null = 唔使浮）。淨係英文用 */
+    protected open fun hoverLabel(box: KeyBox): String? = null
 
     /**
      * 拖幾多先郁一格：橫向密啲（逐個字），直向疏啲（逐行），
@@ -397,6 +421,12 @@ abstract class KeyboardBaseView(context: Context) : View(context) {
         while (y - cursorY >= stepY) { dy++; cursorY += stepY }
         while (cursorY - y >= stepY) { dy--; cursorY -= stepY }
         if (dx != 0 || dy != 0) host?.moveCursor(dx, dy)
+    }
+
+    override fun onDetachedFromWindow() {
+        super.onDetachedFromWindow()
+        variantPopup.dismiss()
+        dismissHover()
     }
 
     private fun cancelPending() {

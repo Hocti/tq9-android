@@ -3,6 +3,7 @@ package hk.tq9.ime
 import android.content.Context
 import hk.tq9.core.Prefs
 import hk.tq9.swipe.GestureKeyTracker
+import kotlin.math.max
 
 enum class ShiftState { OFF, ON, LOCK }
 
@@ -151,7 +152,8 @@ class LatinPadView(context: Context) : RowsPadView(context) {
                 variants = listOf(".com", ".com.hk", ".net", ".org", ".edu", ".gov")
             ))
         } else {
-            r3.add(Key(KeyAction.SPACE, label = "␣", weight = 4.6f))
+            r3.add(Key(KeyAction.SPACE, label = "␣", weight = 3.6f))
+            r3.add(ch("?", extra = listOf("!", "¿", "¡")))
             r3.add(ch("."))
         }
         r3.add(Key(KeyAction.ENTER, label = "⏎", weight = 1.8f, accent = true))
@@ -173,6 +175,25 @@ class LatinPadView(context: Context) : RowsPadView(context) {
     // ---- 滑動 -------------------------------------------------------------
 
     override fun canSwipe(key: Key) = key.swipeable && Prefs.swipeEnabled(context)
+
+    /**
+     * 英文要**行過成粒鍵**先當滑動，唔係一過 touch slop 就算。
+     *
+     * 單撳嗰陣手指好易帶少少，一帶就變咗條好短嘅 swipe，打乜都出錯字。
+     * qwerty 上面又冇兩個字母貼住嘅英文詞，所以「拉到隔離格咁遠就放手」
+     * 一律當誤觸 —— 唔畫線、唔查詞庫，照出返粒鍵本身。
+     */
+    override fun swipeStartDistPx(box: KeyBox?): Float {
+        val b = box ?: return super.swipeStartDistPx(null)
+        return max(b.w, b.h) * 1.2f
+    }
+
+    /** 滑動嗰陣手指遮住咗粒鍵，喺上面浮返個字母出嚟 */
+    override fun hoverLabel(box: KeyBox): String? {
+        val k = box.key
+        if (k.action != KeyAction.CHAR || k.text.length != 1 || k.text[0] !in 'a'..'z') return null
+        return displayLabel(k)
+    }
 
     override fun swipeKeyAt(x: Float, y: Float): Int {
         val b = boxAt(x, y) ?: return GestureKeyTracker.NO_KEY
