@@ -241,10 +241,12 @@ class LatinPadView(context: Context) : RowsPadView(context) {
         return max(b.w, b.h) * 1.2f
     }
 
-    /** 滑動嗰陣手指遮住咗粒鍵，喺上面浮返個字母出嚟 */
+    /** 撳落／滑動嗰陣手指遮住咗粒鍵，喺上面浮返個大字出嚟（字母、數字都要） */
     override fun hoverLabel(box: KeyBox): String? {
         val k = box.key
-        if (k.action != KeyAction.CHAR || k.text.length != 1 || k.text[0] !in 'a'..'z') return null
+        if (k.action != KeyAction.CHAR || k.text.length != 1) return null
+        val c = k.text[0]
+        if (c !in 'a'..'z' && c !in '0'..'9') return null
         return displayLabel(k)
     }
 

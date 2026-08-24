@@ -2,6 +2,7 @@ package hk.tq9.core
 
 import android.content.Context
 import android.content.SharedPreferences
+import org.json.JSONObject
 
 /** 顯示方式：中文輸入本體超過 max size 之後可以 toggle 的狀態 */
 enum class PadAlign(val label: String) {
@@ -96,6 +97,30 @@ object Prefs {
         "(if it is already English, just fix the grammar). " +
         "Output ONLY the rewritten text itself - no preamble, no explanation, " +
         "no quotation marks, no comments, nothing else.\n\n%text%"
+
+    /**
+     * 自訂 API（Gemini 以外嘅簡單 provider）。預設關閉 = 用返 Gemini。
+     * 開咗之後改用 [KEY_AI_URL] / [KEY_AI_HEADERS] / [KEY_AI_BODY] 三個範本打 HTTP POST，
+     * 再用 [KEY_AI_RESPONSE_PATH] 喺 JSON 回應入面搵返改寫完嘅字（見 `AiRewrite.callCustom`）。
+     * 三個範本入面 `%key%`＝API key、`%model%`＝模型名稱、`%prompt%`＝套用咗
+     * [KEY_AI_PROMPT] 之後嘅內容（落 body 範本時已經自動做咗 JSON escape）。
+     * 預設值係 OpenAI 相容嘅 chat completions 格式，OpenAI、Groq、DeepSeek、
+     * OpenRouter、Ollama 呢類大多數都啱用，唔啱就照住實際 API 文件改就得。
+     */
+    const val KEY_AI_USE_CUSTOM = "ai_use_custom"
+    const val KEY_AI_URL = "ai_custom_url"
+    const val KEY_AI_HEADERS = "ai_custom_headers"
+    const val KEY_AI_BODY = "ai_custom_body"
+    const val KEY_AI_RESPONSE_PATH = "ai_custom_response_path"
+
+    const val DEFAULT_AI_URL = "https://api.openai.com/v1/chat/completions"
+    const val DEFAULT_AI_HEADERS = "Authorization: Bearer %key%"
+    const val DEFAULT_AI_BODY =
+        "{\"model\":\"%model%\",\"messages\":[{\"role\":\"user\",\"content\":\"%prompt%\"}]}"
+    const val DEFAULT_AI_RESPONSE_PATH = "choices.0.message.content"
+
+    /** 成套 AI 設定（provider／key／model／prompt／自訂範本）打包做一個 profile，存喺呢個 key 底下嘅一個 JSON object */
+    const val KEY_AI_PROFILES = "ai_profiles"
 
     // 內部 state（唔喺設定頁出現）
     const val KEY_CLIP_HISTORY = "clip_history"
@@ -198,6 +223,64 @@ object Prefs {
     fun aiPrompt(ctx: Context): String =
         sp(ctx).getString(KEY_AI_PROMPT, DEFAULT_AI_PROMPT)!!.ifBlank { DEFAULT_AI_PROMPT }
 
+    fun aiUseCustom(ctx: Context) = sp(ctx).getBoolean(KEY_AI_USE_CUSTOM, false)
+    fun aiCustomUrl(ctx: Context): String =
+        sp(ctx).getString(KEY_AI_URL, DEFAULT_AI_URL)!!.ifBlank { DEFAULT_AI_URL }
+    fun aiCustomHeaders(ctx: Context): String =
+        sp(ctx).getString(KEY_AI_HEADERS, DEFAULT_AI_HEADERS)!!
+    fun aiCustomBody(ctx: Context): String =
+        sp(ctx).getString(KEY_AI_BODY, DEFAULT_AI_BODY)!!.ifBlank { DEFAULT_AI_BODY }
+    fun aiCustomResponsePath(ctx: Context): String =
+        sp(ctx).getString(KEY_AI_RESPONSE_PATH, DEFAULT_AI_RESPONSE_PATH)!!.ifBlank { DEFAULT_AI_RESPONSE_PATH }
+
     fun dbLabel(ctx: Context): String = sp(ctx).getString(KEY_DB_LABEL, "內置 dataset.db")!!
     fun setDbLabel(ctx: Context, v: String) = sp(ctx).edit().putString(KEY_DB_LABEL, v).apply()
+
+    // ---- AI profiles：save/load/delete 成套 AI 設定 -----------------------
+
+    private fun aiProfilesJson(ctx: Context): JSONObject =
+        runCatching { JSONObject(sp(ctx).getString(KEY_AI_PROFILES, "{}")!!) }
+            .getOrDefault(JSONObject())
+
+    fun aiProfileNames(ctx: Context): List<String> =
+        aiProfilesJson(ctx).keys().asSequence().toList().sorted()
+
+    /** 將而家用緊嗰套 AI 設定存做一個叫 [name] 嘅 profile（同名就覆蓋） */
+    fun saveAiProfile(ctx: Context, name: String) {
+        val profiles = aiProfilesJson(ctx)
+        val p = JSONObject().apply {
+            put("useCustom", aiUseCustom(ctx))
+            put("key", aiApiKey(ctx))
+            put("model", aiModel(ctx))
+            put("prompt", aiPrompt(ctx))
+            put("url", aiCustomUrl(ctx))
+            put("headers", aiCustomHeaders(ctx))
+            put("body", aiCustomBody(ctx))
+            put("responsePath", aiCustomResponsePath(ctx))
+        }
+        profiles.put(name, p)
+        sp(ctx).edit().putString(KEY_AI_PROFILES, profiles.toString()).apply()
+    }
+
+    /** 將叫 [name] 嘅 profile 讀返做而家用緊嗰套 AI 設定；搵唔到就乜都唔做，返 false */
+    fun loadAiProfile(ctx: Context, name: String): Boolean {
+        val p = aiProfilesJson(ctx).optJSONObject(name) ?: return false
+        sp(ctx).edit()
+            .putBoolean(KEY_AI_USE_CUSTOM, p.optBoolean("useCustom", false))
+            .putString(KEY_AI_KEY, p.optString("key", ""))
+            .putString(KEY_AI_MODEL, p.optString("model", DEFAULT_AI_MODEL))
+            .putString(KEY_AI_PROMPT, p.optString("prompt", DEFAULT_AI_PROMPT))
+            .putString(KEY_AI_URL, p.optString("url", DEFAULT_AI_URL))
+            .putString(KEY_AI_HEADERS, p.optString("headers", DEFAULT_AI_HEADERS))
+            .putString(KEY_AI_BODY, p.optString("body", DEFAULT_AI_BODY))
+            .putString(KEY_AI_RESPONSE_PATH, p.optString("responsePath", DEFAULT_AI_RESPONSE_PATH))
+            .apply()
+        return true
+    }
+
+    fun deleteAiProfile(ctx: Context, name: String) {
+        val profiles = aiProfilesJson(ctx)
+        profiles.remove(name)
+        sp(ctx).edit().putString(KEY_AI_PROFILES, profiles.toString()).apply()
+    }
 }

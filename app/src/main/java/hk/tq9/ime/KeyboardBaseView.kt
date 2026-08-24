@@ -290,6 +290,9 @@ abstract class KeyboardBaseView(context: Context) : View(context) {
                     tracker.minSegPx = min(b.w, b.h) * 0.3f
                     tracker.start(x, y, t)
                 }
+                // 一撳落去就即刻浮個大字出嚟，唔使等滑動先出（見 [hoverLabel]）；
+                // 長撳出變體 popup 嗰陣 [openVariantPopup] 自己會 [dismissHover]，換返嗰個
+                updateHoverPopup(x, y)
                 invalidate()
             }
 
@@ -325,10 +328,10 @@ abstract class KeyboardBaseView(context: Context) : View(context) {
                         }
                     }
                 }
-                if (tracker.active) {
-                    tracker.move(x, y, t)
-                    if (swiping) { updateHoverPopup(x, y); invalidate() }
-                }
+                if (tracker.active) tracker.move(x, y, t)
+                // 唔止滑動先跟：手指拖去邊，大字提示都要跟到邊（[updateHoverPopup] 同格就唔郁）
+                updateHoverPopup(x, y)
+                if (swiping) invalidate()
             }
 
             MotionEvent.ACTION_UP -> {
@@ -398,8 +401,12 @@ abstract class KeyboardBaseView(context: Context) : View(context) {
     protected open fun swipeStartDistPx(box: KeyBox?): Float = slop
 
     /**
-     * 滑動嗰陣，手指底下嗰粒鍵會俾自己隻手遮住，所以喺上面浮返個大字出嚟話你知
-     * 而家掃緊邊粒（同長撳個變體 popup 一樣用 [KeyPopup]，出得鍵盤範圍外面）。
+     * 手指底下嗰粒鍵會俾自己隻手遮住，所以喺上面浮返個大字出嚟話你知而家撳緊
+     * （或者掃緊）邊粒 —— 一撳落去就即刻出，唔使等長撳、亦唔使等滑動
+     * （同長撳個變體 popup 一樣用 [KeyPopup]，出得鍵盤範圍外面）。
+     *
+     * 邊粒鍵有呢個提示由 [hoverLabel] 決定（null = 唔浮）；長撳出咗變體 popup
+     * 就會由 [openVariantPopup] 換走佢（見嗰度嘅 [dismissHover]）。
      */
     private fun updateHoverPopup(x: Float, y: Float) {
         if (swipeAborted) { dismissHover(); return }
@@ -419,7 +426,7 @@ abstract class KeyboardBaseView(context: Context) : View(context) {
         hoverPopup.dismiss()
     }
 
-    /** 滑動經過呢粒鍵嗰陣，浮窗要寫乜（null = 唔使浮）。淨係英文用 */
+    /** 撳落／滑動經過呢粒鍵嗰陣，浮窗要寫乜（null = 唔使浮）。淨係英文／數字用 */
     protected open fun hoverLabel(box: KeyBox): String? = null
 
     /**

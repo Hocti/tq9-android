@@ -481,7 +481,12 @@ class TQ9InputMethodService : android.inputmethodservice.InputMethodService(),
 
     override fun feedback(key: Key) {
         if (Prefs.vibrate(this)) {
-            vibrator()?.vibrate(VibrationEffect.createOneShot(12, 40))
+            vibrator()?.let { v ->
+                // 部分機款（如部分 Sony Xperia）唔支援自訂震幅，
+                // 硬傳 amplitude 會令震動完全無反應，要用 DEFAULT_AMPLITUDE 做後備
+                val amplitude = if (v.hasAmplitudeControl()) 40 else VibrationEffect.DEFAULT_AMPLITUDE
+                v.vibrate(VibrationEffect.createOneShot(12, amplitude))
+            }
         }
         if (Prefs.sound(this)) {
             (getSystemService(Context.AUDIO_SERVICE) as? AudioManager)

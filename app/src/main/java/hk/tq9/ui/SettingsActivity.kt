@@ -19,6 +19,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
+import android.webkit.WebView
 import android.widget.AdapterView
 import android.widget.ArrayAdapter
 import android.widget.Button
@@ -32,7 +33,10 @@ import android.widget.Switch
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.WindowCompat
+import com.google.android.material.tabs.TabLayout
 import hk.tq9.core.BarMode
 import hk.tq9.core.PadFunc
 import hk.tq9.core.Prefs
@@ -70,6 +74,7 @@ class SettingsActivity : AppCompatActivity() {
     }
 
     private lateinit var content: LinearLayout
+    private lateinit var aiContent: LinearLayout
     private var preview: ChinesePadView? = null
     private var previewHolder: FrameLayout? = null
     private var dbLabelView: TextView? = null
@@ -86,28 +91,82 @@ class SettingsActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // targetSdk 36 預設 edge-to-edge，令到 ActionBar 個 container 浮喺 content 上面
+        // （蓋住新加嘅 TabLayout）。淨係 opt-out edge-to-edge 都唔夠解決，
+        // 索性收埋 ActionBar，個標題改由自己畫嘅 TextView 負責，先至保證唔會再疊埋一齊。
+        WindowCompat.setDecorFitsSystemWindows(window, true)
         Q9Db.ensureInstalled(this)
+        title = "九万輸入法"
+        supportActionBar?.hide()
 
-        val scroll = ScrollView(this)
-        content = LinearLayout(this).apply {
+        val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+
+        root.addView(TextView(this).apply {
+            text = "九万輸入法"
+            textSize = 20f
+            setTypeface(typeface, android.graphics.Typeface.BOLD)
+            setPadding(dp(16), dp(16), dp(16), dp(12))
+        }, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+
+        val tabs = TabLayout(this).apply {
+            addTab(newTab().setText("一般"))
+            addTab(newTab().setText("AI"))
+            addTab(newTab().setText("說明"))
+        }
+        root.addView(tabs, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+
+        val pages = FrameLayout(this)
+        root.addView(pages, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
+        setContentView(root)
+
+        val generalPane = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(16), dp(16), dp(16), dp(24))
         }
-        scroll.addView(content)
-        setContentView(scroll)
-        title = "九万輸入法"
+        val generalScroll = ScrollView(this).apply { addView(generalPane) }
 
+        aiContent = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(16), dp(16), dp(16), dp(24))
+        }
+        val aiScroll = ScrollView(this).apply { addView(aiContent) }
+
+        val helpView = buildHelpView()
+
+        val panelLp = FrameLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
+        pages.addView(generalScroll, panelLp)
+        pages.addView(aiScroll, FrameLayout.LayoutParams(panelLp))
+        pages.addView(helpView, FrameLayout.LayoutParams(panelLp))
+
+        content = generalPane
         buildImeSection()
         buildDbSection()
         buildSizeSection()
         buildKeysSection()
         buildSwipeSection()
-        buildAiSection()
         buildBehaviourSection()
         if (SHOW_DEBUG_SECTIONS) {
             buildTryBox()
             buildPreview()
         }
+
+        rebuildAiSection()
+
+        aiScroll.visibility = View.GONE
+        helpView.visibility = View.GONE
+        tabs.addOnTabSelectedListener(object : TabLayout.OnTabSelectedListener {
+            override fun onTabSelected(tab: TabLayout.Tab) {
+                generalScroll.visibility = if (tab.position == 0) View.VISIBLE else View.GONE
+                aiScroll.visibility = if (tab.position == 1) View.VISIBLE else View.GONE
+                helpView.visibility = if (tab.position == 2) View.VISIBLE else View.GONE
+            }
+            override fun onTabUnselected(tab: TabLayout.Tab) {}
+            override fun onTabReselected(tab: TabLayout.Tab) {}
+        })
     }
 
     override fun onResume() {
@@ -284,22 +343,35 @@ class SettingsActivity : AppCompatActivity() {
         tlLong?.sync()
     }
 
+    /** AI tab 成個內容會因為載入／刪除 profile、切換「自訂 API」而成組重畫，所以獨立一個 function 可以再叫 */
+    private fun rebuildAiSection() {
+        aiContent.removeAllViews()
+        content = aiContent
+        buildAiSection()
+    }
+
     /**
      * AI 改寫。
      *
      * API key 唔用普通輸入框 —— 冇人會逐個字撳，一係喺其他地方複製完貼過嚟，
      * 一係就係刪走，所以淨係得「貼上／刪除／顯示」三粒掣加一行狀態字。
+     *
+     * 預設用 Gemini；[Prefs.KEY_AI_USE_CUSTOM] 開咗就改用下面嗰組範本打任何
+     * 接受 JSON 嘅 HTTP POST API（見 `AiRewrite.callCustom`）。成套設定
+     * （provider／key／model／prompt／範本）可以用下面嘅 profile 掣 save/load/delete。
      */
     private fun buildAiSection() {
         header("AI 改寫")
-        note("在任何應用程式中按工具列的 ✨ 即可用 Gemini 改寫：" +
+        note("在任何應用程式中按工具列的 ✨ 即可用 AI 改寫：" +
             "有選取文字就只改選取的部分，沒有選取則會改寫整個輸入框的內容。" +
             "尚未輸入 API key 時，✨ 按鍵不會出現。")
 
+        buildAiProfileRow()
+
         content.addView(TextView(this).apply {
-            text = "Gemini API key"
+            text = "API key"
             textSize = 14f
-            setPadding(0, dp(6), 0, 0)
+            setPadding(0, dp(10), 0, 0)
         })
         aiKeyLabel = note("")
         refreshAiKeyLabel()
@@ -329,6 +401,85 @@ class SettingsActivity : AppCompatActivity() {
         textField("模型名稱", Prefs.KEY_AI_MODEL, Prefs.DEFAULT_AI_MODEL)
         textField("Prompt（%text% 代表要改寫的文字）", Prefs.KEY_AI_PROMPT, Prefs.DEFAULT_AI_PROMPT,
             multiline = true)
+
+        switch("使用自訂 API（而非 Gemini）", Prefs.KEY_AI_USE_CUSTOM, false) { rebuildAiSection() }
+
+        if (Prefs.aiUseCustom(this)) {
+            note("自訂 API 須為接受 JSON 的 HTTP POST 端點。下面範本預設是 OpenAI 相容格式" +
+                "（OpenAI、Groq、DeepSeek、OpenRouter、Ollama 等大多適用），可按實際 API 文件調整。" +
+                "範本中 %key% = API key，%model% = 上面的模型名稱，" +
+                "%prompt% = 套用了上面 Prompt 範本後的內容（已自動處理 JSON 逸出字元）。")
+            textField("Request URL", Prefs.KEY_AI_URL, Prefs.DEFAULT_AI_URL)
+            textField("Request Headers（每行一個，例如 Authorization: Bearer %key%）",
+                Prefs.KEY_AI_HEADERS, Prefs.DEFAULT_AI_HEADERS, multiline = true)
+            textField("Request Body 範本（JSON）", Prefs.KEY_AI_BODY, Prefs.DEFAULT_AI_BODY,
+                multiline = true)
+            textField("回應內容路徑（例如 choices.0.message.content）",
+                Prefs.KEY_AI_RESPONSE_PATH, Prefs.DEFAULT_AI_RESPONSE_PATH)
+        }
+    }
+
+    /** 已存 profile 嘅下拉選單 + 載入／另存新檔／刪除三粒掣 */
+    private fun buildAiProfileRow() {
+        content.addView(TextView(this).apply {
+            text = "已儲存的 Profile"
+            textSize = 14f
+            setPadding(0, dp(6), 0, dp(2))
+        })
+        val names = Prefs.aiProfileNames(this)
+        val spinner = Spinner(this).apply {
+            adapter = ArrayAdapter(
+                this@SettingsActivity, android.R.layout.simple_spinner_item,
+                if (names.isEmpty()) listOf("（未有已存 Profile）") else names
+            ).apply { setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item) }
+        }
+        content.addView(spinner, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+        row(
+            button("載入") {
+                val name = names.getOrNull(spinner.selectedItemPosition)
+                if (name == null) { toast("未有已存 Profile"); return@button }
+                Prefs.loadAiProfile(this, name)
+                aiKeyShown = false
+                rebuildAiSection()
+                toast("已載入「$name」")
+            },
+            button("另存新檔") { promptSaveAiProfile() },
+            button("刪除") {
+                val name = names.getOrNull(spinner.selectedItemPosition)
+                if (name == null) { toast("未有已存 Profile"); return@button }
+                Prefs.deleteAiProfile(this, name)
+                rebuildAiSection()
+                toast("已刪除「$name」")
+            }
+        )
+    }
+
+    /** 彈個對話框問 profile 個名，撳「儲存」先真係存 */
+    private fun promptSaveAiProfile() {
+        val input = EditText(this).apply { hint = "Profile 名稱" }
+        val pad = dp(20)
+        val wrap = FrameLayout(this).apply {
+            setPadding(pad, dp(8), pad, 0)
+            addView(input)
+        }
+        AlertDialog.Builder(this)
+            .setTitle("另存 AI Profile")
+            .setView(wrap)
+            .setPositiveButton("儲存") { _, _ ->
+                val name = input.text.toString().trim()
+                if (name.isEmpty()) { toast("請輸入名稱"); return@setPositiveButton }
+                Prefs.saveAiProfile(this, name)
+                rebuildAiSection()
+                toast("已儲存「$name」")
+            }
+            .setNegativeButton("取消", null)
+            .show()
+    }
+
+    /** 「說明」tab：淨係一個 WebView 直接顯示 `assets/help.html`，冇任何互動 */
+    private fun buildHelpView(): WebView = WebView(this).apply {
+        loadUrl("file:///android_asset/help.html")
     }
 
     /** 冇 key 就講明冇，有 key 就預設遮住中間（撳「顯示」先睇到全個） */
@@ -566,7 +717,7 @@ class SettingsActivity : AppCompatActivity() {
     }
 
     @Suppress("DEPRECATION")
-    private fun switch(label: String, key: String, def: Boolean) {
+    private fun switch(label: String, key: String, def: Boolean, onChange: ((Boolean) -> Unit)? = null) {
         val s = Switch(this).apply {
             text = label
             textSize = 15f
@@ -577,6 +728,7 @@ class SettingsActivity : AppCompatActivity() {
             setOnCheckedChangeListener { _, v ->
                 Prefs.sp(this@SettingsActivity).edit().putBoolean(key, v).apply()
                 rebuildPreview()
+                onChange?.invoke(v)
             }
         }
         content.addView(s, LinearLayout.LayoutParams(
