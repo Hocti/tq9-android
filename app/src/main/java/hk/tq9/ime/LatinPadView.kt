@@ -37,8 +37,24 @@ private val ACCENTS: Map<String, List<String>> = mapOf(
     "v" to listOf("ν"),
     "b" to listOf("ḃ"),
     "n" to listOf("ñ", "ń", "ň"),
-    "m" to listOf("µ"),
-    "." to listOf(",", "?", "!", "'", "\"", ":", ";", "-")
+    "m" to listOf("µ")
+)
+
+/**
+ * 標點鍵長撳彈出嘅嘢。三粒都會喺左上角寫返個細字提示（見 [LatinPadView.punct]），
+ * 唔係冇人知撳實佢仲有嘢揀。
+ *
+ * 三粒都**唔跟**「第一個 = 自己本身」嗰個規矩 —— 每粒排頭嗰個係長撳一彈出嚟
+ * 就已經停咗喺度嗰個（唔郁手指放開就出佢），粒鍵自己短撳就攞得返：
+ *
+ *  - `,` → **Tab**（`\t`，畫成 `⇥`）
+ *  - `.` → `;`
+ *  - `/` → `?`（`?` 打得多過 `/` 好多）
+ */
+private val PUNCT_VARIANTS: Map<String, List<String>> = mapOf(
+    "," to listOf("\t", ",", "<", ">", "[", "]", "{", "}"),
+    "." to listOf(";", ".", "'", "\"", ":", "`", "~"),
+    "/" to listOf("?", "/", "\\", "|", "=", "_", "+", "-")
 )
 
 /**
@@ -104,11 +120,36 @@ class LatinPadView(context: Context) : RowsPadView(context) {
     private fun ch(
         c: String, hint: String = "", hintRight: String = "", extra: List<String> = emptyList(),
         weight: Float = 1f
-    ) = Key(
-        KeyAction.CHAR, label = c, text = c, hint = hint, hintRight = hintRight, weight = weight,
-        variants = listOf(c) + extra + ACCENTS[c].orEmpty(),
-        swipeable = c.length == 1 && c[0] in 'a'..'z'
-    )
+    ): Key {
+        val letter = c.length == 1 && c[0] in 'a'..'z'
+        val upper = letter && shift != ShiftState.OFF
+        // 大細階兩樣都要揀得到：排頭嗰個係而家粒鍵寫住嗰個（撳實唔郁放手 = 打返佢），
+        // 第二個就係另一個大細階，跟住先至係口音字（一樣跟返而家嘅大細階）
+        val base = if (upper) c.uppercase() else c
+        val head = if (!letter) listOf(c)
+                   else listOf(base, if (upper) c.lowercase() else c.uppercase())
+        // "ß".uppercase() 會變兩個字母 "SS" —— 變咗長度就唔換，照出返細階嗰個
+        val accents = ACCENTS[c].orEmpty().let { list ->
+            if (!upper) list
+            else list.map { a -> a.uppercase().takeIf { it.length == a.length } ?: a }
+        }
+        return Key(
+            KeyAction.CHAR, label = c, text = c, hint = hint, hintRight = hintRight, weight = weight,
+            variants = head + extra + accents,
+            swipeable = letter
+        )
+    }
+
+    /** 標點鍵（`,` `.` `/`）：長撳有嘢揀，所以左上角要寫返個細字提示 */
+    private fun punct(c: String, weight: Float = 1f): Key {
+        val v = PUNCT_VARIANTS[c].orEmpty()
+        // 提示寫「長撳會停喺邊個」嗰個 —— `/` 就係 `?`，其餘就係第二個（第一個係自己）
+        val tip = if (v.firstOrNull() != c) v.firstOrNull() else v.getOrNull(1)
+        return Key(
+            KeyAction.CHAR, label = c, text = c, weight = weight,
+            hint = tip?.let(::variantDisplay).orEmpty(), variants = v
+        )
+    }
 
     override fun rows(): List<List<Key>> {
         // 開咗數字行就真係多一行數字喺上面，字母角落亦都唔會再寫細字
@@ -121,42 +162,54 @@ class LatinPadView(context: Context) : RowsPadView(context) {
             if (numRow) ch(c.toString())
             else ch(c.toString(), hint = d, hintRight = sym, extra = listOf(d, sym))
         }
-        // a、l 兩隻收邊鍵較長，s~k 就同其他行嘅每粒鍵一樣闊
-        val r1 = "asdfghjkl".map { ch(it.toString(), weight = if (it == 'a' || it == 'l') 1.5f else 1f) }
+        // a、l 同其他字母一樣闊，兩頭讓返半格出嚟（跟返一般 qwerty 個樣，
+        // 唔再將收邊嗰兩粒拉長）。空格唔會食掉掂觸 —— 撳落去會 snap 去隔籬粒鍵。
+        val r1 = listOf(spacerKey(0.5f)) + "asdfghjkl".map { ch(it.toString()) } +
+            listOf(spacerKey(0.5f))
+        // `,` 搬咗落底行（頂咗本來個 `?`），呢行讓返出嚟嘅位就俾 ⇧ 同 ⌫ 拉長
         val r2 = listOf(
-            Key(KeyAction.SHIFT, label = shiftLabel(), weight = 1.2f,
+            Key(KeyAction.SHIFT, label = shiftLabel(), weight = 1.75f,
                 accent = shift == ShiftState.LOCK)
-        ) + "zxcvbnm".map { ch(it.toString()) } + listOf(ch(",")) +
-            listOf(Key(KeyAction.BACKSPACE, label = "⌫", weight = 1.2f, repeatable = true))
+        ) + "zxcvbnm".map { ch(it.toString()) } +
+            listOf(Key(KeyAction.BACKSPACE, label = "⌫", weight = 1.75f, repeatable = true))
         val r3 = ArrayList<Key>()
         if (emojiSearchMode) {
             r3.add(Key(KeyAction.TO_EMOJI, label = "😀", weight = 1.3f, bigLabel = true))
         } else {
             r3.add(Key(KeyAction.TO_CHINESE, label = "中", weight = 1.3f, bigLabel = true))
         }
-        r3.add(Key(KeyAction.TO_SYMBOL, label = "?123", weight = 1.3f))
-        // 搵 emoji 嗰陣粒位讓返俾「中」（打中文關鍵字，例如「貓」），
-        // 平時就係 "/"（轉輸入法喺中文 view 嘅 🌐 度做）
-        if (emojiSearchMode) r3.add(Key(KeyAction.TO_CHINESE, label = "中", weight = 1f))
-        else r3.add(ch("/"))
+        // 長撳 ?123 唔使經符號頁，直接跳去純數字 keypad
+        r3.add(Key(KeyAction.TO_SYMBOL, label = "?123", weight = 1.3f,
+            longAction = KeyAction.TO_NUMBER))
         if (emailMode) {
             // 長撳 @：可以揀常用信箱域名，第一個照舊係 @ 本身
             r3.add(Key(
                 KeyAction.CHAR, label = "@", text = "@", weight = 1f,
                 variants = listOf("@", "@gmail.com", "@hotmail.com")
             ))
-            r3.add(Key(KeyAction.SPACE, label = "␣", weight = 2.4f))
+            r3.add(Key(KeyAction.SPACE, label = "␣", weight = 2.2f))
             // 長撳 .com：.com.hk、.net 呢啲常用尾巴，第一個照舊係 .com 本身
             r3.add(Key(
-                KeyAction.CHAR, label = ".com", text = ".com", weight = 1.6f,
+                KeyAction.CHAR, label = ".com", text = ".com", weight = 1.5f,
                 variants = listOf(".com", ".com.hk", ".net", ".org", ".edu", ".gov")
             ))
+            r3.add(punct("/"))
         } else {
-            r3.add(Key(KeyAction.SPACE, label = "␣", weight = 3.6f))
-            r3.add(ch("?", extra = listOf("!", "¿", "¡")))
-            r3.add(ch("."))
+            // 搵 emoji 嗰陣 `/` 個位讓返俾「中」（打中文關鍵字，例如「貓」）
+            if (emojiSearchMode) {
+                r3.add(Key(KeyAction.TO_CHINESE, label = "中", weight = 1f))
+                r3.add(Key(KeyAction.SPACE, label = "␣", weight = 3.4f))
+                r3.add(punct(","))
+                r3.add(punct("."))
+            } else {
+                r3.add(Key(KeyAction.SPACE, label = "␣", weight = 3.4f))
+                // space 右邊順住排 `, . /` 三粒，三粒都有長撳 popup
+                r3.add(punct(","))
+                r3.add(punct("."))
+                r3.add(punct("/"))
+            }
         }
-        r3.add(Key(KeyAction.ENTER, label = "⏎", weight = 1.8f, accent = true))
+        r3.add(Key(KeyAction.ENTER, label = "⏎", weight = 1.7f, accent = true))
         return if (numRow) listOf(digits, r0, r1, r2, r3) else listOf(r0, r1, r2, r3)
     }
 

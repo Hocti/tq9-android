@@ -5,16 +5,16 @@ import android.content.SharedPreferences
 
 /** 顯示方式：中文輸入本體超過 max size 之後可以 toggle 的狀態 */
 enum class PadAlign(val label: String) {
-    STRETCH("拉長"),
-    LEFT_GAP("左留白"),
-    RIGHT_GAP("右留白");
+    STRETCH("拉闊"),
+    LEFT_GAP("靠右（左邊留白）"),
+    RIGHT_GAP("靠左（右邊留白）");
 
     fun next(): PadAlign = entries[(ordinal + 1) % entries.size]
 }
 
 /** 上面條 bar 嘅三段：關 → 候選字 → 工具 */
 enum class BarMode(val label: String) {
-    OFF("關"),
+    OFF("關閉"),
     CANDIDATES("候選字"),
     TOOLS("工具");
 
@@ -24,15 +24,17 @@ enum class BarMode(val label: String) {
 /**
  * 可以喺設定度換走嘅鍵功能（而家用喺左上角嗰粒）。
  * 除咗 [EMOJI]，粒面全部改返寫中文，唔再用意義不明嘅 icon。
+ *
+ * 設定頁而家用 spinner 揀，[next] / [nextFor] 淨係留返俾舊 code path 用。
  */
 enum class PadFunc(val label: String, val icon: String) {
     SHORTCUT("速選字", "速選"),
     SC_TOGGLE("簡體開關", "简"),
-    EMOJI("Emoji", "😀"),
+    EMOJI("表情符號", "😀"),
     PASTE("貼上", "貼上"),
-    STT("錄音", "錄音"),
+    STT("語音輸入", "錄音"),
     AI("AI 改寫", "AI改"),
-    NONE("無效", "");
+    NONE("停用", "");
 
     fun next(): PadFunc = entries[(ordinal + 1) % entries.size]
 
@@ -61,6 +63,7 @@ object Prefs {
     const val KEY_MAX_H_DP = "key_max_h_dp"        // 中文本體最大高度
     const val KEY_ALIGN = "key_align"              // PadAlign.name
     const val KEY_HEIGHT_SCALE = "key_height_scale" // 成個鍵盤高度倍數（拉高／拉低）
+    const val KEY_WIDTH_SCALE = "key_width_scale"  // 中文本體闊度倍數（靠左／靠右嗰陣左右拉）
     const val KEY_H_RATIO = "key_h_ratio"          // 中文格仔高度 / 闊度
     const val KEY_GAP_DP = "key_gap_dp"
     const val KEY_FONT_SCALE = "key_font_scale"
@@ -119,6 +122,23 @@ object Prefs {
     const val MIN_HEIGHT_SCALE = 0.6f
     const val MAX_HEIGHT_SCALE = 1.8f
 
+    /**
+     * 中文本體闊度倍數。淨係 [PadAlign.LEFT_GAP] / [PadAlign.RIGHT_GAP] 有用
+     * （[PadAlign.STRETCH] 本來就用盡成行），喺工具 bar 最左嗰粒掣左右拖就改到。
+     */
+    fun widthScale(ctx: Context) = sp(ctx).getFloat(KEY_WIDTH_SCALE, 1.0f)
+    fun setWidthScale(ctx: Context, v: Float) =
+        sp(ctx).edit().putFloat(KEY_WIDTH_SCALE, v.coerceIn(MIN_WIDTH_SCALE, MAX_WIDTH_SCALE)).apply()
+
+    const val MIN_WIDTH_SCALE = 0.45f
+    const val MAX_WIDTH_SCALE = 1.6f
+
+    /**
+     * 中文本體窄到淨低咁多位（佔螢幕嘅比例以下）就唔好再喺上面擺條 bar ——
+     * 空出嚟嗰邊夠位擺得晒功能掣同候選字，見 `TQ9InputMethodService.sidePanelActive`。
+     */
+    const val SIDE_PANEL_MAX_RATIO = 0.60f
+
     fun align(ctx: Context): PadAlign =
         runCatching { PadAlign.valueOf(sp(ctx).getString(KEY_ALIGN, PadAlign.STRETCH.name)!!) }
             .getOrDefault(PadAlign.STRETCH)
@@ -136,7 +156,15 @@ object Prefs {
     fun setBarMode(ctx: Context, m: BarMode) =
         sp(ctx).edit().putString(KEY_BAR_MODE, m.name).apply()
 
-    fun latinNumberRow(ctx: Context) = sp(ctx).getBoolean(KEY_LATIN_NUM_ROW, false)
+    /**
+     * 英文鍵盤上面永遠有一行數字。設定頁嗰個開關收埋咗（見
+     * `SettingsActivity.SHOW_HIDDEN_OPTIONS`），個 pref 本身冇刪，
+     * 想再開返出嚟就將 [FORCE_LATIN_NUM_ROW] 改做 false。
+     */
+    const val FORCE_LATIN_NUM_ROW = true
+
+    fun latinNumberRow(ctx: Context) =
+        if (FORCE_LATIN_NUM_ROW) true else sp(ctx).getBoolean(KEY_LATIN_NUM_ROW, false)
 
     /** 短撳唔准係「無效」，舊設定入面有就當返預設 */
     fun topLeftTap(ctx: Context): PadFunc {

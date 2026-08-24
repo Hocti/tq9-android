@@ -150,7 +150,7 @@ class EmojiPadView(context: Context) : LinearLayout(context) {
         grid.removeAllViews()
         if (EmojiDict.peek() == null) {
             grid.addView(TextView(context).apply {
-                text = "載入緊…"
+                text = "載入中…"
                 setTextColor(theme.textDim)
             })
             EmojiDict.preloadAsync(context)

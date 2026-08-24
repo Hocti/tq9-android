@@ -71,7 +71,8 @@ class ChinesePadView(context: Context, private val engine: Q9Engine) : KeyboardB
         add(topLeftKey(), 0f, 0)
         // 左上角嗰段細字係 engine 出嘅字碼提示，喺 drawFunction 度即時攞
         add(Key(KeyAction.HOMO, label = "同音"), 0f, 1)
-        add(Key(KeyAction.TO_SYMBOL, label = "?123"), 0f, 2)
+        // 長撳 ?123 唔使經符號頁，直接跳去純數字 keypad（英文鍵盤嗰粒一樣）
+        add(Key(KeyAction.TO_SYMBOL, label = "?123", longAction = KeyAction.TO_NUMBER), 0f, 2)
         // 🌐 收埋咗，但長撳「Eng」照樣叫得出輸入法揀選（KeyAction.IME_SWITCH 個 code 冇刪）
         add(Key(KeyAction.TO_LATIN, label = "Eng", longAction = KeyAction.IME_SWITCH), 0f, 3)
 

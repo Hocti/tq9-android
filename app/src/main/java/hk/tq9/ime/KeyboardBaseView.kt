@@ -141,6 +141,12 @@ abstract class KeyboardBaseView(context: Context) : View(context) {
     /** 有啲鍵係睇實時狀態先知撳唔撳得（例如 AI 鍵要揀咗字先） */
     protected open fun keyEnabled(k: Key): Boolean = k.enabled
 
+    /**
+     * 呢粒鍵撳耐咗有冇效果（變體 popup、[Host.onLongPress]、連撳…）。
+     * 純數字頁成頁 false —— 打號碼撳耐咗少少就彈嘢出嚟好煩（見 [NumberPadView]）。
+     */
+    protected open fun allowLongPress(k: Key): Boolean = true
+
     /** ⏎ 一定要跟返而家個欄要做乜，唔可以淨係睇 [Key.label] */
     protected fun labelOf(k: Key): String =
         if (k.action == KeyAction.ENTER) enterLabel else k.label
@@ -208,6 +214,10 @@ abstract class KeyboardBaseView(context: Context) : View(context) {
         popupBox = box
         popupItems = items
         popupItemW = maxOf(box.w * 1.1f, dp(50f))
+        // 格多過螢幕裝得落（`/` 有八個）就一齊迫窄，剛剛好一行鋪滿成個闊度 ——
+        // 情願粒粒細啲，都好過有幾個推咗出螢幕外面永遠揀唔到。
+        // 字太大 KeyPopup 自己會縮返（見 Content.onDraw 嗰句 avail / need）。
+        if (popupItemW * items.size > width) popupItemW = width.toFloat() / items.size
         popupItemH = box.h
         val total = popupItemW * items.size
         popupLeft = (box.cx - popupItemW / 2f).coerceIn(0f, maxOf(0f, width - total))
@@ -217,7 +227,9 @@ abstract class KeyboardBaseView(context: Context) : View(context) {
         popupMoved = false
         dismissHover()
         variantPopup.setStyle(theme, fontScale)
-        variantPopup.showRow(this, items, popupIndex, popupLeft, popupTop, popupItemW, popupItemH)
+        // 畫用 variantDisplay（Tab → ⇥），commit 就照用返 popupItems 入面嗰個真字元
+        variantPopup.showRow(this, items.map(::variantDisplay), popupIndex,
+            popupLeft, popupTop, popupItemW, popupItemH)
     }
 
     /**
@@ -246,7 +258,8 @@ abstract class KeyboardBaseView(context: Context) : View(context) {
         variantPopup.dismiss()
         if (commit && box != null && popupIndex in items.indices) {
             val v = items[popupIndex]
-            host?.onKey(Key(KeyAction.CHAR, label = v, text = v))
+            // literal：個 list 本身已經有大細階揀，唔好再俾 shift 覆寫返
+            host?.onKey(Key(KeyAction.CHAR, label = v, text = v, literal = true))
         }
     }
 
@@ -268,7 +281,9 @@ abstract class KeyboardBaseView(context: Context) : View(context) {
                 swipeAborted = false
                 cursorMode = false
                 host?.feedback(b.key)
-                handler.postDelayed(longPressRunnable, Prefs.longPressMs(context))
+                if (allowLongPress(b.key)) {
+                    handler.postDelayed(longPressRunnable, Prefs.longPressMs(context))
+                }
                 if (b.key.repeatable) startRepeat(b)
                 if (canSwipe(b.key)) {
                     tracker.attach(swipeDelegate)

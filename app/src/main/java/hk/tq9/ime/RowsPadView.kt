@@ -31,11 +31,15 @@ abstract class RowsPadView(context: Context) : KeyboardBaseView(context) {
             // 最後一格夾硬去到最右，最後一行夾硬去到最底：唔可以喺邊位留條撳唔到嘅隙
             for ((i, k) in row.withIndex()) {
                 val kw = cw * (k.weight / total)
-                val b = KeyBox(k)
                 val right = if (i == row.size - 1) ox + cw else x + kw
                 val bottom = if (r == rs.size - 1) h.toFloat() else (r + 1) * rh
-                b.set(x, r * rh, right, bottom)
-                boxes.add(b)
+                // 空位淨係食位，唔入 boxes —— 咁撳落去先會 snap 去隔籬真嗰粒鍵
+                // （boxNear 嘅 SNAP_DP），唔會變成一撳乜都唔發生嘅死位
+                if (!k.spacer) {
+                    val b = KeyBox(k)
+                    b.set(x, r * rh, right, bottom)
+                    boxes.add(b)
+                }
                 x += kw
             }
         }

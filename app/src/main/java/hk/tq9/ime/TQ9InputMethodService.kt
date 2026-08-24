@@ -40,6 +40,7 @@ import hk.tq9.core.ClipHistory
 import hk.tq9.core.EmojiDict
 import hk.tq9.core.EnDict
 import hk.tq9.core.NextWordModel
+import hk.tq9.core.PadAlign
 import hk.tq9.core.Prefs
 import hk.tq9.core.Q9Db
 import hk.tq9.core.Q9Cmd
@@ -71,6 +72,11 @@ class TQ9InputMethodService : android.inputmethodservice.InputMethodService(),
     private var numberPad: NumberPadView? = null
     private var emojiPad: EmojiPadView? = null
     private var overlay: View? = null
+    /**
+     * 中文本體拉到夠窄嗰陣，上面條 bar 收埋、內容搬去空出嚟嗰邊（見 [refreshSidePanel]）。
+     * 唔夠窄就一路係 null／detach 咗，成套行為同以前一模一樣。
+     */
+    private var sidePanel: SidePanelView? = null
     /** 候選字 bar 拉大咗：`bars.expandedView` 蓋喺 padHolder 度（見 [onExpandChanged]） */
     private var candidatesExpanded = false
     private var aiOverlay: View? = null
@@ -86,6 +92,10 @@ class TQ9InputMethodService : android.inputmethodservice.InputMethodService(),
     /** URL／email／密碼／關咗提示嘅欄：唔好自作聰明補空格（見 [autoSpaceAfterPunct]） */
     private var noAutoSpaceField = false
     private var hasSelection = false
+    /** 而家有冇嘢俾 AI 改（揀咗一段，或者成個輸入框有字） */
+    private var aiUsable = false
+    /** 設定頁有冇入 Gemini API key —— 冇就成粒 ✨ 唔見咗，唔係淨係灰咗 */
+    private var aiKeySet = false
     private val latinComposing = StringBuilder()
     private var latinSuggestions: List<String> = emptyList()
 
@@ -125,7 +135,7 @@ class TQ9InputMethodService : android.inputmethodservice.InputMethodService(),
     }
 
     override val optionOn: Boolean get() = barMode != BarMode.OFF
-    override val aiReady: Boolean get() = hasSelection
+    override val aiReady: Boolean get() = aiUsable
 
     // ---- lifecycle --------------------------------------------------------
 
@@ -243,6 +253,7 @@ class TQ9InputMethodService : android.inputmethodservice.InputMethodService(),
         latinPad?.emailMode = isEmail
         numberPad?.pinMode = isNumberPassword
         hasSelection = currentInputConnection?.getSelectedText(0)?.isNotEmpty() == true
+        refreshAiState()
 
         val want = when {
             cls == InputType.TYPE_CLASS_NUMBER || cls == InputType.TYPE_CLASS_PHONE ||
@@ -267,10 +278,12 @@ class TQ9InputMethodService : android.inputmethodservice.InputMethodService(),
         super.onUpdateSelection(oldSelStart, oldSelEnd, newSelStart, newSelEnd,
             candidatesStart, candidatesEnd)
         val sel = newSelStart != newSelEnd
-        if (sel == hasSelection) return
+        // 揀唔揀咗字唔緊要，個欄有冇字都會影響 ✨ 撳唔撳得（冇揀就當改寫成個欄），
+        // 所以每次都要重新計，唔可以好似以前咁「揀嘅狀態冇變就 return」
         hasSelection = sel
-        if (::bars.isInitialized) bars.setAiReady(sel)
-        chinesePad?.invalidate()
+        // caret 唔喺最頭 = 前面實有字，慳返一次 IPC
+        applyAiState(sel || newSelStart > 0 ||
+            !currentInputConnection?.getTextAfterCursor(1, 0).isNullOrEmpty())
     }
 
     /** 搜尋欄要出放大鏡，唔係就照出 ⏎ */
@@ -435,7 +448,7 @@ class TQ9InputMethodService : android.inputmethodservice.InputMethodService(),
             KeyAction.SPACE -> space()
             KeyAction.ENTER -> enter()
             KeyAction.SHIFT -> tapShift()
-            KeyAction.CHAR -> typeChar(key.text)
+            KeyAction.CHAR -> typeChar(key.text, key.literal)
             KeyAction.NOOP -> {}
         }
     }
@@ -508,7 +521,7 @@ class TQ9InputMethodService : android.inputmethodservice.InputMethodService(),
 
     // ---- 編輯動作 ---------------------------------------------------------
 
-    private fun typeChar(raw: String) {
+    private fun typeChar(raw: String, literal: Boolean = false) {
         var s = raw
         val pad = latinPad
         if (emojiSearch) {
@@ -517,8 +530,11 @@ class TQ9InputMethodService : android.inputmethodservice.InputMethodService(),
             refreshEmojiResults()
             return
         }
-        if (mode == PadMode.LATIN && pad != null && s.length == 1 && s[0] in 'a'..'z') {
-            if (pad.shift != ShiftState.OFF) s = s.uppercase()
+        // 大階字母都要行呢條路：長撳變體 popup 揀到大階（"a" 撳實可以揀 "A"），
+        // 唔當佢係英文字母就會 finishComposing，打字提示同 backspace 全部散晒
+        if (mode == PadMode.LATIN && pad != null && s.length == 1 &&
+            (s[0] in 'a'..'z' || s[0] in 'A'..'Z')) {
+            if (!literal && s[0] in 'a'..'z' && pad.shift != ShiftState.OFF) s = s.uppercase()
             if (pad.shift == ShiftState.ON) { pad.shift = ShiftState.OFF; pad.rebuild() }
             latinWordDone = false
             forceCandidates = false
@@ -699,7 +715,7 @@ class TQ9InputMethodService : android.inputmethodservice.InputMethodService(),
 
     private fun paste() {
         val text = runCatching { ClipHistory.current(this) }.getOrDefault("")
-        if (text.isEmpty()) { toast("剪貼簿係空嘅"); return }
+        if (text.isEmpty()) { toast("剪貼簿是空的"); return }
         commitPlain(text)
     }
 
@@ -813,6 +829,12 @@ class TQ9InputMethodService : android.inputmethodservice.InputMethodService(),
         // 搵 emoji 嗰陣一定要見到啲結果，就算條 bar 本身係關住
         var effective = if (emojiSearch || (forceCandidates && latinSuggestions.isNotEmpty()))
             BarMode.CANDIDATES else barMode
+        // 英文／符號頁夾硬開返條 bar：呢兩頁靠佢出打字提示同滑動出嚟嘅字，
+        // 冇咗就等於打盲舖。**唔會改到 [barMode] 本身** —— 返到中文頁
+        // 照樣跟返 user 設定嘅開關。
+        if ((mode == PadMode.LATIN || mode == PadMode.SYMBOL) && effective == BarMode.OFF) {
+            effective = BarMode.CANDIDATES
+        }
         // emoji 表／剪貼簿嗰陣冇候選字可以出，索性成行出工具，唔好淨係得粒 ✖ 吉住
         if (specialPad) effective = BarMode.TOOLS
 
@@ -827,13 +849,117 @@ class TQ9InputMethodService : android.inputmethodservice.InputMethodService(),
             mode == PadMode.LATIN || mode == PadMode.SYMBOL -> latinSuggestions
             else -> emptyList()
         }
+
+        // 中文本體窄到夠位喺隔籬擺嘢 → 條 bar 收埋，功能掣同候選字全部搬去側邊欄
+        if (refreshSidePanel(cands)) {
+            bars.visibility = View.GONE
+            return
+        }
+
         bars.setMode(effective)
         bars.setCandidates(if (effective == BarMode.CANDIDATES) cands else emptyList())
         bars.setCloseVisible(specialPad)
-        bars.setAiReady(hasSelection)
+        bars.setAiReady(aiUsable)
+        bars.setAiVisible(aiKeySet)
         bars.refreshAlignLabel()
         // 條 bar 高度定死，唔會因為有冇候選字而跳高跳低
         bars.visibility = if (effective == BarMode.OFF) View.GONE else View.VISIBLE
+    }
+
+    // ---- 側邊欄（中文拉窄嗰陣）----------------------------------------------
+
+    /**
+     * 中文本體靠咗一邊、又窄過螢幕嘅 [Prefs.SIDE_PANEL_MAX_RATIO]（六成）嗰陣，
+     * 空出嚟嗰四成幾位夠曬擺功能掣同一大版候選字，冇理由再喺上面霸多條 bar。
+     *
+     * 回傳 true = 而家用緊側邊欄（call 嗰邊要自己收埋 [bars]）。
+     *
+     * 只限中文九宮格：英文／符號／純數字係一行行鋪滿成行嘅，冇位空出嚟；
+     * 剪貼簿嗰個 overlay 又會蓋住成個 padHolder（連側邊欄都遮埋，就撳唔返粒 ✖）。
+     */
+    private fun refreshSidePanel(cands: List<String>): Boolean {
+        val geom = sideGeom()
+        if (geom == null || barMode == BarMode.OFF || overlay != null) {
+            removeSidePanel()
+            return false
+        }
+        val panel = sidePanel ?: SidePanelView(this).also {
+            it.listener = this
+            it.applyTheme(theme)
+            sidePanel = it
+        }
+        // 高度**寫死做中文九宮格嗰個高度**，唔可以用 MATCH_PARENT。
+        // padHolder 係 wrap_content 嘅 FrameLayout：MATCH_PARENT 嘅仔會攞到
+        // AT_MOST(成個可用高度)，入面又有個食 weight 嘅候選字 ScrollView，
+        // 結果候選字一多就撐大咗 padHolder，成個鍵盤跟住拉高（打橫尤其明顯）。
+        val lp = FrameLayout.LayoutParams(geom.slackPx, geom.heightPx).apply {
+            // 「靠右」= 內容貼右、左邊留白 → 側邊欄擺左邊，反之亦然
+            gravity = if (geom.atStart) Gravity.START else Gravity.END
+        }
+        val old = panel.layoutParams as? FrameLayout.LayoutParams
+        if (panel.parent !== padHolder) {
+            (panel.parent as? ViewGroup)?.removeView(panel)
+            padHolder.addView(panel, lp)
+        } else if (old == null || old.width != lp.width || old.height != lp.height ||
+            old.gravity != lp.gravity) {
+            panel.layoutParams = lp
+        }
+        panel.setCandidates(cands)
+        panel.setAiReady(aiUsable)
+        panel.setAiVisible(aiKeySet)
+        panel.setCloseVisible(false)
+        panel.refreshAlignLabel()
+        return true
+    }
+
+    /** 側邊欄擺喺邊、幾大 */
+    private class SideGeom(val slackPx: Int, val heightPx: Int, val atStart: Boolean)
+
+    /** null = 唔夠窄／唔啱模式，照用返上面條 bar */
+    private fun sideGeom(): SideGeom? {
+        if (mode != PadMode.CHINESE || !::padHolder.isInitialized) return null
+        val align = Prefs.align(this)
+        if (align == PadAlign.STRETCH) return null
+        val w = padHolder.width.takeIf { it > 0 } ?: resources.displayMetrics.widthPixels
+        if (w <= 0) return null
+        val m = PadMetrics(this, w)
+        if (m.contentW > w * Prefs.SIDE_PANEL_MAX_RATIO) return null
+        val slack = (w - m.contentW).roundToInt()
+        if (slack <= 0) return null
+        // 「靠右」（LEFT_GAP）= 內容貼右、左邊留白 → 側邊欄擺喺最左
+        return SideGeom(slack, m.totalHeight.roundToInt(), align == PadAlign.LEFT_GAP)
+    }
+
+    private fun removeSidePanel() {
+        val p = sidePanel ?: return
+        (p.parent as? ViewGroup)?.removeView(p)
+    }
+
+    // ---- AI 撳唔撳得 --------------------------------------------------------
+
+    /** 開頭／轉欄嗰陣：問清楚個欄到底有冇字（三次 IPC，唔係逐粒鍵行嘅路） */
+    private fun refreshAiState() {
+        val ic = currentInputConnection
+        applyAiState(
+            !ic?.getSelectedText(0).isNullOrEmpty() ||
+                !ic?.getTextBeforeCursor(1, 0).isNullOrEmpty() ||
+                !ic?.getTextAfterCursor(1, 0).isNullOrEmpty()
+        )
+    }
+
+    /**
+     * ✨ 撳唔撳得：**唔使揀住字都用得** —— 個欄有字就當「改寫成個欄」（見 [runAi]）。
+     * 完全冇入 API key 就連粒掣都唔出（[OptionBarsView.setAiVisible]）。
+     */
+    private fun applyAiState(hasText: Boolean) {
+        val keySet = Prefs.aiApiKey(this).isNotBlank()
+        val usable = keySet && hasText
+        if (keySet == aiKeySet && usable == aiUsable) return
+        aiKeySet = keySet
+        aiUsable = usable
+        if (::bars.isInitialized) { bars.setAiVisible(keySet); bars.setAiReady(usable) }
+        sidePanel?.let { it.setAiVisible(keySet); it.setAiReady(usable) }
+        chinesePad?.invalidate()
     }
 
     override fun onCloseSpecialPad() {
@@ -891,6 +1017,26 @@ class TQ9InputMethodService : android.inputmethodservice.InputMethodService(),
         Prefs.setAlign(this, next)
         chinesePad?.onSettingsChanged()
         bars.refreshAlignLabel()
+        // 轉咗顯示方式可能就啱啱夠窄／唔再夠窄，側邊欄要跟住出現或者消失
+        refreshBars()
+    }
+
+    /**
+     * 左右拖 = 拉闊拉窄中文本體。方向要跟返顯示方式：內容貼右（左邊留白）嗰陣
+     * 向左拖先係拉闊，貼左就啱啱相反 —— 永遠都係「拖向留白嗰邊 = 拉闊」。
+     */
+    override fun onWidthDrag(dxDp: Int) {
+        if (dxDp == 0) return
+        val align = Prefs.align(this)
+        if (align == PadAlign.STRETCH) return // 本來就用盡成行，冇位可以拉
+        val sign = if (align == PadAlign.LEFT_GAP) -1 else 1
+        val cur = Prefs.widthScale(this)
+        val next = (cur + sign * dxDp / 250f)
+            .coerceIn(Prefs.MIN_WIDTH_SCALE, Prefs.MAX_WIDTH_SCALE)
+        if (next == cur) return
+        Prefs.setWidthScale(this, next)
+        chinesePad?.onSettingsChanged()
+        refreshBars()
     }
 
     /** 上下拖 = 拉高／拉低成個鍵盤（鍵盤永遠貼實底，唔會提起留個窿）。自由移動已經冇咗。 */
@@ -898,7 +1044,7 @@ class TQ9InputMethodService : android.inputmethodservice.InputMethodService(),
         if (dyDp == 0) return
         val cur = Prefs.heightScale(this)
         val next = (cur + dyDp / 250f).coerceIn(Prefs.MIN_HEIGHT_SCALE, Prefs.MAX_HEIGHT_SCALE)
-        if (next != cur) { Prefs.setHeightScale(this, next); relayoutPads() }
+        if (next != cur) { Prefs.setHeightScale(this, next); relayoutPads(); refreshBars() }
     }
 
     /**
@@ -923,11 +1069,24 @@ class TQ9InputMethodService : android.inputmethodservice.InputMethodService(),
 
     // ---- AI 改寫 -----------------------------------------------------------
 
+    /**
+     * ✨：**冇揀住字都用得**。揀咗就淨係改揀咗嗰段，冇揀就當「改寫成個輸入框」——
+     * 夾硬全選再交出去，返到嚟嗰段字直接取代成個欄嘅內容。
+     *
+     * 全選要喺出返嚟嗰陣**再做多次**：等緊 Gemini 嗰幾秒 user 隨時撳過個欄，
+     * 一撳 caret 就散咗個 selection，`commitText` 就會變成插埋落去而唔係取代。
+     */
     private fun runAi() {
-        val ic = currentInputConnection
-        val selected = ic?.getSelectedText(0)?.toString().orEmpty()
-        if (selected.isBlank()) { toast("要先揀住一段字先用得 AI"); return }
-        if (Prefs.aiApiKey(this).isBlank()) { toast("請喺設定頁入 Gemini API key"); return }
+        val ic = currentInputConnection ?: return
+        if (Prefs.aiApiKey(this).isBlank()) { toast("請先在設定頁輸入 Gemini API key"); return }
+        var selected = ic.getSelectedText(0)?.toString().orEmpty()
+        val wholeField = selected.isBlank()
+        if (wholeField) {
+            val all = extractedAll()
+            if (all.isBlank()) { toast("輸入框沒有文字，無法改寫"); return }
+            ic.setSelection(0, all.length)
+            selected = all
+        }
 
         val myGen = ++aiGeneration
         showAiLoading()
@@ -937,7 +1096,7 @@ class TQ9InputMethodService : android.inputmethodservice.InputMethodService(),
             aiGeneration++ // 令跟住嚟遲到嘅 callback 當第晒
             hideAiLoading()
             playErrorTone()
-            toast("AI 逾時（10 秒冇回應）")
+            toast("AI 逾時（10 秒沒有回應）")
         }
         ui.postDelayed(timeout, AI_TIMEOUT_MS)
 
@@ -947,13 +1106,22 @@ class TQ9InputMethodService : android.inputmethodservice.InputMethodService(),
             aiGeneration++
             hideAiLoading()
             r.onSuccess { out ->
+                val c = currentInputConnection
+                // 全欄改寫：等緊嗰陣個 selection 可能已經冇咗，出返嚟之前再全選一次
+                if (wholeField) c?.setSelection(0, extractedAll().length)
                 // commitText 會取代咗揀住嗰段
-                currentInputConnection?.commitText(out, 1)
+                c?.commitText(out, 1)
             }.onFailure {
                 playErrorTone()
                 toast("AI 失敗：" + (it.message ?: "未知錯誤"))
             }
         }
+    }
+
+    /** 成個輸入框而家有幾多字（攞唔到就當空） */
+    private fun extractedAll(): String {
+        val req = ExtractedTextRequest().apply { hintMaxChars = 100_000; hintMaxLines = 10_000 }
+        return currentInputConnection?.getExtractedText(req, 0)?.text?.toString().orEmpty()
     }
 
     /** AI 處理緊嗰陣：成個 UI disable，中間出個轉緊嘅圈 */
@@ -1121,7 +1289,7 @@ class TQ9InputMethodService : android.inputmethodservice.InputMethodService(),
             return
         }
         if (!SpeechRecognizer.isRecognitionAvailable(this)) {
-            toast("部機冇語音輸入服務")
+            toast("此裝置沒有語音輸入服務")
             return
         }
         val r = SpeechRecognizer.createSpeechRecognizer(this)
@@ -1158,7 +1326,7 @@ class TQ9InputMethodService : android.inputmethodservice.InputMethodService(),
         }
         listening = true
         setSttLight(true)
-        toast("🎤 聽緊…")
+        toast("🎤 聆聽中…")
         runCatching { r.startListening(intent) }.onFailure {
             listening = false; releaseRecognizer()
         }
@@ -1172,7 +1340,10 @@ class TQ9InputMethodService : android.inputmethodservice.InputMethodService(),
     }
 
     private fun setSttLight(on: Boolean) {
-        if (::bars.isInitialized) ui.post { bars.setSttActive(on) }
+        ui.post {
+            if (::bars.isInitialized) bars.setSttActive(on)
+            sidePanel?.setSttActive(on)
+        }
     }
 
     private fun releaseRecognizer() {

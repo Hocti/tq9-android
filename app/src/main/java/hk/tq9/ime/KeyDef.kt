@@ -47,8 +47,31 @@ data class Key(
     val swipeable: Boolean = false,
     val bigLabel: Boolean = false,
     /** false = 畫成灰色兼且撳唔到（AI 鍵未揀字嗰陣） */
-    val enabled: Boolean = true
+    val enabled: Boolean = true,
+    /**
+     * 淨係佔位、唔畫亦都撳唔到（英文 `asdfghjkl` 行兩頭嗰半格）。
+     * 排版嗰陣唔會加入 `boxes`，所以撳落去會 snap 去隔籬真嗰粒鍵。
+     */
+    val spacer: Boolean = false,
+    /**
+     * [text] 已經係最終要出嘅字，唔好再套 shift。
+     *
+     * 長撳變體 popup 揀返嚟嗰啲鍵先會 true —— 大細階兩樣都喺個 list 度揀得到，
+     * shift 開住嗰陣特登揀個細階 `a`，就唔應該畀 shift 再夾硬變返 `A`。
+     */
+    val literal: Boolean = false
 )
+
+/** 一格空位（英文第二行兩頭）。淨係佔 [weight] 咁多闊，唔畫亦都撳唔到。 */
+fun spacerKey(weight: Float) = Key(KeyAction.NOOP, weight = weight, spacer = true)
+
+/**
+ * 變體 popup／角落提示要點寫。
+ *
+ * Tab（`\t`）冇字形，畫出嚟係一片空白，所以寫個 `⇥` 代替 ——
+ * **真正 commit 出去嗰個仲係 `\t`**，淨係畫面換咗個樣。
+ */
+fun variantDisplay(s: String): String = if (s == "\t") "⇥" else s
 
 class KeyBox(val key: Key) {
     var left = 0f; var top = 0f; var right = 0f; var bottom = 0f

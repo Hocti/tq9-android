@@ -12,7 +12,7 @@ class MicPermissionActivity : AppCompatActivity() {
     private val ask = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         Toast.makeText(
             this,
-            if (granted) "已開啟咪高峰，返去再撳一次 🎤" else "冇咪高峰權限，用唔到語音輸入",
+            if (granted) "已開啟麥克風，請返回再按一次 🎤" else "沒有麥克風權限，無法使用語音輸入",
             Toast.LENGTH_SHORT
         ).show()
         finish()

@@ -42,6 +42,11 @@ class OptionBarsView(context: Context) : LinearLayout(context) {
         /** 工具 bar 最左嗰粒上下拖：拉高拉低成個鍵盤（自由移動嗰個方向已經冇用，刪咗） */
         fun onSizeDrag(dyDp: Int)
         /**
+         * 同一粒掣左右拖：拉闊拉窄中文本體。淨係靠左／靠右嗰兩個顯示方式先有用
+         * （拉闊模式本來就用盡成行，冇位可以拉）。
+         */
+        fun onWidthDrag(dxDp: Int)
+        /**
          * 候選字 bar 拉大／縮返：**唔係**喺呢個 view 度自己攞位擴闊，
          * 交返俾 host（[expandedView]）覆蓋喺個鍵盤本身度，成個 UI 高度先唔會跳
          */
@@ -91,6 +96,7 @@ class OptionBarsView(context: Context) : LinearLayout(context) {
     init {
         orientation = VERTICAL
 
+        @Suppress("ClickableViewAccessibility")
         sizeBtn.apply {
             gravity = Gravity.CENTER
             textSize = 15f
@@ -221,11 +227,20 @@ class OptionBarsView(context: Context) : LinearLayout(context) {
         switchBtn.visibility = if (v) View.GONE else View.VISIBLE
     }
 
-    /** AI 要而家真係揀咗一段字先撳得 */
+    /** AI 要而家真係有字改先撳得（揀咗一段，或者成個欄有字） */
     fun setAiReady(ready: Boolean) {
         if (aiReady == ready) return
         aiReady = ready
         refreshAiLook()
+    }
+
+    /**
+     * 未入 Gemini API key 就**成粒掣唔見咗**，唔係淨係灰咗 ——
+     * 用唔到嘅嘢佔住個位冇意思，其餘幾粒會自動攤開填返佢個位。
+     */
+    fun setAiVisible(visible: Boolean) {
+        val want = if (visible) View.VISIBLE else View.GONE
+        if (aiBtn.visibility != want) aiBtn.visibility = want
     }
 
     private fun refreshAiLook() {
@@ -304,19 +319,34 @@ class OptionBarsView(context: Context) : LinearLayout(context) {
 
     // ---- 大細：直接喺粒掣度上下拖 -------------------------------------------
 
+    private var dragX = 0f
     private var dragY = 0f
     private var dragging = false
 
-    /** 上下拖 = 拉高拉低成個鍵盤。鍵盤永遠貼實底，唔會整個提高留返個窿喺下面。 */
+    /**
+     * 喺粒掣度直接拖就改到鍵盤大細：
+     *
+     *  - **上下** = 拉高拉低成個鍵盤（永遠貼實底，唔會整個提高留返個窿喺下面）
+     *  - **左右** = 拉闊拉窄中文本體（靠左／靠右嗰陣先有用）
+     *
+     * 兩個方向唔會撈埋一齊：一拖夠 8dp 就即刻鎖死係邊個方向，
+     * 唔係斜少少就會一邊拉高一邊拉闊。
+     */
     private fun handleSizeDrag(e: MotionEvent): Boolean {
         when (e.actionMasked) {
-            MotionEvent.ACTION_DOWN -> { dragY = e.rawY; dragging = false }
+            MotionEvent.ACTION_DOWN -> { dragX = e.rawX; dragY = e.rawY; dragging = false; horizontal = false }
             MotionEvent.ACTION_MOVE -> {
+                val dx = e.rawX - dragX
                 val dy = e.rawY - dragY
-                if (!dragging && abs(dy) > dp(8f)) dragging = true
+                if (!dragging && (abs(dx) > dp(8f) || abs(dy) > dp(8f))) {
+                    dragging = true
+                    horizontal = abs(dx) > abs(dy)
+                }
                 if (dragging) {
                     val d = resources.displayMetrics.density
-                    listener?.onSizeDrag((-dy / d).roundToInt())
+                    if (horizontal) listener?.onWidthDrag((dx / d).roundToInt())
+                    else listener?.onSizeDrag((-dy / d).roundToInt())
+                    dragX = e.rawX
                     dragY = e.rawY
                 }
             }
@@ -324,4 +354,7 @@ class OptionBarsView(context: Context) : LinearLayout(context) {
         }
         return false
     }
+
+    /** 而家拖緊嘅方向（[handleSizeDrag] 一鎖就唔會中途轉） */
+    private var horizontal = false
 }

@@ -40,8 +40,11 @@ class PadMetrics(ctx: Context, availW: Int, val cols: Int = 5, val rows: Int = 4
 
         // 正方格喺手機上面太高，預設壓扁 20%（設定入面可以校）
         val hRatio = Prefs.keyHeightRatio(ctx)
-        cellW = if (align == PadAlign.STRETCH) availW.toFloat() / cols else unit
+        // 高度**唔跟**闊度倍數行：左右拉淨係應該改到闊度，唔可以順手拉埋高度
+        // （上下拉係另一件事，行 Prefs.heightScale）
         cellH = unit * hRatio * Prefs.heightScale(ctx)
+        cellW = if (align == PadAlign.STRETCH) availW.toFloat() / cols
+                else min(unit * Prefs.widthScale(ctx), availW.toFloat() / cols)
         contentW = cellW * cols
 
         val slack = max(0f, availW - contentW)

@@ -23,7 +23,7 @@ object AiRewrite {
     fun rewrite(ctx: Context, selected: String, done: (Result<String>) -> Unit) {
         val key = Prefs.aiApiKey(ctx)
         if (key.isBlank()) {
-            done(Result.failure(IllegalStateException("未設定 Gemini API key")))
+            done(Result.failure(IllegalStateException("尚未設定 Gemini API key")))
             return
         }
         val model = Prefs.aiModel(ctx)
@@ -62,7 +62,7 @@ object AiRewrite {
             val stream = if (code in 200..299) conn.inputStream else conn.errorStream
             val text = stream?.bufferedReader()?.use(BufferedReader::readText).orEmpty()
             if (code !in 200..299) error(errorMessage(code, text))
-            return extract(text).ifBlank { error("Gemini 冇回應內容") }
+            return extract(text).ifBlank { error("Gemini 沒有回應內容") }
         } finally {
             conn.disconnect()
         }

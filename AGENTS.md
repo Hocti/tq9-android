@@ -35,8 +35,11 @@ adb shell ime set    hk.tq9/.ime.TQ9InputMethodService
 3. **每次 `adb install -r` 之後都要再 `ime enable` + `ime set` 一次**，
    系統會當佢 reinstall 而 reset。
 
-設定頁最底有「試打」四個欄（普通／email／PIN／搜尋）同埋實時預覽，慳返開第三方 app 去試。
-搜尋嗰欄係用嚟睇 `⏎` 有冇變 `🔍`（`enterLabelFor()` 睇 `IME_ACTION_SEARCH`）。
+設定頁最底本來有「試打」四個欄（普通／email／PIN／搜尋）同埋實時預覽，
+**而家收埋咗**（`SettingsActivity.SHOW_DEBUG_SECTIONS = false`，user 唔想見到）。
+`buildTryBox()` / `buildPreview()` 一行都冇刪 —— 想 debug 排位就改返做 `true`，
+唔使開第三方 app。搜尋嗰欄係用嚟睇 `⏎` 有冇變 `🔍`
+（`enterLabelFor()` 睇 `IME_ACTION_SEARCH`）。
 
 ---
 
@@ -51,13 +54,46 @@ adb shell ime set    hk.tq9/.ime.TQ9InputMethodService
 
 ### 底行嘅規矩（英文／符號／純數字）
 
-- **左下兩粒一定係「返去中文／英文」**（`中`、`ABC`）—— 中文九宮格例外，
-  佢自己就係中文，左下角係 `Eng`。
+- **左下兩粒一定係「返去中文／英文」**（`中`、`ABC`）—— 有兩個例外：
+  中文九宮格自己就係中文，左下角係 `Eng`；**純數字頁**兩粒搬咗去**右上角**
+  （user 要求，左下角讓咗俾 `0` `.` `-`）。
 - **`⏎` 上面嗰粒一定係 `⌫`**。所以符號頁嘅分頁掣（`=\<`／`?123`）同 `⌫`
   都喺倒數第二行嘅最左同最右，純數字頁嘅 `⌫` 亦都由右上角搬咗去 `⏎` 上面。
 - 讓返出嚟嘅位：符號第一頁底行 space 右邊順住排 `, . ? ; /` 五粒（本來散喺
   上面兩行）；第二頁唔要標點，space 同 `⏎` 拉長，`numpad` 掣再升多一行。
-- 英文底行 space 同 `.` 中間加咗粒 `?`。
+- **英文底行 space 右邊係 `, . /` 三粒**（本來係 `/` 喺 space 左、`?` 同 `.` 喺右）。
+  `?` 已經冇咗獨立一粒 —— 佢係長撳 `/` 嘅第一個選擇（見下面）。
+
+### 英文鍵盤排位（2026-08-24 大執過）
+
+- **永遠有數字行**（`Prefs.FORCE_LATIN_NUM_ROW = true`）。設定頁嗰個開關收埋咗，
+  但 `KEY_LATIN_NUM_ROW` 同「冇數字行就喺字母角落寫細字」嗰段 code 都冇刪。
+- `asdfghjkl` **唔再靠拉長 `a` / `l` 收邊**：九粒一樣闊，兩頭各讓半格空位
+  （`spacerKey(0.5f)`）。空位**唔會**入 `boxes`，所以撳落去會由 `boxNear()`
+  snap 去隔籬真嗰粒鍵，唔會變死位。
+- `,` 由 `zxcvbnm` 行搬咗落底行（頂咗本來個 `?`），讓返出嚟嘅位俾 `⇧` 同 `⌫` 拉長。
+- **長撳字母大細階兩樣都揀得**：`ch()` 會按而家個 `ShiftState` 砌 variants ——
+  排頭嗰個係粒鍵而家寫住嗰個（撳實唔郁放手 = 打返佢），第二個係另一個大細階。
+  popup 揀返嚟嗰粒鍵帶 `Key.literal = true`，`typeChar()` 見到就**唔會**再套 shift
+  （唔係特登揀個細階 `a` 會俾 shift 夾硬變返 `A`）。
+- 標點三粒（`, . /`）長撳有 `PUNCT_VARIANTS`，左上角寫住細字提示。
+  **三粒都唔跟「第一個 = 自己」規矩** —— 排頭嗰個係長撳一彈出嚟就已經停咗
+  喺度嗰個（唔郁手指放開就出佢），粒鍵自己短撳攞得返：
+  `,` → **Tab**（`\t`）、`.` → `;`、`/` → `?`。
+- **Tab 冇字形**，畫出嚟一片空白，所以 `variantDisplay()`（`KeyDef.kt`）會換做
+  `⇥` —— popup 同角落提示都要行呢個 helper，但係 `Key.variants` 入面存嘅、
+  同埋最後 commit 出去嗰個一定要係真正嘅 `\t`。
+- **變體多過螢幕裝得落就一齊迫窄**（`openVariantPopup`：
+  `if (popupItemW * items.size > width) popupItemW = width / items.size`）。
+  情願粒粒細啲都好過有幾個推咗出螢幕外面永遠揀唔到 —— `/` 有八個，
+  用返 `max(鍵闊 × 1.1, 50dp)` 就一定爆。字太大 `KeyPopup` 自己會縮返。
+- `?123` 長撳 = 直接跳純數字頁（`longAction = TO_NUMBER`），中文九宮格嗰粒一樣。
+
+### 純數字頁：成頁唔准長撳
+
+`NumberPadView.allowLongPress()` 一律回 `false`（`KeyboardBaseView` 嗰個 hook）。
+打電話號碼／金額撳耐咗少少就彈個符號 popup 出嚟好煩，所以數字鍵**用 `num()`
+唔用 `digitKey()`**（後者會帶 `variants`）。
 
 ### mapped_table 嘅 id 有特別意思
 
@@ -152,15 +188,46 @@ ui/     SettingsActivity / MicPermissionActivity
 `Q9Engine.status` 仲計緊，但係冇人畫。要出 message 就用 `toast()`，
 唔好再喺條 bar 上面加行。
 
+### 中文拉窄就唔要上面條 bar，改用側邊欄
+
+`PadAlign.LEFT_GAP` / `RIGHT_GAP` 之下，中文本體闊過螢幕嘅
+`Prefs.SIDE_PANEL_MAX_RATIO`（六成）就照舊用上面條 `OptionBarsView`；
+**窄過六成**就 `bars.visibility = GONE`，成條 bar 嘅內容搬去 `SidePanelView`
+（加落 `padHolder` 度，`FrameLayout.LayoutParams` 闊度 = 空出嚟嗰邊，
+gravity 跟 `PadAlign` 反過嚟擺）：上面一（兩）行功能掣，下面成塊可 scroll 嘅候選字。
+
+入口係 `refreshBars()` 開頭嗰句 `if (refreshSidePanel(cands)) { … return }`。
+
+**個高度一定要寫死做 `PadMetrics.totalHeight`（＝中文九宮格幾高），
+唔可以用 `MATCH_PARENT`。** `padHolder` 係 `wrap_content` 嘅 `FrameLayout`：
+`MATCH_PARENT` 嘅仔會攞到 `AT_MOST(成個可用高度)`，而 `SidePanelView` 入面
+個候選字 `ScrollView` 又食住 `weight = 1`，結果候選字一多就撐大咗 `padHolder`，
+成個鍵盤跟住拉高（**打橫特別明顯**，因為打橫一定入側邊欄模式）。
+只限**中文九宮格** —— 英文／符號／純數字係鋪滿成行，冇位空出嚟；
+剪貼簿個 overlay 又會蓋住成個 `padHolder`（連側邊欄都遮埋就撳唔返粒 ✖），
+所以 `overlay != null` 嗰陣一定要退返去用上面條 bar。
+
+側邊欄冇 `⇄`（候選字同工具一次過見晒，唔使切）。`switchMode()` 個
+`padHolder.removeAllViews()` 會順手 detach 咗佢，最後嗰句 `refreshBars()` 會加返。
+
 ### 鍵盤永遠貼實底
 
 `PadMetrics` 冇咗 `extraBottom`／`Prefs.floatY`。`PadAlign.FLOATING` 已經刪咗
 （自由移動嗰粒冇用，`Prefs.floatX`／`ChinesePadView.nudgeFloat` 一齊清咗）——
 而家 `PadAlign` 得 `STRETCH`／`LEFT_GAP`／`RIGHT_GAP` 三個，
-`OptionBarsView` 個 sizeBtn 淨係轉呢三個，拖動就淨係得上下（拉高拉低）。
-「拉高／拉低」係 `Prefs.heightScale`（0.6~1.8），
-`PadMetrics.cellH` 同 `PadMetrics.rowHeightPx()` 兩邊都要乘返佢，
-唔係英文鍵盤就唔會跟住變。
+`OptionBarsView` 個 sizeBtn 淨係轉呢三個。拖動**兩個方向都有嘢做**
+（一拖夠 8dp 就鎖死方向，唔會斜少少就兩樣一齊改）：
+
+- **上下** = `Prefs.heightScale`（0.6~1.8）。`PadMetrics.cellH` 同
+  `PadMetrics.rowHeightPx()` 兩邊都要乘返佢，唔係英文鍵盤就唔會跟住變。
+- **左右** = `Prefs.widthScale`（0.45~1.6），淨係 `LEFT_GAP` / `RIGHT_GAP` 有用。
+  **淨係入 `cellW`，唔可以入 `cellH`** —— 兩者本來都由同一個 `unit` 出，
+  一唔小心就會變成「左右拉埋高度都跟住變」。
+  方向要跟顯示方式反（見 `onWidthDrag`）：永遠都係「拖向留白嗰邊 = 拉闊」。
+
+設定頁嗰幾條尺寸 slider（按鍵大細／最大闊度／最大高度／按鍵高度／鍵盤高度）
+全部收埋咗（`SettingsActivity.SHOW_HIDDEN_OPTIONS = false`，一行 code 都冇刪），
+剩返「字體大細」同「邊框粗幼」—— 長闊而家一律喺鍵盤度直接拖。
 
 `EmojiPadView` 同 `ClipboardListView` 唔係 `KeyboardBaseView`，
 高度靠 `forcedHeightPx`（開之前喺 `rememberPadHeight()` 記低上一個 pad 幾高），
@@ -176,6 +243,48 @@ ui/     SettingsActivity / MicPermissionActivity
 唔係 user 熄咗條 bar 之後開 emoji 就返唔到去普通鍵盤。
 
 `showOverlay()` / `hideOverlay()` 兩邊都會叫 `refreshBars()`。
+
+**英文／符號頁亦都夾硬開返條 bar**：呢兩頁靠佢出打字提示同滑出嚟嘅字，
+冇咗就等於打盲舖。`refreshBars()` 見到 `mode` 係 `LATIN`／`SYMBOL` 而
+`effective == BarMode.OFF` 就升做 `CANDIDATES`。**唔會改到 `barMode` 本身** ——
+返到中文頁照樣跟返 user 設定嗰個開關。
+
+## `Spinner` 唔可以用「跳過第一下 callback」嗰招
+
+`SettingsActivity.FuncPicker`（左上角鍵嘅短撳／長撳）試過用一個 `ready` flag
+擋開頭嗰下 programmatic `onItemSelected`，**中過伏**：第一下幾時 fire（甚至
+fire 唔 fire）係睇 layout 時序，擋錯咗就會食咗 user 真正嗰下 —— 個掣睇落郁咗，
+但係 pref 冇改過、上面個 label 亦都仲係舊嗰個，跟住去另一個 spinner 揀返同一樣
+嘢就會冤枉人「功能重覆」。
+
+而家改成**同 pref 而家真正存住嗰個值比**：一樣就當開場／回位乜都唔做，
+唔一樣先至算 user 揀過嘢。個 label 每次都由 getter 重新讀，就算 `onPick`
+拒絕咗都唔會同 pref 唔夾。
+
+順帶一提 `Prefs.topLeftLong()` 撞咗短撳嗰陣**淨係計出** `NONE`，個 pref 入面
+仲係舊嗰個 —— 改完短撳要自己 `setFunc(KEY_TL_LONG, NONE)` 寫實落去，
+唔係個 spinner 同 pref 就會各講各話。
+
+## 畀人睇嘅字：全部正體中文書面語
+
+app 入面所有 user 見到嘅字（設定頁、toast、鍵面、空狀態提示）一律用
+**正體中文書面語**，唔用廣東話口語（「冇」→「沒有」、「撳」→「按」、
+「而家」→「目前」…）。**注釋同 commit message 唔使跟**，照舊用口語。
+
+個名一律叫「**九万輸入法**」，簡稱「**九万**」。「TQ9」係 project 個英文名，
+**淨係可以喺 code／檔名／package 度出現**，唔可以出現喺畀人睇嘅字入面
+（`strings.xml` 個 `subtype_en` 就係因為咁刪咗）。
+
+## AI 改寫（✨）
+
+- **唔使揀住字都用得**：揀咗就淨係改揀咗嗰段，冇揀就當「改寫成個輸入框」——
+  `runAi()` 會 `setSelection(0, 全長)` 再交出去。**出返嚟之前要再全選一次**：
+  等緊 Gemini 嗰幾秒 user 隨時撳過個欄，一撳 caret 就散咗個 selection，
+  `commitText` 就會變成插埋落去而唔係取代。
+- **完全冇入 API key 就成粒掣唔見咗**（`setAiVisible`，唔係淨係灰咗）。
+  灰咗嗰個狀態留返俾「有 key 但個欄空咗」。
+- 撳唔撳得由 `applyAiState()` 話事，`onUpdateSelection` 每次都會重新計
+  （唔可以好似以前咁「揀嘅狀態冇變就 return」—— 而家個欄有冇字都影響到）。
 
 ## 候選欄吉住就出速選字
 

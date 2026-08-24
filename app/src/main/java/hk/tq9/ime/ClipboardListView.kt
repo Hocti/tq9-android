@@ -41,7 +41,7 @@ class ClipboardListView(context: Context) : LinearLayout(context) {
         isClickable = true          // 唔好俾下面個鍵盤食咗啲掂觸
 
         title.apply {
-            text = "剪貼簿歷史（撳一下貼，長撳剷走）"
+            text = "剪貼簿記錄（按一下貼上，長按刪除）"
             textSize = 13f
             gravity = Gravity.CENTER_VERTICAL
             setPadding(dp(8f).toInt(), 0, dp(8f).toInt(), 0)
@@ -113,7 +113,7 @@ class ClipboardListView(context: Context) : LinearLayout(context) {
         val items = ClipHistory.list(context)
         if (items.isEmpty()) {
             list.addView(TextView(context).apply {
-                text = "未有記錄。喺其他 app 複製過嘅字會出喺呢度。"
+                text = "尚未有記錄。在其他應用程式複製過的文字會顯示在這裡。"
                 textSize = 13f
                 setTextColor(theme.textDim)
                 setPadding(dp(6f).toInt(), dp(10f).toInt(), dp(6f).toInt(), dp(10f).toInt())

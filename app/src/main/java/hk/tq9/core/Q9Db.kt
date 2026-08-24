@@ -157,7 +157,7 @@ class Q9Db private constructor(private val db: SQLiteDatabase) {
             val tmp = File(ctx.cacheDir, "incoming.db")
             ctx.contentResolver.openInputStream(uri)?.use { input ->
                 tmp.outputStream().use { out -> input.copyTo(out) }
-            } ?: error("開唔到揀咗嘅檔案")
+            } ?: error("無法開啟所選檔案")
             validate(tmp)
             val target = file(ctx)
             if (target.exists()) target.delete()
@@ -174,7 +174,7 @@ class Q9Db private constructor(private val db: SQLiteDatabase) {
                     while (c.moveToNext()) have.add(c.getString(0))
                 }
                 val missing = need.filter { t -> t !in have }
-                require(missing.isEmpty()) { "唔係有效嘅九万資料庫，欠缺：" + missing.joinToString(", ") }
+                require(missing.isEmpty()) { "不是有效的九万資料庫，缺少：" + missing.joinToString(", ") }
             }
         }
 

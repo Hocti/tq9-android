@@ -14,6 +14,9 @@ import kotlin.math.min
  */
 class NumberPadView(context: Context) : RowsPadView(context) {
 
+    /** 呢頁一律唔准長撳（打號碼撳耐咗就彈 popup 出嚟好煩） */
+    override fun allowLongPress(k: Key) = false
+
     /** true = 密碼／PIN，唔畀轉去其他 view */
     var pinMode: Boolean = false
         set(v) { field = v; rebuild() }
@@ -30,16 +33,18 @@ class NumberPadView(context: Context) : RowsPadView(context) {
                     Key(KeyAction.BACKSPACE, label = "⌫", repeatable = true))
             )
         }
-        // 數字鍵長撳出符號（1 → !、4 → 各國銀紙），同英文鍵盤嗰行數字一樣
-        fun d(n: Int) = digitKey(n.toString(), bigLabel = true)
-        // 底行左邊兩粒一定係「返去中文／英文」，⌫ 一定喺 ⏎ 上面 —— 全部鍵盤一樣
+        // 呢頁**冇一粒鍵有長撳效果** —— 打電話號碼／金額嗰陣撳耐咗少少就彈個
+        // 符號 popup 出嚟好煩，所以數字一律用淨得個 label 嘅 [num]，唔用 digitKey。
+        // `中` / `ABC` 喺右上角（唔喺底行），`0` `.` `-` 就喺左下角，
+        // ⌫ 照舊喺 ⏎ 上面。
         return listOf(
-            listOf(d(1), d(2), d(3), Key(KeyAction.CHAR, label = "-", text = "-")),
-            listOf(d(4), d(5), d(6), Key(KeyAction.CHAR, label = ".", text = ".")),
-            listOf(d(7), d(8), d(9), Key(KeyAction.BACKSPACE, label = "⌫", repeatable = true)),
+            listOf(num(1), num(2), num(3), Key(KeyAction.TO_CHINESE, label = "中", bigLabel = true)),
+            listOf(num(4), num(5), num(6), Key(KeyAction.TO_LATIN, label = "ABC")),
+            listOf(num(7), num(8), num(9), Key(KeyAction.BACKSPACE, label = "⌫", repeatable = true)),
             listOf(
-                Key(KeyAction.TO_CHINESE, label = "中", bigLabel = true),
-                Key(KeyAction.TO_LATIN, label = "ABC"), d(0),
+                num(0),
+                Key(KeyAction.CHAR, label = ".", text = "."),
+                Key(KeyAction.CHAR, label = "-", text = "-"),
                 Key(KeyAction.ENTER, label = "⏎", accent = true)
             )
         )
