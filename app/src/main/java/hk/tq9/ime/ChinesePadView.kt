@@ -6,7 +6,6 @@ import android.graphics.Rect
 import android.graphics.RectF
 import hk.tq9.core.PadFunc
 import hk.tq9.core.Prefs
-import hk.tq9.core.Q9Cmd
 import hk.tq9.core.Q9Engine
 import hk.tq9.swipe.GestureKeyTracker
 import kotlin.math.min
@@ -20,6 +19,9 @@ import kotlin.math.roundToInt
  *   [同音]     4 5 6  [⌫]
  *   [?123]     7 8 9  [␣]
  *   [Eng]      0 0 取消 [⏎]
+ *
+ * 選字夠兩頁嗰陣底行兩格闊嗰粒 `0` 會拆做「下頁」＋「上頁」兩粒正常闊
+ * （以前係撳住「下頁」向左掃先返到上一頁，太難撳，收咗）。
  *
  * 🎤 搬咗上面條工具 bar（貼上隔籬），左上角嗰粒都揀得。
  * 🌐（轉輸入法）收埋咗，長撳「Eng」照樣叫得出嚟（見 [KeyAction.IME_SWITCH]）。
@@ -42,6 +44,14 @@ class ChinesePadView(context: Context, private val engine: Q9Engine) : KeyboardB
     private var metrics: PadMetrics? = null
     private val imgRect = Rect()
     private val dstRect = RectF()
+
+    /**
+     * 底行而家係咪「下頁／上頁」兩粒（唔係就係兩格闊嗰粒 `0`）。
+     * 排完版記住實際排咗邊個樣，engine 狀態變咗先知使唔使重排（見 [onEngineState]）。
+     */
+    private var splitPager = false
+
+    private fun wantSplitPager() = engine.selectMode && engine.totalPage > 1
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         val w = MeasureSpec.getSize(widthMeasureSpec)
@@ -82,8 +92,15 @@ class ChinesePadView(context: Context, private val engine: Q9Engine) : KeyboardB
             val row = 2 - (i - 1) / 3
             add(Key(KeyAction.DIGIT, digit = i, swipeable = true, holdRepeat = true), col.toFloat(), row)
         }
-        // 0（兩格闊）＋ 取消。0 長撳係開關標點，所以冇「長撳當連撳」
-        add(Key(KeyAction.DIGIT, digit = 0, swipeable = true, hint = "「」"), 1f, 3, 2f)
+        // 0（兩格闊）＋ 取消。0 長撳係開關標點，所以冇「長撳當連撳」。
+        // 選字夠兩頁嗰陣兩格闊嗰粒 0 就拆做「下頁」＋「上頁」兩粒正常闊（見 [splitPager]）
+        splitPager = wantSplitPager()
+        if (splitPager) {
+            add(Key(KeyAction.DIGIT, digit = 0, hint = "「」"), 1f, 3)
+            add(Key(KeyAction.PREV_PAGE, label = "上頁"), 2f, 3)
+        } else {
+            add(Key(KeyAction.DIGIT, digit = 0, swipeable = true, hint = "「」"), 1f, 3, 2f)
+        }
         add(Key(KeyAction.CANCEL, label = "取消"), 3f, 3)
 
         // 右欄。☰ 代表「揭開上面條 bar」，⚙ 太似「設定」，人哋撳落去唔知做乜
@@ -121,6 +138,14 @@ class ChinesePadView(context: Context, private val engine: Q9Engine) : KeyboardB
 
     override fun keyEnabled(k: Key): Boolean =
         k.enabled && (k.action != KeyAction.AI || chineseHost?.aiReady == true)
+
+    /**
+     * engine 狀態變咗要重畫。入／出「夠兩頁嘅選字模式」嗰陣底行會由
+     * 兩格闊嘅 `0` 變成「下頁」＋「上頁」兩粒，所以仲要重排一次。
+     */
+    fun onEngineState() {
+        if (splitPager != wantSplitPager()) relayout() else invalidate()
+    }
 
     fun onSettingsChanged() {
         refreshSwipeSettings()
@@ -162,16 +187,6 @@ class ChinesePadView(context: Context, private val engine: Q9Engine) : KeyboardB
         chineseHost?.pressDigit(index)
         // 撳完呢一碼啱啱夠字出候選 → 之後嗰啲鍵唔可以再當碼用
         if (engine.selectMode) abortSwipe()
-    }
-
-    /** 選字模式嘅 `0` 係「下頁」，向左掃就係返轉頭上一頁 */
-    override fun canFlick(key: Key) =
-        key.action == KeyAction.DIGIT && key.digit == 0 && engine.selectMode
-
-    override fun onFlick(key: Key, dx: Float): Boolean {
-        if (dx >= 0f) return false // 向右冇特別意思，照當撳咗「下頁」
-        engine.cmd(Q9Cmd.PREV)
-        return true
     }
 
     // ---- 畫面 -------------------------------------------------------------

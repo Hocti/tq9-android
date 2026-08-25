@@ -17,7 +17,6 @@ import hk.tq9.core.Prefs
 import hk.tq9.swipe.GestureKeyTracker
 import kotlin.math.abs
 import kotlin.math.hypot
-import kotlin.math.max
 import kotlin.math.min
 
 /**
@@ -313,10 +312,6 @@ abstract class KeyboardBaseView(context: Context) : View(context) {
                             swiping = true
                             onSwipeStart()
                         }
-                    } else if (pressed?.let { canFlick(it.key) } == true) {
-                        // 掃鍵（例如選字模式嘅 0）：唔好拖去隔離格，
-                        // 亦都唔好等長撳彈嘢出嚟，放手嗰陣先算方向
-                        cancelPending()
                     } else {
                         // 唔支援滑動嘅鍵：可以拖去隔離格
                         val b = boxNear(x, y)
@@ -364,13 +359,7 @@ abstract class KeyboardBaseView(context: Context) : View(context) {
                 } else {
                     tracker.cancel()
                     val b = pressed
-                    if (b != null && !longFired) {
-                        val dx = x - downX
-                        val dy = y - downY
-                        val flicked = canFlick(b.key) && abs(dx) >= flickMinPx &&
-                            abs(dx) > abs(dy) && onFlick(b.key, dx)
-                        if (!flicked) host?.onKey(b.key)
-                    }
+                    if (b != null && !longFired) host?.onKey(b.key)
                 }
                 pressed = null
                 invalidate()
@@ -511,18 +500,6 @@ abstract class KeyboardBaseView(context: Context) : View(context) {
         swipeAborted = true
         invalidate()
     }
-
-    /**
-     * 呢粒鍵撳住向左／右掃有冇特別意思（例如選字模式嘅 `0`：向左掃 = 上一頁）。
-     * 回 true 就唔會再當佢「拖去隔離格」，亦都唔會等長撳。
-     */
-    protected open fun canFlick(key: Key): Boolean = false
-
-    /** 掃咗。[dx] 負數 = 向左。回傳 true = 處理咗，唔使再當短撳 */
-    protected open fun onFlick(key: Key, dx: Float): Boolean = false
-
-    /** 掃幾遠先算數（唔好同普通手震撞） */
-    private val flickMinPx: Float get() = max(slop * 2f, dp(20f))
 
     private val swipeDelegate = object : GestureKeyTracker.Delegate {
         override fun keyAt(x: Float, y: Float) = swipeKeyAt(x, y)

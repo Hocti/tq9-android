@@ -35,11 +35,11 @@ class NumberPadView(context: Context) : RowsPadView(context) {
         }
         // 呢頁**冇一粒鍵有長撳效果** —— 打電話號碼／金額嗰陣撳耐咗少少就彈個
         // 符號 popup 出嚟好煩，所以數字一律用淨得個 label 嘅 [num]，唔用 digitKey。
-        // `中` / `ABC` 喺右上角（唔喺底行），`0` `.` `-` 就喺左下角，
+        // `中` / `Eng` 喺右上角（唔喺底行），`0` `.` `-` 就喺左下角，
         // ⌫ 照舊喺 ⏎ 上面。
         return listOf(
             listOf(num(1), num(2), num(3), Key(KeyAction.TO_CHINESE, label = "中", bigLabel = true)),
-            listOf(num(4), num(5), num(6), Key(KeyAction.TO_LATIN, label = "ABC")),
+            listOf(num(4), num(5), num(6), Key(KeyAction.TO_LATIN, label = "Eng")),
             listOf(num(7), num(8), num(9), Key(KeyAction.BACKSPACE, label = "⌫", repeatable = true)),
             listOf(
                 num(0),

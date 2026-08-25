@@ -10,12 +10,12 @@ import android.content.Context
  *
  * 底行嘅規矩（同英文鍵盤一樣，全部鍵盤都跟）：
  *
- *  - **左下兩粒一定係 `中` 同 `ABC`**，即係「返去中文／英文」，唔使兜圈。
- *  - **`⏎` 上面嗰粒一定係 `⌫`**，所以 `⌫` 同分頁掣（`=\<`／`?123`）都搬咗上
+ *  - **左下兩粒一定係 `Eng` 同 `中`**（英行先），即係「返去英文／中文」，唔使兜圈。
+ *  - **`⏎` 上面嗰粒一定係 `⌫`**，所以 `⌫` 同分頁掣（`€£¥`／`?123`）都搬咗上
  *    倒數第二行嘅最左同最右，底行淨返轉鍵盤、space、標點同 `⏎`。
  *
  * 第一頁底行 space 右邊順住排 `, . ? ; /` 五粒（都係打字最常用嗰啲），
- * 呢五粒本來喺上面兩行，讓返位出嚟畀 `=\<`／`⌫`。
+ * 呢五粒本來喺上面兩行，讓返位出嚟畀分頁掣（`€£¥`）同 `⌫`。
  * 第二頁就唔要標點（space 同 `⏎` 拉長），純數字 keypad 擺喺 numpad 掣（
  * [KeyAction.TO_NUMBER]），又再向上升多一行，個位留返俾 `⌫`。
  *
@@ -41,12 +41,13 @@ class SymbolPadView(context: Context) : RowsPadView(context) {
             r1 = row("!@#$%^&*()")
             r2 = row("`~-_=+[]{}")
             // `/ ? ;` 搬咗落底行 space 隔籬，呢行兩頭讓咗位出嚟畀分頁掣同 ⌫
-            r3 = listOf(Key(KeyAction.SYM_PAGE, label = "=\\<", weight = 1.4f)) +
+            // 分頁掣寫住 `€£¥` —— 第二頁頭一行就係啲銀紙符號，寫 `=\<` 冇人知係乜
+            r3 = listOf(Key(KeyAction.SYM_PAGE, label = "€£¥", weight = 1.4f)) +
                 row("\\|:'\"<>") +
                 listOf(Key(KeyAction.BACKSPACE, label = "⌫", weight = 1.4f, repeatable = true))
             r4 = listOf(
+                Key(KeyAction.TO_LATIN, label = "Eng", weight = 1.3f),
                 Key(KeyAction.TO_CHINESE, label = "中", weight = 1.3f),
-                Key(KeyAction.TO_LATIN, label = "ABC", weight = 1.3f),
                 Key(KeyAction.SPACE, label = "␣", weight = 2.4f),
                 ch(","), ch("."), ch("?"), ch(";"), ch("/"),
                 Key(KeyAction.ENTER, label = "⏎", weight = 1.5f, accent = true)
@@ -61,8 +62,8 @@ class SymbolPadView(context: Context) : RowsPadView(context) {
                 listOf("«", "»", "\u201c", "\u201d", "\u2018", "\u2019", "–", "—").map { ch(it) } +
                 listOf(Key(KeyAction.BACKSPACE, label = "⌫", weight = 1.4f, repeatable = true))
             r4 = listOf(
+                Key(KeyAction.TO_LATIN, label = "Eng", weight = 1.3f),
                 Key(KeyAction.TO_CHINESE, label = "中", weight = 1.3f),
-                Key(KeyAction.TO_LATIN, label = "ABC", weight = 1.3f),
                 Key(KeyAction.SPACE, label = "␣", weight = 5.4f),
                 Key(KeyAction.ENTER, label = "⏎", weight = 2f, accent = true)
             )

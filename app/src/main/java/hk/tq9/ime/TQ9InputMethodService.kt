@@ -414,7 +414,8 @@ class TQ9InputMethodService : android.inputmethodservice.InputMethodService(),
     }
 
     override fun onStateChanged() {
-        chinesePad?.invalidate()
+        // 唔淨係重畫：入／出「夠兩頁嘅選字模式」底行要換做「下頁／上頁」兩粒
+        chinesePad?.onEngineState()
         refreshBars()
     }
 
@@ -433,6 +434,7 @@ class TQ9InputMethodService : android.inputmethodservice.InputMethodService(),
             KeyAction.SHORTCUT -> engine.cmd(Q9Cmd.SHORTCUT)
             KeyAction.SC_TOGGLE -> toggleSc()
             KeyAction.HOMO -> engine.cmd(Q9Cmd.HOMO)
+            KeyAction.PREV_PAGE -> engine.cmd(Q9Cmd.PREV)
             KeyAction.TO_CHINESE -> switchMode(PadMode.CHINESE)
             KeyAction.TO_LATIN -> switchMode(PadMode.LATIN)
             KeyAction.TO_SYMBOL -> { switchMode(PadMode.SYMBOL); symbolPad?.page = 0 }
@@ -460,8 +462,16 @@ class TQ9InputMethodService : android.inputmethodservice.InputMethodService(),
             return true
         }
         when (key.action) {
-            // 本身 "/" 鍵嘅開關標點，改成長撳 0
-            KeyAction.DIGIT -> if (key.digit == 0) { engine.cmd(Q9Cmd.OPENCLOSE); return true }
+            KeyAction.DIGIT -> {
+                // 本身 "/" 鍵嘅開關標點，改成長撳 0
+                if (key.digit == 0) { engine.cmd(Q9Cmd.OPENCLOSE); return true }
+                // 選字模式長撳一格 = 開嗰個字嘅同音字表（唔使先撳「同音」）。
+                // 就算查唔到同音字都照食咗呢下長撳 —— 唔好跌返落「長撳 = 連撳」，
+                // 唔係就會即刻揀咗個字，跟住放手嗰下再攞個數字起新碼。
+                if (engine.selectMode) { engine.homoAt(key.digit); return true }
+                // 未打過碼長撳 1~9 = 直接開嗰格嘅速選字表（打緊碼就照舊「長撳 = 連撳」）
+                if (engine.shortcutDigit(key.digit)) return true
+            }
             KeyAction.HOMO -> { engine.cmd(Q9Cmd.RELATE); return true }
             KeyAction.PASTE -> { onPasteHistory(); return true }
             KeyAction.IME_SWITCH -> {

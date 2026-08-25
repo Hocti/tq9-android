@@ -185,6 +185,46 @@ class Q9Engine(val db: Q9Db) {
         homo = !homo
     }
 
+    /**
+     * **未打過任何碼**嗰陣長撳 1~9：唔使先撳個碼再撳「速選」，
+     * 直接開嗰格嘅速選字表（`mapped_table` 嘅 `1000 + digit`）。
+     *
+     * 回 false = 冇嘢開得（唔喺首頁、或者嗰格根本冇速選字），
+     * 粒鍵就行返平時嘅長撳（九宮格係「長撳 = 連撳」）。
+     */
+    fun shortcutDigit(digit: Int): Boolean {
+        if (digit !in 1..9 || selectMode || currCode.isNotEmpty()) return false
+        val words = db.keyInput(1000 + digit)
+        if (words.isEmpty()) return false
+        statusPrefix = "速選$digit"
+        startSelectWord(words)
+        changed()
+        return true
+    }
+
+    /**
+     * 選字模式長撳其中一格：直接開嗰個字嘅同音字表 ——
+     * **唔使先撳「同音」掣**，兩條路出嚟嘅表一模一樣（見 [selectWord] 嘅 `homo` 段）。
+     *
+     * 回 false = 嗰格冇字、係多字詞（同音字淨係單字先有）、或者查唔到同音字。
+     */
+    fun homoAt(slot: Int): Boolean {
+        if (!selectMode || openclose || slot !in 1..9) return false
+        val idx = currPage * 9 + slot - 1
+        if (idx >= selectWords.size) return false
+        val word = selectWords[idx]
+        if (word.isEmpty() || word == "*") return false
+        val list = db.getHomo(word)
+        if (list.isEmpty()) return false
+        homo = false
+        // 揀完之後照樣喺狀態列寫返個字正路點打（同撳「同音」掣嗰條路一樣）
+        afterHomo = true
+        statusPrefix = "同音[$word]"
+        startSelectWord(list)
+        changed()
+        return true
+    }
+
     /** 上面條 bar 冇候選字嗰陣會出速選字，撳咗就當揀咗佢（會行返同音／關聯字嗰套） */
     fun pickQuick(word: String) {
         if (word.isEmpty() || word == "*") return

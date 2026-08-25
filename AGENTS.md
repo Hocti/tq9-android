@@ -48,17 +48,21 @@ adb shell ime set    hk.tq9/.ime.TQ9InputMethodService
 ### 九宮格排位係 numpad，唔係電話
 
 `7 8 9` 喺最上、`1 2 3` 喺最落，跟返 `Q9Form.cs` 嘅 `ResizeAllButton()`。
-底行係 `[0 佔兩格][取消]`。改過嚟電話排法就同原版打法唔同曬。
+底行係 `[0 佔兩格][取消]`；選字夠兩頁嗰陣兩格闊嗰粒 `0` 會拆做
+`[下頁][上頁]` 兩粒正常闊（見下面「選字揭頁」）。改過嚟電話排法就同原版打法唔同曬。
 左下角淨返粒 `🌐`（成格闊）—— `🎤` 搬咗上工具 bar，喺 `📋` 隔籬，
 亦都係左上角嗰粒鍵揀得嘅其中一個 `PadFunc`。
 
 ### 底行嘅規矩（英文／符號／純數字）
 
-- **左下兩粒一定係「返去中文／英文」**（`中`、`ABC`）—— 有兩個例外：
-  中文九宮格自己就係中文，左下角係 `Eng`；**純數字頁**兩粒搬咗去**右上角**
+- **左下兩粒一定係「返去英文／中文」**（`Eng` 行先，跟住先至 `中`）—— 有兩個例外：
+  中文九宮格自己就係中文，左下角淨係 `Eng`；**純數字頁**兩粒搬咗去**右上角**
   （user 要求，左下角讓咗俾 `0` `.` `-`）。
-- **`⏎` 上面嗰粒一定係 `⌫`**。所以符號頁嘅分頁掣（`=\<`／`?123`）同 `⌫`
+  英文嗰粒**寫 `Eng` 唔寫 `ABC`**（2026-08-25 user 要求，全部頁一致）。
+- **`⏎` 上面嗰粒一定係 `⌫`**。所以符號頁嘅分頁掣（`€£¥`／`?123`）同 `⌫`
   都喺倒數第二行嘅最左同最右，純數字頁嘅 `⌫` 亦都由右上角搬咗去 `⏎` 上面。
+  第一頁嗰粒分頁掣**寫三個銀紙符號 `€£¥`**（第二頁頭一行就係啲銀紙），
+  以前寫 `=\<`，冇人知係乜。
 - 讓返出嚟嘅位：符號第一頁底行 space 右邊順住排 `, . ? ; /` 五粒（本來散喺
   上面兩行）；第二頁唔要標點，space 同 `⏎` 拉長，`numpad` 掣再升多一行。
 - **英文底行 space 右邊係 `, . /` 三粒**（本來係 `/` 喺 space 左、`?` 同 `.` 喺右）。
@@ -308,6 +312,12 @@ app 入面所有 user 見到嘅字（設定頁、toast、鍵面、空狀態提�
 **注意有啲字（例如「嘅」「喺」）根本冇 `word_meta` 記錄**，`getHomo()` 回空，
 嗰陣 `selectWord()` 會直接 `cancel()`。
 
+除咗個 flag，仲有第二條路入同音字表：**選字模式長撳嗰格**
+（`Q9Engine.homoAt()`，2026-08-25 加）。兩條路出嚟嘅表一模一樣（同一句
+`db.getHomo()`），亦都一樣會 set `afterHomo`，所以揀完照樣喺同音鍵左上角
+寫返個字正路點打。`homoAt()` 唔會掂 `homo` 個 flag 以外嘅嘢，
+開關標點模式（`openclose`）就直接唔做 —— 嗰陣個表係「」呢啲一對對嘅標點。
+
 ## 搵 emoji 唔會真係入字落個欄，但會 set 做 composing text
 
 `emojiSearch` 開住嗰陣，`typeChar()` 同 `Q9Engine.Host.commitText()` 兩邊
@@ -408,17 +418,20 @@ user 報過滑 `7→9→0` 出到字之後，最尾嗰個 `0` 走咗去揭第二
 
 畫線同出鍵要一齊停 —— 得個線繼續行但係冇反應，user 會以為部嘢壞咗。
 
-#### 選字模式嘅 `0`：向左掃 = 上一頁
+#### 選字揭頁：「下頁」拆兩粒，唔好再做 flick
 
-`0` 撳一下係「下頁」，但係冇掣返上一頁。所以 `KeyboardBaseView` 有一套
-**flick**（同 swipe 分開，唔經 `GestureKeyTracker`）：`canFlick(key)` 講明邊粒鍵
-撳住左右掃有意思，`onFlick(key, dx)` 收方向。`ChinesePadView` 淨係喺選字模式
-嘅 `0` 開，`dx < 0` 就 `engine.cmd(Q9Cmd.PREV)`（`addPage(-1)` 會由第一頁捲返
-最後一頁）。向右冇特別意思，照當撳咗「下頁」。
+`0` 撳一下係「下頁」。返上一頁本來係**撳住「下頁」向左掃**（`KeyboardBaseView`
+一套 `canFlick` / `onFlick`），2026-08-25 user 話「swipe 左變咗下頁，好難用」，
+成套 flick 連 `ChinesePadView` 嗰個 override 一齊**刪咗**，唔好再加返。
 
-flick 鍵喺 ACTION_MOVE **唔會**「拖去隔離格」，亦都會 `cancelPending()` 熄咗
-長撳（唔係掃掃下會彈咗開關標點出嚟）；掃夠 `flickMinPx`（≥ 2 個 touch slop）
-同埋橫向大過縱向先算數。
+而家改成排位度解決：`ChinesePadView.wantSplitPager()`（＝`selectMode &&
+totalPage > 1`）為真嗰陣，兩格闊嘅 `0` 拆做兩粒正常闊 ——
+左邊仲係 `0`（＝「下頁」，撳開嗰個位唔變），右邊係新嘅
+`KeyAction.PREV_PAGE`（「上頁」→ `Q9Cmd.PREV`）。
+
+排位跟住 engine 狀態變，所以 `Q9Engine.Host.onStateChanged()` 唔可以淨係
+`invalidate()`：要行 `ChinesePadView.onEngineState()`，佢見到 `splitPager`
+同而家想要嘅唔一樣先至 `relayout()`（每次 `onStateChanged` 都重排就嘥）。
 
 中文係**即時出碼**：離開一格就即刻 `engine.press()`，九宮格內容即刻變。
 滑 `7→9→3` 畫直角 = 順序撳咗三下（`GestureKeyTracker` 逐格判斷）。**英文唔用呢套** —— `LatinPadView.onSwipeEnd()` 淨係將
@@ -439,6 +452,18 @@ per-key 判斷）連埋 `keyCenter` 拋畀 IME service，放手之後**由 IME s
   英文唔使呢樣，所以 `holdRepeatMs` 預設 0（熄），淨係 `ChinesePadView` 開。
 
 `0` 冇 `holdRepeat`，因為佢長撳係開關標點。
+
+**「長撳 = 連撳」係最後一條路**：`longPressRunnable` 要 `Host.onLongPress()`
+回 `false` 先至行到佢。九宮格 `1`~`9` 有兩個情況會截走（2026-08-25 加）：
+
+- **一個碼都未打**（`!selectMode && currCode.isEmpty()`）→
+  `Q9Engine.shortcutDigit(d)`：直接開嗰格嘅速選字表（`mapped_table` id
+  `1000 + d`），唔使再「撳個碼再撳速選掣」。打緊碼（`currCode` 有嘢）就唔截，
+  照行返連撳，`77x` 呢啲碼撳得返。
+- **選字模式**→ `Q9Engine.homoAt(slot)`：開嗰格嗰個字嘅同音字表，
+  **唔使先撳「同音」掣**。就算查唔到同音字（多字詞、標點、`word_meta` 冇記錄）
+  `onLongPress` 都要回 `true` 食咗佢 —— 跌返落連撳就會即刻揀咗個字，
+  跟住放手嗰下再攞個數字起新碼，一撳出兩樣嘢。
 
 ## 開關標點（長撳 `0`）：包住 vs 移 caret
 
@@ -560,6 +585,30 @@ JAVA_HOME=/opt/android-studio/jbr ./gradlew :app:assembleDebug :app:testDebugUni
 
 要保持**零 warning**。`GestureKeyTracker` 同 `EnDict` 有 unit test（純 JVM），
 改判定邏輯或者評分公式一定要跑。UI 就上模擬器影相睇。
+
+## 簽名：兩條 key，唔好撈亂
+
+| 用途 | key | 點行 |
+| --- | --- | --- |
+| side-load（dl 嘅 `tq9-v<N>.apk`、GitHub release） | `~/.android/debug.keystore` | `./gradlew assembleRelease`（預設） |
+| 上架 Google Play | `~/.android/tq9-release.keystore` | `./gradlew bundleRelease -Ptq9.upload` |
+
+正式嗰條 key（2026-08-25 user 自己 `keytool -genkeypair` 出嚟）**唔喺 repo 入面**，
+密碼亦都唔會入 git：
+
+```
+~/.android/tq9-release.keystore
+~/.android/tq9-release.properties   # storePassword / keyAlias / keyPassword
+```
+
+`app/build.gradle.kts` 見到 `-Ptq9.upload` 先至砌 `upload` 呢個 `signingConfig`，
+兩個檔案有一個唔見就即刻 fail（唔會靜靜雞跌返落 debug key）。**冇加 `-Ptq9.upload`
+就一定係 debug key** —— side-load 果條線一路都係嗰條 key 簽，靜靜雞換咗，
+啲人就要 uninstall 咗先裝到新版。`.gitignore` 已經封晒 `*.keystore` / `*.jks` /
+`*keystore.properties`，keystore 唔見咗就永遠再 update 唔到個 app，記住備份。
+
+Play 收 `.aab` 唔收 `.apk`（新 app），所以上架果個係 `bundleRelease`；
+想自己裝嚟試就 `assembleRelease -Ptq9.upload`（同 debug key 嗰個裝唔埋同一部機）。
 
 ## 版本號：每次改完自動加一
 

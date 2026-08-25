@@ -6,6 +6,7 @@ enum class KeyAction {
     SHORTCUT,     // 速選字
     SC_TOGGLE,    // 簡體輸出開關
     HOMO,         // 同音 toggle（長撳 = 關聯字）
+    PREV_PAGE,    // 選字上一頁（淨係選字模式、夠兩頁先出現喺 0 隔籬）
     TO_CHINESE,
     TO_LATIN,
     TO_SYMBOL,
