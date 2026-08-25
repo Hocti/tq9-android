@@ -3,6 +3,7 @@ package hk.tq9.core
 import android.content.Context
 import android.os.Handler
 import android.os.Looper
+import android.util.Base64
 import org.json.JSONArray
 import org.json.JSONObject
 import org.json.JSONTokener
@@ -47,28 +48,47 @@ object AiRewrite {
                     if (url.isBlank()) error("尚未設定 Request URL")
                     callCustom(key, model, prompt, url, headers, body, responsePath)
                 } else {
-                    call(key, model, prompt)
+                    callGemini(key, model, prompt)
                 }
             }
             ui.post { done(r) }
         }.start()
     }
 
-    private fun call(key: String, model: String, prompt: String): String {
+    /**
+     * 直接叫 Gemini `generateContent`。[audio] 唔係 null 就連埋一段錄音（`inline_data`）
+     * 一齊送上去，[audioMime] 係嗰段嘢嘅 MIME type —— `AiStt` 用嚟做語音轉文字。
+     *
+     * 唔喺呢個 object 之外叫 —— `internal` 純粹係俾同 module 嘅 [AiStt] 用，
+     * 唔使將成段 HTTP／錯誤處理／回應拆解抄多次。
+     */
+    internal fun callGemini(
+        key: String, model: String, prompt: String,
+        audio: ByteArray? = null, audioMime: String = "audio/wav"
+    ): String {
         val url = URL(
             "https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent"
         )
-        val body = JSONObject().apply {
-            put("contents", JSONArray().put(JSONObject().apply {
-                put("parts", JSONArray().put(JSONObject().put("text", prompt)))
+        val parts = JSONArray().put(JSONObject().put("text", prompt))
+        if (audio != null) {
+            parts.put(JSONObject().put("inline_data", JSONObject().apply {
+                put("mime_type", audioMime)
+                put("data", Base64.encodeToString(audio, Base64.NO_WRAP))
             }))
+        }
+        val body = JSONObject().apply {
+            put("contents", JSONArray().put(JSONObject().put("parts", parts)))
         }.toString()
 
         val conn = (url.openConnection() as HttpURLConnection).apply {
             requestMethod = "POST"
             connectTimeout = 15_000
-            readTimeout = 45_000
+            // 送成段錄音上去比純文字慢好多，所以呢度放鬆到 90 秒
+            readTimeout = if (audio == null) 45_000 else 90_000
             doOutput = true
+            // 唔開 chunked mode，HttpURLConnection 為咗計 Content-Length 會喺 memory
+            // 度再 buffer 多一份成個 body —— 錄音嗰啲 base64 動輒幾 MB，唔想要多一份
+            if (audio != null) setChunkedStreamingMode(0)
             setRequestProperty("Content-Type", "application/json; charset=utf-8")
             setRequestProperty("x-goog-api-key", key)
         }
@@ -84,14 +104,14 @@ object AiRewrite {
         }
     }
 
-    private fun errorMessage(code: Int, body: String): String {
+    internal fun errorMessage(code: Int, body: String): String {
         val msg = runCatching {
             JSONObject(body).optJSONObject("error")?.optString("message")
         }.getOrNull()
         return if (msg.isNullOrBlank()) "HTTP $code" else "HTTP $code：$msg"
     }
 
-    private fun extract(json: String): String {
+    internal fun extract(json: String): String {
         val parts = JSONObject(json)
             .optJSONArray("candidates")?.optJSONObject(0)
             ?.optJSONObject("content")?.optJSONArray("parts")

@@ -20,7 +20,7 @@ import kotlin.math.roundToInt
 /**
  * Emoji 表：上面一行係分類同搵字，下面攤開成個 grid。
  *
- * 搵字唔係喺呢度打，撳 🔍 會轉去英文鍵盤，打嘅字淨係用嚟篩，
+ * 搵字唔係喺呢度打，撳左上角粒搵字掣（[SEARCH_GLYPH]）會轉去英文鍵盤，打嘅字淨係用嚟篩，
  * 夾到嘅 emoji 出喺上面條 bar（睇 `TQ9InputMethodService.emojiQuery`）。
  * 咁樣就唔使喺鍵盤入面再塞多個輸入框，個鍵盤高度都唔會變。
  */
@@ -55,7 +55,8 @@ class EmojiPadView(context: Context) : LinearLayout(context) {
     init {
         orientation = VERTICAL
 
-        chip(searchBtn, "🔍") { emojiHost?.onEmojiSearch() }
+        // 單色 `⌕`，唔用彩色 emoji 🔍（見 [SEARCH_GLYPH]）
+        chip(searchBtn, SEARCH_GLYPH) { emojiHost?.onEmojiSearch() }
         chip(backspaceBtn, "⌫") { emojiHost?.onEmojiBackspace() }
 
         tabStrip.orientation = HORIZONTAL

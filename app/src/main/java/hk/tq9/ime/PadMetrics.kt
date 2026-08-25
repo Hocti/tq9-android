@@ -43,8 +43,12 @@ class PadMetrics(ctx: Context, availW: Int, val cols: Int = 5, val rows: Int = 4
         // 高度**唔跟**闊度倍數行：左右拉淨係應該改到闊度，唔可以順手拉埋高度
         // （上下拉係另一件事，行 Prefs.heightScale）
         cellH = unit * hRatio * Prefs.heightScale(ctx)
-        cellW = if (align == PadAlign.STRETCH) availW.toFloat() / cols
-                else min(unit * Prefs.widthScale(ctx), availW.toFloat() / cols)
+        val wanted = if (align == PadAlign.STRETCH) availW.toFloat() / cols
+                     else min(unit * Prefs.widthScale(ctx), availW.toFloat() / cols)
+        // 中文本體再窄都要有 [MIN_CONTENT_DP] 咁闊（螢幕本身窄過呢個數就用盡螢幕）——
+        // 拉到得幾格咁窄嘅九宮格，每粒鍵細過隻手指，根本撳唔中
+        val minCellW = min(dp(MIN_CONTENT_DP), availW.toFloat()) / cols
+        cellW = max(wanted, minCellW)
         contentW = cellW * cols
 
         val slack = max(0f, availW - contentW)
@@ -58,6 +62,14 @@ class PadMetrics(ctx: Context, availW: Int, val cols: Int = 5, val rows: Int = 4
     val totalHeight: Float get() = cellH * rows
 
     companion object {
+        /**
+         * 中文本體最少要咁闊。螢幕本身窄過呢個數就用盡螢幕闊度
+         * （細機唔會被迫到橫向 scroll），闊過就一定夠 320dp。
+         *
+         * 拉窄（工具 bar 最左嗰粒左右拖）同 [Prefs.KEY_WIDTH_SCALE] 都收唔過呢條線。
+         */
+        const val MIN_CONTENT_DP = 320f
+
         /**
          * 所有鍵盤（中文九宮格、英文、符號、純數字、emoji）**成塊嘅高度**都係呢個。
          *

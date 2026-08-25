@@ -101,6 +101,15 @@
 <ul>
   <li>按 <span class="key">1</span>～<span class="key">9</span> 揀碼，逐步縮小候選字範圍；候選字會即時顯示喺格內。</li>
   <li>按 <span class="key">0</span> 開關成對標點「」，並將游標移到中間方便輸入。</li>
+  <li>候選字夠兩頁嗰陣，底行兩格闊嗰粒 <span class="key">0</span> 會變成翻頁鍵。排法有三種，可以喺「一般」分頁嘅<strong>「選字翻頁」</strong>揀：
+    <ul>
+      <li><strong>大格「下頁」</strong>（預設）：成兩格都係「下頁」，容易撳中；<strong>長按</strong>呢粒就係「上頁」。
+          呢個狀態下長按 <span class="key">0</span> 嘅成對標點「」會暫時失效，個位改為喺左上角細字寫住「上頁」，頁數（例如 <span class="key">1/10</span>）就搬去右上角。</li>
+      <li><strong>拆兩粒：上頁、下頁</strong> 或 <strong>下頁、上頁</strong>：拆成兩粒正常闊嘅鍵，左右次序照你揀。
+          「下頁」左上角寫住而家第幾頁／總共幾頁（例如 <span class="key">1/10</span>）。</li>
+    </ul>
+  </li>
+  <li>攤開同音字表嗰陣，「同音」鍵左上角會寫住而家搵緊邊隻字嘅同音；揀完就會變成嗰隻字正路嘅字碼。</li>
   <li>字碼、關聯字、同音字、繁簡對照表全部收錄喺同一個 sqlite 資料庫，可以喺「一般」分頁換走。</li>
 </ul>
 
@@ -122,6 +131,14 @@
   <li>長按字母鍵可揀大小寫及各地重音寫法。</li>
   <li>長按 <span class="key">,</span> <span class="key">.</span> <span class="key">/</span> 三鍵可揀其餘標點（左上角小字係長按時嘅預設項）。</li>
   <li>長按 <span class="key">?123</span> 可以直接跳去純數字鍵盤，唔使經符號頁。</li>
+  <li>純數字鍵盤最左一欄係 <span class="key">+</span> <span class="key">-</span> <span class="key">*</span> <span class="key">/</span>，
+      <span class="key">0</span> 右邊仲有粒 <span class="key">000</span>（一次過打三個 0）。闊度同左右擺位跟返中文九宮格。</li>
+</ul>
+
+<h2>表情符號</h2>
+<ul>
+  <li>喺表情符號表撳左上角嘅搵字鍵 <span class="key">⌕</span> 就可以打字搵：打嘅字唔會入落輸入框，淨係用嚟篩，夾到嘅表情會出喺上面條候選欄。</li>
+  <li>搵緊嗰陣底行淨係得<strong>「退出表情搜尋」</strong>同空白鍵兩粒；撳「退出表情搜尋」就返去表情符號表。</li>
 </ul>
 
 <h2>游標與切換輸入法</h2>
@@ -145,8 +162,11 @@
 <h2>AI 改寫</h2>
 <div class="card">
   <p>喺任何 app 入面，揀咗一段文字之後按工具列嘅 <span class="accent">✨</span> 即可用 AI 改寫：
-  有揀嘢就淨係改揀咗嗰部分，冇揀就改寫成個輸入框嘅內容。未輸入 API key 之前，✨ 按鍵唔會出現。</p>
-  <p>喺「AI」分頁入面：</p>
+  有揀嘢就淨係改揀咗嗰部分，冇揀就改寫成個輸入框嘅內容。
+  未輸入 API key、或者喺「AI 改寫」嗰類熄咗個總開關，✨ 按鍵都唔會出現。</p>
+  <p>「AI」分頁分做<strong>語音輸入 (STT)</strong>、<strong>AI 改寫</strong>、<strong>AI 設定</strong>三大類，
+  撳個標題就可以收埋／攤開。頭兩類各自有總開關（<strong>熄咗「AI 改寫」，工具列就唔會出粒 ✨</strong>），
+  API key 同模型名稱兩邊共用，放喺「AI 設定」：</p>
   <ul>
     <li><strong>API key</strong>：貼上／刪除／顯示，一律經剪貼簿操作。</li>
     <li><strong>模型名稱</strong> 同 <strong>Prompt</strong>：Prompt 入面嘅 <code>%text%</code> 會換成要改寫嗰段字。</li>
@@ -162,15 +182,41 @@
 
 <h2>語音輸入</h2>
 <p>工具列或左上角按鍵設做「語音輸入」，撳落去即可用麥克風輸入文字（首次使用會要求麥克風權限）。</p>
+<div class="card">
+  <p><strong>AI 語音輸入</strong>：喺「AI」分頁嘅<strong>「語音輸入 (STT)」</strong>開咗之後，
+  粒 <span class="accent">🎤</span> 就會由系統內置嘅語音輸入改為交俾 AI 辨識。</p>
+  <ul>
+    <li><strong>撳一下開始錄音，再撳一次（或者輕觸畫面）停止</strong>；<strong>撳住 🎤 唔放手</strong>就一路錄，放手即停。</li>
+    <li>錄音同埋等緊結果嗰陣，成個鍵盤會變灰兼撳唔到：錄音時中間顯示計時器，等緊結果時顯示載入動畫。</li>
+    <li>開始錄音、錄音完結、成功、失敗會分別發出<strong>四種唔同嘅提示音</strong>。</li>
+    <li>送上去嘅唔淨止係段錄音，仲有輸入框而家嘅內容做上下文（純粹畀 AI 知個語境，唔會重複輸出）。</li>
+    <li>呢個功能<strong>淨係 Gemini 做得到</strong>（要送成段錄音上去），開咗「使用自訂 API」就用唔到。</li>
+  </ul>
+</div>
 
 <h2>其他設定</h2>
 <ul>
   <li><strong>輸出簡體字</strong>：開啟後輸入直接出簡體。</li>
-  <li><strong>按鍵震動 / 按鍵聲音</strong>：可分別開關。</li>
-  <li><strong>長按時間</strong>：決定幾耐算長按。</li>
+  <li><strong>按鍵震動</strong>：分 0～3 級 —— 0 = 完全關閉，1 最輕（舊版唯一嗰個力度），數字越大震得越明顯。放手嗰陣會震一下畀你試。部分機款唔支援自訂震幅，嗰啲機淨係感覺到震動時間長短嘅分別。</li>
+  <li><strong>按鍵聲音</strong>：可以開關。</li>
+  <li><strong>長按時間</strong>：決定幾耐算長按，逐 10ms 一格。</li>
   <li><strong>字體大細 / 邊框粗幼</strong>：調整候選字同鍵盤外觀。</li>
-  <li><strong>鍵盤高度與闊度</strong>：直接喺鍵盤上拖動工具列最左嘅按鍵調整（上下拖 = 高度，左右拖 = 闊度）。</li>
+  <li><strong>鍵盤高度與闊度</strong>：直接喺鍵盤上拖動工具列最左嘅按鍵調整（上下拖 = 高度，左右拖 = 闊度）；
+      <strong>長按</strong>同一粒按鍵（撳實唔好拉）就會即刻拉到最闊。中文鍵盤最窄都會保持 320dp 闊。</li>
+  <li><strong>版本</strong>：「一般」分頁最底寫住而家用緊邊個版本（回報問題嗰陣用得着）。</li>
 </ul>
+
+<h2>使用習慣統計</h2>
+<div class="card">
+  <p>每隻字打過幾多次、以及連續兩個字嘅組合，都會記錄喺 <code>usage_stats.db</code>，
+  同字碼資料庫分開存放（換字碼資料庫唔會影響呢啲記錄）。</p>
+  <ul>
+    <li><strong>常用字排前</strong>（預設開）：候選字第一頁會依「同前一個字嘅組合」打過幾多次推前，第九個之後就依該字本身打過幾多次推前。
+        熄咗就完全依字碼表原本次序，但仍然會繼續記錄次數。</li>
+    <li><strong>匯出 / 匯入</strong>：可以備份或者喺另一部機還原（匯入會覆蓋現有記錄）。</li>
+    <li><strong>清除記錄</strong>：全部刪走並重設為新嘅空白記錄，無法復原。</li>
+  </ul>
+</div>
 
 </body>
 </html>

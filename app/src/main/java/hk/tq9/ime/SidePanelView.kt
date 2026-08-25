@@ -65,10 +65,22 @@ class SidePanelView(context: Context) : LinearLayout(context) {
             textSize = 15f
             setOnClickListener { listener?.onCycleAlign(); refreshAlignLabel() }
             setOnTouchListener { _, e -> handleSizeDrag(e) }
+            // 撳實唔拉 = 一下子拉到最闊（同工具 bar 嗰粒一樣）
+            setOnLongClickListener { listener?.onMaxWidth(); true }
         }
         tool(pasteBtn, "📋", KeyAction.PASTE)
         pasteBtn.setOnLongClickListener { listener?.onPasteHistory(); true }
         tool(sttBtn, "🎤", KeyAction.STT)
+        // 撳實 🎤 = 一路錄，放手就停（淨係 AI 語音輸入先做得到，所以由 host 話
+        // 收唔收呢下長撳）。onTouch 回 false，粒掣本身嘅短撳／長撳照行；
+        // ACTION_UP 一定喺 performClick 之前到，所以撳一下唔會誤當放手收工。
+        @Suppress("ClickableViewAccessibility")
+        sttBtn.setOnLongClickListener { listener?.onSttHoldStart() == true }
+        sttBtn.setOnTouchListener { _, e ->
+            if (e.actionMasked == MotionEvent.ACTION_UP ||
+                e.actionMasked == MotionEvent.ACTION_CANCEL) listener?.onSttHoldEnd()
+            false
+        }
         tool(emojiBtn, "😀", KeyAction.TO_EMOJI)
         tool(aiBtn, "✨", KeyAction.AI)
         closeBtn.apply {

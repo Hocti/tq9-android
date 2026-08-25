@@ -6,7 +6,11 @@ import android.content.Intent
 import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.os.VibratorManager
 import android.provider.OpenableColumns
 import android.provider.Settings
 import android.text.Editable
@@ -37,11 +41,14 @@ import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.WindowCompat
 import com.google.android.material.tabs.TabLayout
+import hk.tq9.core.AiStt
 import hk.tq9.core.BarMode
 import hk.tq9.core.PadFunc
+import hk.tq9.core.PagerLayout
 import hk.tq9.core.Prefs
 import hk.tq9.core.Q9Db
 import hk.tq9.core.Q9Engine
+import hk.tq9.core.UsageStats
 import hk.tq9.ime.ChinesePadView
 import hk.tq9.ime.Key
 import hk.tq9.ime.KeyboardBaseView
@@ -84,9 +91,25 @@ class SettingsActivity : AppCompatActivity() {
     private var tlLong: FuncPicker? = null
     private var aiKeyLabel: TextView? = null
     private var aiKeyShown = false
+    private var usageLabel: TextView? = null
+    private var pagerNote: TextView? = null
+
+    /** AI 頁三大類各自攤開咗未（唔入 pref，重新開個 app 就當全部攤開） */
+    private var aiOpenStt = true
+    private var aiOpenRewrite = true
+    private var aiOpenSetup = true
 
     private val pickDb = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) replaceDb(uri)
+    }
+
+    /** 匯出使用習慣統計（usage_stats.db）—— 揀邊度存由系統個檔案揀選器話事 */
+    private val saveUsage = registerForActivityResult(
+        ActivityResultContracts.CreateDocument("application/octet-stream")
+    ) { uri -> if (uri != null) exportUsage(uri) }
+
+    private val pickUsage = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) importUsage(uri)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -148,6 +171,7 @@ class SettingsActivity : AppCompatActivity() {
         buildSizeSection()
         buildKeysSection()
         buildSwipeSection()
+        buildUsageSection()
         buildBehaviourSection()
         if (SHOW_DEBUG_SECTIONS) {
             buildTryBox()
@@ -172,6 +196,8 @@ class SettingsActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         refreshImeStatus()
+        // 個數字喺鍵盤度打字嗰陣一路都會變，返到嚟就要重新讀（onCreate 嗰次已經舊咗）
+        refreshUsageLabel()
     }
 
     // ---- sections ---------------------------------------------------------
@@ -336,6 +362,41 @@ class SettingsActivity : AppCompatActivity() {
             "長按 , . / 三鍵可選其餘標點（左上角小字為長按時的預設項）。")
         note("長按 ␣ 後不要放手，上下左右拖動即可移動游標（切換輸入法改為長按中文鍵盤的 Eng 鍵）。" +
             "長按 ?123 可直接跳至純數字鍵盤。")
+
+        buildPagerSection()
+    }
+
+    /**
+     * 選字夠兩頁嗰陣，底行兩格闊嗰粒 `0` 點變（見 [PagerLayout]）。
+     * 三個選擇本身喺 `ChinesePadView` 度實現，呢度淨係揀。
+     */
+    private fun buildPagerSection() {
+        header("選字翻頁")
+        note("候選字多於一頁時，底行原本兩格闊的 0 鍵會變成翻頁鍵，排法可自選。")
+        val options = PagerLayout.entries.toList()
+        enumPicker("翻頁鍵排法", options.map { it.label },
+            options.indexOf(Prefs.pagerLayout(this))) { i ->
+            Prefs.setPagerLayout(this, options[i])
+            refreshPagerNote()
+            rebuildPreview()
+        }
+        pagerNote = note("")
+        refreshPagerNote()
+    }
+
+    private fun refreshPagerNote() {
+        pagerNote?.text = when (Prefs.pagerLayout(this)) {
+            PagerLayout.PREV_NEXT ->
+                "0 鍵拆成兩顆正常闊度的鍵，左「上頁」右「下頁」。" +
+                "「下頁」左上角會顯示目前頁數（例如 1/10，由 1 起算）。"
+            PagerLayout.NEXT_PREV ->
+                "0 鍵拆成兩顆正常闊度的鍵，左「下頁」右「上頁」。" +
+                "「下頁」左上角會顯示目前頁數（例如 1/10，由 1 起算）。"
+            PagerLayout.WIDE_NEXT ->
+                "0 鍵維持兩格闊，整顆都是「下頁」（較易按中）；長按這顆鍵則是「上頁」。" +
+                "此時長按 0 的成對標點（「」）功能會暫時失效，該位置改為以左上角小字顯示" +
+                "「上頁」，頁數（例如 1/10）則移到右上角。離開選字狀態後「」即回復正常。"
+        }
     }
 
     private fun syncFuncPickers() {
@@ -351,7 +412,89 @@ class SettingsActivity : AppCompatActivity() {
     }
 
     /**
-     * AI 改寫。
+     * AI 頁分三大類，每類都收埋得（[collapsible]）：
+     *
+     *  1. **語音輸入**（[buildSttCategory]）—— 用 AI 取代系統嗰個語音輸入
+     *  2. **AI 改寫**（[buildRewriteCategory]）—— 工具列粒 ✨
+     *  3. **AI 設定**（[buildSetupCategory]）—— API key、模型、自訂 API、profile
+     *
+     * 頭兩類各自有個總開關，第三類係兩邊共用嘅 provider 設定：
+     * 一個 API key、一個模型，唔會分開兩份。
+     */
+    private fun buildAiSection() {
+        collapsible("語音輸入 (STT)", aiOpenStt, { aiOpenStt = !aiOpenStt; rebuildAiSection() }) {
+            buildSttCategory()
+        }
+        collapsible("AI 改寫", aiOpenRewrite, { aiOpenRewrite = !aiOpenRewrite; rebuildAiSection() }) {
+            buildRewriteCategory()
+        }
+        collapsible("AI 設定", aiOpenSetup, { aiOpenSetup = !aiOpenSetup; rebuildAiSection() }) {
+            buildSetupCategory()
+        }
+    }
+
+    /**
+     * 用 AI 做語音輸入。**只限 Gemini** —— 要把整段錄音送上去，
+     * 自訂 API 那組範本表達不了（見 [Prefs.aiSttOn]），所以開了「自訂 API」
+     * 這個開關就會被鎖住兼且強制關閉。
+     */
+    private fun buildSttCategory() {
+        val custom = Prefs.aiUseCustom(this)
+        val hasKey = Prefs.aiApiKey(this).isNotBlank()
+        note("開啟後，工具列的 🎤 會由系統內置的語音輸入改為交給 AI 辨識：" +
+            "按一下開始錄音，再按一次（或輕觸畫面）停止；按住 🎤 不放則會一直錄，放手即停。" +
+            "錄音與等待結果期間鍵盤會變灰不能按，錄音時顯示計時器，等待時顯示載入動畫；" +
+            "開始錄音、錄音完結、成功、失敗會分別發出四種不同的提示音。")
+        if (custom) {
+            note("⚠️ 目前使用「自訂 API」，AI 語音輸入無法啟用 —— 錄音須以 Gemini 專用的格式上傳，" +
+                "自訂 API 的範本無法表達。要用這個功能請先在「AI 設定」關閉自訂 API。")
+        } else if (!hasKey) {
+            note("⚠️ 尚未設定 API key，請先在「AI 設定」貼上 Gemini API key。")
+        }
+        switch("使用 AI 語音輸入", Prefs.KEY_AI_STT_ON, false, enabled = !custom) { rebuildAiSection() }
+
+        if (Prefs.aiSttOn(this)) {
+            textField("Prompt（%text% 代表輸入框現有內容，只作上下文）",
+                Prefs.KEY_AI_STT_PROMPT, Prefs.DEFAULT_AI_STT_PROMPT, multiline = true)
+            note("預設 prompt 已寫明只輸出辨識結果、逐字轉錄不作潤飾、只用繁體字，" +
+                "並把輸入框現有的內容當成上下文（不會重複輸出）。改動前請保留這些要求，" +
+                "否則 AI 很容易多加一句開場白，或者自作主張把你說的話改寫。")
+            row(button("還原預設 Prompt") {
+                Prefs.sp(this).edit().putString(Prefs.KEY_AI_STT_PROMPT, Prefs.DEFAULT_AI_STT_PROMPT).apply()
+                rebuildAiSection()
+                toast("已還原預設 Prompt")
+            })
+            note("錄音最長 " + (AiStt.MAX_RECORD_MS / 1000) + " 秒，到時會自動停止並送出。" +
+                "首次使用需要授權錄音權限。")
+        }
+    }
+
+    /**
+     * AI 改寫（工具列粒 ✨）。整個功能可以熄咗 —— 熄咗就連粒掣都唔會出
+     * （見 `TQ9InputMethodService.applyAiState`）。
+     */
+    private fun buildRewriteCategory() {
+        note("在任何應用程式中按工具列的 ✨ 即可用 AI 改寫：" +
+            "有選取文字就只改選取的部分，沒有選取則會改寫整個輸入框的內容。")
+        switch("啟用 AI 改寫", Prefs.KEY_AI_REWRITE_ON, true) { rebuildAiSection() }
+        if (!Prefs.aiRewriteOn(this)) {
+            note("已關閉：工具列不會出現 ✨ 按鍵。")
+            return
+        }
+        if (Prefs.aiApiKey(this).isBlank()) {
+            note("⚠️ 尚未設定 API key，✨ 按鍵不會出現。請先在「AI 設定」貼上 API key。")
+        }
+        textField("Prompt（%text% 代表要改寫的文字）", Prefs.KEY_AI_PROMPT, Prefs.DEFAULT_AI_PROMPT,
+            multiline = true)
+        row(button("還原預設 Prompt") {
+            Prefs.sp(this).edit().putString(Prefs.KEY_AI_PROMPT, Prefs.DEFAULT_AI_PROMPT).apply()
+            rebuildAiSection()
+            toast("已還原預設 Prompt")
+        })
+    }
+
+    /**
+     * 兩邊共用嘅 provider 設定。
      *
      * API key 唔用普通輸入框 —— 冇人會逐個字撳，一係喺其他地方複製完貼過嚟，
      * 一係就係刪走，所以淨係得「貼上／刪除／顯示」三粒掣加一行狀態字。
@@ -360,11 +503,8 @@ class SettingsActivity : AppCompatActivity() {
      * 接受 JSON 嘅 HTTP POST API（見 `AiRewrite.callCustom`）。成套設定
      * （provider／key／model／prompt／範本）可以用下面嘅 profile 掣 save/load/delete。
      */
-    private fun buildAiSection() {
-        header("AI 改寫")
-        note("在任何應用程式中按工具列的 ✨ 即可用 AI 改寫：" +
-            "有選取文字就只改選取的部分，沒有選取則會改寫整個輸入框的內容。" +
-            "尚未輸入 API key 時，✨ 按鍵不會出現。")
+    private fun buildSetupCategory() {
+        note("API key 與模型名稱由「AI 改寫」和「語音輸入」共用。")
 
         buildAiProfileRow()
 
@@ -399,16 +539,15 @@ class SettingsActivity : AppCompatActivity() {
         )
 
         textField("模型名稱", Prefs.KEY_AI_MODEL, Prefs.DEFAULT_AI_MODEL)
-        textField("Prompt（%text% 代表要改寫的文字）", Prefs.KEY_AI_PROMPT, Prefs.DEFAULT_AI_PROMPT,
-            multiline = true)
 
         switch("使用自訂 API（而非 Gemini）", Prefs.KEY_AI_USE_CUSTOM, false) { rebuildAiSection() }
 
         if (Prefs.aiUseCustom(this)) {
+            note("自訂 API 只適用於「AI 改寫」，語音輸入必須用 Gemini。")
             note("自訂 API 須為接受 JSON 的 HTTP POST 端點。下面範本預設是 OpenAI 相容格式" +
                 "（OpenAI、Groq、DeepSeek、OpenRouter、Ollama 等大多適用），可按實際 API 文件調整。" +
                 "範本中 %key% = API key，%model% = 上面的模型名稱，" +
-                "%prompt% = 套用了上面 Prompt 範本後的內容（已自動處理 JSON 逸出字元）。")
+                "%prompt% = 套用了改寫 Prompt 範本後的內容（已自動處理 JSON 逸出字元）。")
             textField("Request URL", Prefs.KEY_AI_URL, Prefs.DEFAULT_AI_URL)
             textField("Request Headers（每行一個，例如 Authorization: Bearer %key%）",
                 Prefs.KEY_AI_HEADERS, Prefs.DEFAULT_AI_HEADERS, multiline = true)
@@ -507,30 +646,135 @@ class SettingsActivity : AppCompatActivity() {
         }
     }
 
+    /**
+     * 使用習慣統計（`usage_stats.db`）：每隻字打過幾多次、連續兩個字嘅組合各打過幾多次。
+     *
+     * 呢個檔同字碼庫（`dataset.db`）**分開存**，換字碼表唔會累到佢。呢度可以
+     * 匯出備份、匯入還原、或者成個清走（等於換返一張新表），
+     * 亦都可以熄咗「常用字排前」—— 熄咗照樣繼續記數，淨係唔攞嚟排候選字。
+     */
+    private fun buildUsageSection() {
+        header("使用習慣統計")
+        usageLabel = note("")
+        refreshUsageLabel()
+        note("每隻字打過多少次、以及連續兩個字的組合都會記錄在 usage_stats.db，" +
+            "與字碼資料庫分開存放（更換字碼資料庫不會影響這些記錄）。")
+        switch("常用字排前", Prefs.KEY_USAGE_REORDER, true)
+        note("開啟後，候選字第一頁會依「與前一個字的組合」打過的次數推前（至少三次才會調動），" +
+            "第九個之後則依該字本身打過的次數推前。關閉則完全依字碼表原本的次序，" +
+            "但仍然會繼續記錄次數。")
+        row(
+            button("匯出…") { saveUsage.launch("usage_stats.db") },
+            button("匯入…") { pickUsage.launch(arrayOf("*/*")) },
+            button("清除記錄") { confirmClearUsage() }
+        )
+    }
+
+    private fun refreshUsageLabel() {
+        val (chars, pairs) = runCatching { UsageStats.counts(this) }.getOrDefault(0 to 0)
+        usageLabel?.text = if (chars == 0 && pairs == 0) "目前未有任何記錄"
+                           else "目前記錄：$chars 個字、$pairs 組前後字組合"
+    }
+
+    private fun exportUsage(uri: Uri) {
+        runCatching {
+            contentResolver.openOutputStream(uri)?.use { out ->
+                UsageStats.exportTo(this, out).getOrThrow()
+            } ?: error("無法寫入所選檔案")
+        }
+            .onSuccess { toast("已匯出使用記錄") }
+            .onFailure { toast("匯出失敗：" + (it.message ?: "未知錯誤")) }
+    }
+
+    private fun importUsage(uri: Uri) {
+        runCatching {
+            contentResolver.openInputStream(uri)?.use { input ->
+                UsageStats.importFrom(this, input).getOrThrow()
+            } ?: error("無法開啟所選檔案")
+        }
+            .onSuccess { refreshUsageLabel(); toast("已匯入使用記錄") }
+            .onFailure { toast("匯入失敗：" + (it.message ?: "未知錯誤")) }
+    }
+
+    /** 清除係救唔返嘅，一定要問一次 */
+    private fun confirmClearUsage() {
+        AlertDialog.Builder(this)
+            .setTitle("清除使用記錄")
+            .setMessage("將會刪除所有字數與前後字組合的記錄，並重設為新的空白記錄。此動作無法復原。")
+            .setPositiveButton("清除") { _, _ ->
+                UsageStats.clear(this)
+                    .onSuccess { refreshUsageLabel(); toast("已清除使用記錄") }
+                    .onFailure { toast("清除失敗：" + (it.message ?: "未知錯誤")) }
+            }
+            .setNegativeButton("取消", null)
+            .show()
+    }
+
     private fun buildBehaviourSection() {
         header("其他")
         switch("輸出簡體字", Prefs.KEY_SC_OUTPUT, false)
         note("九宮格右上角的 ☰ 只負責開關整條工具列，開啟後會先進入候選字。" +
             "開啟後可按工具列最左的 ⇄ 在候選字與工具（大小位置、貼上、語音、" +
             "表情符號、AI）之間切換。英文與符號頁一律強制顯示工具列。")
-        switch("按鍵震動", Prefs.KEY_VIBRATE, true)
+        slider("按鍵震動", 0, Prefs.MAX_VIBRATE_LEVEL, Prefs.vibrateLevel(this), "",
+            format = { Prefs.vibrateLevelLabel(it) }) { v ->
+            Prefs.setVibrateLevel(this, v)
+            previewVibrate(v)
+        }
+        note("0 為完全關閉，1 是最輕（舊版唯一的力度），數字越大震得越明顯，放手時會震一下試效果。" +
+            "部分機款不支援自訂震幅，那些機只感覺到震動時間長短的分別。")
         switch("按鍵聲音", Prefs.KEY_SOUND, false)
-        slider("長按時間", 200, 700, Prefs.longPressMs(this).toInt(), "ms") { v ->
+        slider("長按時間", 200, 700, Prefs.longPressMs(this).toInt(), "ms", step = 10) { v ->
             Prefs.sp(this).edit().putInt(Prefs.KEY_LONG_PRESS_MS, v).apply()
         }
         note("長按 0 = 開關成對標點（「」之類）；長按「同音」= 關聯字；" +
             "長按 📋 = 剪貼簿記錄。九宮格 1~9 長按 = 連按兩下（長按 7 再拖到 0 = 770），" +
             "滑到最後一格停留足夠時間才放手亦作兩下計。純數字鍵盤全頁沒有長按功能。")
+
+        buildVersionFooter()
+    }
+
+    /** 放喺「一般」頁最底，細細行寫住而家係邊個版本（回報問題嗰陣用得着） */
+    private fun buildVersionFooter() {
+        val pi = runCatching { packageManager.getPackageInfo(packageName, 0) }.getOrNull()
+        val name = pi?.versionName ?: "?"
+        val code = when {
+            pi == null -> "?"
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.P -> pi.longVersionCode.toString()
+            else -> @Suppress("DEPRECATION") pi.versionCode.toString()
+        }
+        content.addView(TextView(this).apply {
+            text = "九万輸入法　版本 $name（build $code）"
+            textSize = 12f
+            alpha = 0.55f
+            gravity = Gravity.CENTER
+            setPadding(0, dp(28), 0, dp(4))
+        }, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+    }
+
+    /** 拖完震一下，等 user 即刻感覺到揀咗嗰級有幾大力 */
+    private fun previewVibrate(level: Int) {
+        if (level <= 0) return
+        val v = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            (getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager)?.defaultVibrator
+        } else {
+            @Suppress("DEPRECATION")
+            getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
+        } ?: return
+        val amp = if (v.hasAmplitudeControl()) Prefs.vibrateAmplitude(level)
+                  else VibrationEffect.DEFAULT_AMPLITUDE
+        runCatching { v.vibrate(VibrationEffect.createOneShot(Prefs.vibrateDurationMs(level), amp)) }
     }
 
     private fun buildTryBox() {
         header("試打")
         note("email 欄會自動顯示 @ 與 .com；密碼數字欄會自動切換純數字鍵盤；" +
-            "搜尋欄的 ⏎ 會變成放大鏡。")
+            "搜尋欄的 ⏎ 會變成放大鏡（單色符號，非彩色表情）。")
         tryField("在這裡試打", InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE)
         tryField("email 欄", InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS)
         tryField("PIN 欄", InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_VARIATION_PASSWORD)
-        tryField("搜尋欄（⏎ 會變 🔍）", InputType.TYPE_CLASS_TEXT,
+        tryField("搜尋欄（⏎ 會變放大鏡）", InputType.TYPE_CLASS_TEXT,
             EditorInfo.IME_ACTION_SEARCH)
     }
 
@@ -695,35 +939,116 @@ class SettingsActivity : AppCompatActivity() {
         label: String, options: List<PadFunc>, get: () -> PadFunc, onPick: (PadFunc) -> Unit
     ) = FuncPicker(label, options, get, onPick)
 
-    private fun slider(label: String, min: Int, max: Int, value: Int, unit: String, onChange: (Int) -> Unit) {
+    /**
+     * 一個普通下拉式選單（[options] 係已經寫好嘅字，[onPick] 收第幾個）。
+     *
+     * 同 [FuncPicker] 一樣要擋開頭嗰下 programmatic selection，但呢度冇 pref
+     * 可以比對，所以自己記住而家係第幾個：`Spinner` 第一下 `onItemSelected`
+     * 幾時 fire（甚至 fire 唔 fire）係睇 layout 時序嘅，唔擋就會當 user 揀過嘢。
+     */
+    private fun enumPicker(label: String, options: List<String>, selected: Int, onPick: (Int) -> Unit) {
+        content.addView(TextView(this).apply {
+            text = label
+            textSize = 14f
+            setPadding(0, dp(6), 0, dp(2))
+        })
+        var current = selected.coerceIn(0, options.size - 1)
+        val spinner = Spinner(this).apply {
+            adapter = ArrayAdapter(
+                this@SettingsActivity, android.R.layout.simple_spinner_item, options
+            ).apply { setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item) }
+            setSelection(current, false)
+        }
+        // 同 FuncPicker 一樣畫個框，唔係睇落唔似粒可以撳嘅嘢
+        val box = FrameLayout(this).apply {
+            background = GradientDrawable().apply {
+                setColor(Color.TRANSPARENT)
+                cornerRadius = dp(10).toFloat()
+                setStroke(dp(1).coerceAtLeast(1), Color.argb(110, 128, 128, 128))
+            }
+            setPadding(dp(6), dp(2), dp(6), dp(2))
+            addView(spinner, FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+        }
+        content.addView(box, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
+        ).apply { setMargins(0, 0, 0, dp(4)) })
+        spinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(p: AdapterView<*>?, v: View?, pos: Int, id: Long) {
+                if (pos == current) return
+                current = pos
+                onPick(pos)
+            }
+            override fun onNothingSelected(p: AdapterView<*>?) {}
+        }
+    }
+
+    /**
+     * 一段可以收埋嘅嘢：撳個標題就開／關。[body] 攤開嗰陣先至行，
+     * 收埋咗就一件 view 都唔會砌（成段嘢係 rebuild 出嚟嘅，唔使收埋容器）。
+     */
+    private fun collapsible(title: String, open: Boolean, onToggle: () -> Unit, body: () -> Unit) {
+        content.addView(TextView(this).apply {
+            text = (if (open) "▾  " else "▸  ") + title
+            textSize = 17f
+            setTypeface(typeface, android.graphics.Typeface.BOLD)
+            setPadding(0, dp(18), 0, dp(8))
+            setOnClickListener { onToggle() }
+        }, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+        content.addView(View(this).apply {
+            setBackgroundColor(Color.argb(60, 128, 128, 128))
+        }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(1).coerceAtLeast(1))
+            .apply { setMargins(0, 0, 0, dp(4)) })
+        if (open) body()
+    }
+
+    /**
+     * 一條 slider。[step] = 拖一格跳幾多（例如長按時間逐 10ms 一格，
+     * 唔使喺 500 個位度慢慢揀），[format] = 個值點寫（唔寫就 `值+單位`）。
+     *
+     * `onChange` 淨係喺**放手**（`onStopTrackingTouch`）先叫，拖緊嗰陣只係改上面個字。
+     */
+    private fun slider(
+        label: String, min: Int, max: Int, value: Int, unit: String,
+        step: Int = 1, format: ((Int) -> String)? = null, onChange: (Int) -> Unit
+    ) {
+        fun show(v: Int) = format?.invoke(v) ?: "$v$unit"
+        val steps = (max - min) / step
         val title = TextView(this).apply {
-            text = "$label：$value$unit"
+            text = "$label：${show(value)}"
             textSize = 14f
             setPadding(0, dp(6), 0, 0)
         }
+        // SeekBar 只認整數 progress，所以 progress = 第幾格，值 = min + 格數 × step
+        fun valueAt(p: Int) = (min + p * step).coerceIn(min, max)
         val bar = SeekBar(this).apply {
-            this.max = max - min
-            progress = (value - min).coerceIn(0, max - min)
+            this.max = steps
+            progress = ((value - min + step / 2) / step).coerceIn(0, steps)
             setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
                 override fun onProgressChanged(sb: SeekBar?, p: Int, fromUser: Boolean) {
-                    title.text = "$label：${min + p}$unit"
+                    title.text = "$label：${show(valueAt(p))}"
                 }
                 override fun onStartTrackingTouch(sb: SeekBar?) {}
-                override fun onStopTrackingTouch(sb: SeekBar?) { onChange(min + progress) }
+                override fun onStopTrackingTouch(sb: SeekBar?) { onChange(valueAt(progress)) }
             })
         }
         content.addView(title)
         content.addView(bar)
     }
 
+    /** [enabled] = false：撳唔郁（而家唔准開嗰啲，例如自訂 API 之下嘅 AI 語音輸入） */
     @Suppress("DEPRECATION")
-    private fun switch(label: String, key: String, def: Boolean, onChange: ((Boolean) -> Unit)? = null) {
+    private fun switch(label: String, key: String, def: Boolean, enabled: Boolean = true,
+                       onChange: ((Boolean) -> Unit)? = null) {
         val s = Switch(this).apply {
             text = label
             textSize = 15f
             gravity = Gravity.CENTER_VERTICAL
             ellipsize = TextUtils.TruncateAt.END
             isChecked = Prefs.sp(this@SettingsActivity).getBoolean(key, def)
+            isEnabled = enabled
+            alpha = if (enabled) 1f else 0.45f
             setPadding(0, dp(8), 0, dp(8))
             setOnCheckedChangeListener { _, v ->
                 Prefs.sp(this@SettingsActivity).edit().putBoolean(key, v).apply()

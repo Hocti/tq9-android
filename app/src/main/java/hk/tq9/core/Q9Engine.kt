@@ -52,6 +52,13 @@ class Q9Engine(val db: Q9Db) {
     var currCode: String = ""; private set
     var homo: Boolean = false; private set
     var scOutput: Boolean = false
+
+    /**
+     * 要唔要將打得多嘅字推前（設定頁嗰個開關，見 `Prefs.KEY_USAGE_REORDER`）。
+     * 熄咗就完全跟返字碼表原本嘅次序，[Host] 嗰邊照計次數，淨係唔攞嚟排位。
+     */
+    var usageReorder: Boolean = true
+
     private var afterHomo = false
     private var openclose = false
     private var lastWord = ""
@@ -79,6 +86,17 @@ class Q9Engine(val db: Q9Db) {
      */
     var homoCodeHint: String = ""; private set
 
+    /**
+     * 而家攤開緊邊隻字嘅同音字表（撳「同音」掣、或者選字模式長撳一格都會 set）。
+     * 一樣畫喺同音鍵左上角 —— 揀緊嗰版全部都係同音字，冇個字擺喺度就唔知搵緊邊隻字嘅音。
+     * 揀完（`cancel()`）就清走，之後個位就讓返俾 [homoCodeHint]。
+     */
+    var homoWord: String = ""; private set
+
+    /** 選字夠兩頁嗰陣「下頁」鍵左上角寫嘅頁數（由 1 起計，例：`2/10`） */
+    val pageHint: String
+        get() = if (selectMode && totalPage > 1) "${currPage + 1}/$totalPage" else ""
+
     val status: String
         get() = buildString {
             if (homo) append("[同音] ")
@@ -103,6 +121,7 @@ class Q9Engine(val db: Q9Db) {
         statusPrefix = ""
         statusText = ""
         homoCodeHint = ""
+        homoWord = ""
         bigramPrev = ""
         setPadImages(0)
     }
@@ -220,6 +239,7 @@ class Q9Engine(val db: Q9Db) {
         // 揀完之後照樣喺狀態列寫返個字正路點打（同撳「同音」掣嗰條路一樣）
         afterHomo = true
         statusPrefix = "同音[$word]"
+        homoWord = word   // 同音鍵左上角要寫住而家搵緊邊隻字嘅同音
         startSelectWord(list)
         changed()
         return true
@@ -302,7 +322,7 @@ class Q9Engine(val db: Q9Db) {
      */
     private fun reorderByUsage(words: List<String>): List<String> {
         val h = host ?: return words
-        if (words.size <= 1) return words
+        if (!usageReorder || words.size <= 1) return words
         val head = words.take(9)
         val tail = words.drop(9)
         val prev = bigramPrev
@@ -358,6 +378,7 @@ class Q9Engine(val db: Q9Db) {
             homo = false
             afterHomo = true
             statusPrefix = "同音[$typeWord]"
+            homoWord = typeWord   // 同音鍵左上角要寫住而家搵緊邊隻字嘅同音
             val h = db.getHomo(typeWord)
             if (h.isEmpty()) { cancel() } else startSelectWord(h)
             changed()
@@ -421,6 +442,7 @@ class Q9Engine(val db: Q9Db) {
         selectWords = emptyList()
         statusPrefix = ""
         statusText = ""
+        homoWord = ""
         if (clearPad) { relateHints = emptyList(); setPadImages(0) }
     }
 

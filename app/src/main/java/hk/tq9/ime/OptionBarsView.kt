@@ -47,6 +47,11 @@ class OptionBarsView(context: Context) : LinearLayout(context) {
          */
         fun onWidthDrag(dxDp: Int)
         /**
+         * 同一粒掣長撳（撳實唔拉）：中文本體即刻拉到最闊（＝成個螢幕咁闊）。
+         * 拉窄咗之後想一下子還原，唔使一路拖返出去。
+         */
+        fun onMaxWidth()
+        /**
          * 候選字 bar 拉大／縮返：**唔係**喺呢個 view 度自己攞位擴闊，
          * 交返俾 host（[expandedView]）覆蓋喺個鍵盤本身度，成個 UI 高度先唔會跳
          */
@@ -55,6 +60,13 @@ class OptionBarsView(context: Context) : LinearLayout(context) {
         fun onTool(action: KeyAction)
         /** 長撳「貼上」：下面攤開 clipboard 歷史 */
         fun onPasteHistory()
+        /**
+         * 撳實 🎤 開始錄音（AI 語音輸入專用：撳實一路錄，放手就停）。
+         * 回 false = 呢下長撳唔收（用緊系統內置嗰個 STT），粒掣照跌返落短撳。
+         */
+        fun onSttHoldStart(): Boolean
+        /** 放開 🎤。冇喺「撳實錄音」狀態就乜都唔做。 */
+        fun onSttHoldEnd()
         /** ✖：由 emoji 表／剪貼簿返去普通鍵盤 */
         fun onCloseSpecialPad()
         /** 最左嗰粒切換掣：喺候選字／工具兩個 view 之間切 */
@@ -102,11 +114,24 @@ class OptionBarsView(context: Context) : LinearLayout(context) {
             textSize = 15f
             setOnClickListener { listener?.onCycleAlign(); refreshAlignLabel() }
             setOnTouchListener { _, e -> handleSizeDrag(e) }
+            // 撳實唔拉 = 一下子拉到最闊。[handleSizeDrag] 喺 DOWN／MOVE 都回 false，
+            // 所以 View 本身照計長撳；真係拉起上嚟就會過咗 touch slop，長撳自動取消
+            setOnLongClickListener { listener?.onMaxWidth(); true }
         }
         tool(pasteBtn, "📋", KeyAction.PASTE)
         pasteBtn.setOnLongClickListener { listener?.onPasteHistory(); true }
         // 🎤 由九宮格搬咗上嚟，擺喺「貼上」隔籬（左上角嗰粒都揀得做錄音）
         tool(sttBtn, "🎤", KeyAction.STT)
+        // 撳實 🎤 = 一路錄，放手就停（淨係 AI 語音輸入先做得到，所以由 host 話
+        // 收唔收呢下長撳）。onTouch 回 false，粒掣本身嘅短撳／長撳照行；
+        // ACTION_UP 一定喺 performClick 之前到，所以撳一下唔會誤當放手收工。
+        @Suppress("ClickableViewAccessibility")
+        sttBtn.setOnLongClickListener { listener?.onSttHoldStart() == true }
+        sttBtn.setOnTouchListener { _, e ->
+            if (e.actionMasked == MotionEvent.ACTION_UP ||
+                e.actionMasked == MotionEvent.ACTION_CANCEL) listener?.onSttHoldEnd()
+            false
+        }
         tool(emojiBtn, "😀", KeyAction.TO_EMOJI)
         tool(aiBtn, "✨", KeyAction.AI)
 

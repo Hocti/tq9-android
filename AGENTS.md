@@ -48,8 +48,8 @@ adb shell ime set    hk.tq9/.ime.TQ9InputMethodService
 ### 九宮格排位係 numpad，唔係電話
 
 `7 8 9` 喺最上、`1 2 3` 喺最落，跟返 `Q9Form.cs` 嘅 `ResizeAllButton()`。
-底行係 `[0 佔兩格][取消]`；選字夠兩頁嗰陣兩格闊嗰粒 `0` 會拆做
-`[下頁][上頁]` 兩粒正常闊（見下面「選字揭頁」）。改過嚟電話排法就同原版打法唔同曬。
+底行係 `[0 佔兩格][取消]`；選字夠兩頁嗰陣兩格闊嗰粒 `0` 點變由設定話事
+（見下面「選字揭頁」）。改過嚟電話排法就同原版打法唔同曬。
 左下角淨返粒 `🌐`（成格闊）—— `🎤` 搬咗上工具 bar，喺 `📋` 隔籬，
 亦都係左上角嗰粒鍵揀得嘅其中一個 `PadFunc`。
 
@@ -65,6 +65,9 @@ adb shell ime set    hk.tq9/.ime.TQ9InputMethodService
   以前寫 `=\<`，冇人知係乜。
 - 讓返出嚟嘅位：符號第一頁底行 space 右邊順住排 `, . ? ; /` 五粒（本來散喺
   上面兩行）；第二頁唔要標點，space 同 `⏎` 拉長，`numpad` 掣再升多一行。
+- **純數字頁最左有一欄 `+ - * /`**（2026-08-25 加）：`-` 由底行搬咗上去，
+  讓返出嚟嗰個位（`0` 右邊）擺咗粒 **`000`**（一次過打三個 0）。
+  即係而家成頁係 5 欄，同中文九宮格一樣。
 - **英文底行 space 右邊係 `, . /` 三粒**（本來係 `/` 喺 space 左、`?` 同 `.` 喺右）。
   `?` 已經冇咗獨立一粒 —— 佢係長撳 `/` 嘅第一個選擇（見下面）。
 
@@ -98,6 +101,12 @@ adb shell ime set    hk.tq9/.ime.TQ9InputMethodService
 `NumberPadView.allowLongPress()` 一律回 `false`（`KeyboardBaseView` 嗰個 hook）。
 打電話號碼／金額撳耐咗少少就彈個符號 popup 出嚟好煩，所以數字鍵**用 `num()`
 唔用 `digitKey()`**（後者會帶 `variants`）。
+
+闊度同貼邊**唔可以再自己計**：`contentBounds()` 直接開一個 `PadMetrics`
+（一樣 5 欄 4 行）攞 `offsetX` / `contentW`，即係同中文九宮格完全一樣 ——
+連工具 bar 左右拖出嚟嗰個 `Prefs.KEY_WIDTH_SCALE` 都跟。以前呢頁自己置中兼且
+封頂 360dp，中英切換嗰陣啲鍵會左右彈。所以 `onCycleAlign` / `onWidthDrag` /
+`onMaxWidth` 三處都要記得 `numberPad?.rebuild()`。
 
 ### mapped_table 嘅 id 有特別意思
 
@@ -228,6 +237,15 @@ gravity 跟 `PadAlign` 反過嚟擺）：上面一（兩）行功能掣，下面
   **淨係入 `cellW`，唔可以入 `cellH`** —— 兩者本來都由同一個 `unit` 出，
   一唔小心就會變成「左右拉埋高度都跟住變」。
   方向要跟顯示方式反（見 `onWidthDrag`）：永遠都係「拖向留白嗰邊 = 拉闊」。
+- **長撳（撳實唔拉）= 一下子拉到最闊**（`Listener.onMaxWidth`，2026-08-25 加）：
+  `widthScale` 直接寫 `MAX_WIDTH_SCALE`。`handleSizeDrag` 喺 DOWN／MOVE 一路回
+  `false`，所以 `View` 本身照計長撳；真係拉起上嚟過咗 touch slop，系統自己會取消
+  長撳，兩樣唔會撞。手機直度嘅「最闊」＝螢幕闊度（`cellW` 會頂到 `availW / cols`）。
+
+**中文本體最少 `PadMetrics.MIN_CONTENT_DP`（320dp）闊**（螢幕本身窄過 320dp
+就用盡螢幕）—— 拉窄同 `widthScale` 都收唔過呢條線。順帶影響：直度手機
+（400dp 左右）而家永遠達唔到 `SIDE_PANEL_MAX_RATIO`（六成）嗰個側邊欄條件，
+側邊欄實際上淨係打橫／平板先會出。
 
 設定頁嗰幾條尺寸 slider（按鍵大細／最大闊度／最大高度／按鍵高度／鍵盤高度）
 全部收埋咗（`SettingsActivity.SHOW_HIDDEN_OPTIONS = false`，一行 code 都冇刪），
@@ -269,6 +287,28 @@ fire 唔 fire）係睇 layout 時序，擋錯咗就會食咗 user 真正嗰下 �
 仲係舊嗰個 —— 改完短撳要自己 `setFunc(KEY_TL_LONG, NONE)` 寫實落去，
 唔係個 spinner 同 pref 就會各講各話。
 
+## 震動分級：舊個 boolean 冇刪
+
+`Prefs.KEY_VIBRATE`（boolean）改咗做 `KEY_VIBRATE_LEVEL`（0～3，預設 1）。
+舊 key **冇刪**，仲要一路寫住：
+
+- `vibrateLevel()` 見到未寫過新 key，就由舊個 boolean 轉返過嚟（開 = 1、閂 = 0）——
+  update 上嚟嘅人唔會無啦啦震返晒。
+- `setVibrateLevel()` 順手 `putBoolean(KEY_VIBRATE, v > 0)`，萬一有邊度仲讀緊
+  舊嗰個都唔會同新設定唔夾。
+
+級數對應嘅時間／震幅喺 `Prefs.vibrateDurationMs()` / `vibrateAmplitude()`，
+**level 1 一定要係舊嗰個力度**（12ms / 40）—— 嗰個係以前唯一嘅設定。
+部分機款（例如部分 Sony Xperia）冇 `hasAmplitudeControl()`，硬傳 amplitude
+會完全唔震，所以嗰啲機跌返 `DEFAULT_AMPLITUDE`，淨係靠時間長短分三級。
+
+## 設定頁嘅 `slider()` 有 step 同 format
+
+`SettingsActivity.slider()` 收多兩個 optional 參數：`step`（拖一格跳幾多，
+例如長按時間逐 10ms 一格）同 `format`（個值點寫，例如震動級數寫「1（最輕）」）。
+`SeekBar` 只認整數 progress，所以 progress 係**第幾格**，值 = `min + 格數 × step`。
+`onChange` 一路都係**放手先叫**（`onStopTrackingTouch`），拖緊嗰陣淨係改上面個字。
+
 ## 畀人睇嘅字：全部正體中文書面語
 
 app 入面所有 user 見到嘅字（設定頁、toast、鍵面、空狀態提示）一律用
@@ -279,16 +319,62 @@ app 入面所有 user 見到嘅字（設定頁、toast、鍵面、空狀態提�
 **淨係可以喺 code／檔名／package 度出現**，唔可以出現喺畀人睇嘅字入面
 （`strings.xml` 個 `subtype_en` 就係因為咁刪咗）。
 
+## AI 設定頁分三大類
+
+「AI」個 tab 分咗 **語音輸入 (STT)** / **AI 改寫** / **AI 設定** 三段，每段都收埋得
+（`SettingsActivity.collapsible()`）。頭兩段各自有個總開關，第三段係
+**兩邊共用嘅 provider 設定**（API key、模型名稱、自訂 API、profile）——
+唔好分開兩份 key 或者兩個 model 出嚟。
+
+收埋咗未係 activity 嘅 instance state（`aiOpenStt` / `aiOpenRewrite` / `aiOpenSetup`），
+唔入 pref：重新開個 app 就當三段都攤開。改任何一個開關都係成個
+`rebuildAiSection()` 重畫，所以 `collapsible()` 收埋嗰陣索性一件 view 都唔砌。
+
 ## AI 改寫（✨）
 
 - **唔使揀住字都用得**：揀咗就淨係改揀咗嗰段，冇揀就當「改寫成個輸入框」——
   `runAi()` 會 `setSelection(0, 全長)` 再交出去。**出返嚟之前要再全選一次**：
   等緊 Gemini 嗰幾秒 user 隨時撳過個欄，一撳 caret 就散咗個 selection，
   `commitText` 就會變成插埋落去而唔係取代。
-- **完全冇入 API key 就成粒掣唔見咗**（`setAiVisible`，唔係淨係灰咗）。
+- **冇入 API key、或者設定頁熄咗個總開關（`Prefs.aiRewriteOn`），
+  就成粒掣唔見咗**（`setAiVisible`，唔係淨係灰咗）。
   灰咗嗰個狀態留返俾「有 key 但個欄空咗」。
 - 撳唔撳得由 `applyAiState()` 話事，`onUpdateSelection` 每次都會重新計
   （唔可以好似以前咁「揀嘅狀態冇變就 return」—— 而家個欄有冇字都影響到）。
+
+## AI 語音輸入：頂走系統嗰個 `SpeechRecognizer`
+
+`Prefs.aiSttOn` 開咗（而且有 key）嗰陣，粒 🎤 由頭到尾唔再掂
+`SpeechRecognizer` —— `toggleStt()` 第一句就分流去 `startAiStt()` / `stopAiStt()`。
+兩條路**完全分開**，`listening` / `recognizer` 嗰套嘢一個都唔會 set。
+
+- **淨係 Gemini 做得**：段錄音要用 `inline_data` 呢個 Gemini 專用格式送上去，
+  設定頁嗰套自訂 API 範本（URL／headers／body）表達唔到。所以
+  `Prefs.aiSttOn()` 見到 `aiUseCustom` 就**一律回 false**（唔理個 pref 之前開過），
+  設定頁嗰個開關亦都會鎖住。加新 provider 之前請先諗清楚點送段錄音。
+- **錄音**用 `WavRecorder`（`core/AiStt.kt`）：`AudioRecord` 收 16kHz mono PCM，
+  收工先包個 44 byte RIFF header。特登**唔用 `MediaRecorder`** —— 佢一定要寫落
+  檔案，而且各家機出嚟嘅 AAC 容器唔一定啱 Gemini 收。
+- **兩種操作**：撳一下開始、再撳一下停（`hold = false`）；撳實一路錄、放手即停
+  （`hold = true`）。後者要 `OptionBarsView.Listener.onSttHoldStart()` /
+  `onSttHoldEnd()` 兩個 callback，同埋 `KeyboardBaseView.Host.onLongPressEnd()`
+  （左上角揀咗做 🎤 嗰粒鍵用）—— 平時冇人要知「長撳幾時放手」，所以嗰個
+  interface method 有 default 空 body。
+- **粒掣個 `OnTouchListener` 一定要回 `false`**：`ACTION_UP` 喺 `performClick`
+  之前到，回 `false` 先至保得住「撳一下 = 短撳」。回 `true` 就再冇短撳。
+- **左上角嗰粒 🎤 淨係喺長撳位吉住先至撳實錄**（`key.longAction == NOOP`），
+  唔可以食咗 user 特登喺設定頁揀嘅長撳動作。
+- **錄緊同等緊結果，成個鍵盤變灰兼撳唔到**：`showBlockingOverlay()`（AI 改寫
+  嗰個 loading 都係用返佢）。所以「再撳一下停」係撳嗰塊 overlay，唔係撳返粒 🎤。
+  高度**寫死做 `root.height`**，用 MATCH_PARENT 會撐大咗成個 IME window。
+- **四個階段四把唔同嘅聲**（`SttTone`）：開始錄 `TONE_PROP_BEEP`、錄完
+  `TONE_PROP_BEEP2`、成功 `TONE_PROP_ACK`、失敗 `TONE_PROP_NACK`。
+  呢啲同 `Prefs.sound`（按鍵聲）**冇關係**，唔跟嗰個開關。
+- **逾時／離開個欄要記得清**：`sttGeneration` 同 `aiGeneration` 一樣係用嚟
+  當第遲到嘅 callback；`onFinishInputView` / `onDestroy` 行 `cancelAiStt()`。
+- prompt（`Prefs.DEFAULT_AI_STT_PROMPT`）逐條寫死唔准做乜 —— Gemini 好鍾意
+  加句「以下是錄音的轉錄內容：」，又鍾意順手幫你執靚啲句子。改 prompt 嗰陣
+  唔好刪咗「只輸出結果」同「逐字轉錄唔好潤飾」呢兩條。
 
 ## 候選欄吉住就出速選字
 
@@ -306,9 +392,16 @@ app 入面所有 user 見到嘅字（設定頁、toast、鍵面、空狀態提�
 （有 `lastWord` 就開佢嘅同音字，冇就開速選字表），user 話打斷咗打字流程，**收返咗**。
 撳一下淨係著／熄粒掣（會變藍），唔可以換走而家個字表。
 
-用同音字打完之後，`homoCodeHint` 會記住嗰個字**正路點打**（`db.getCode()`），
-畫喺同音鍵左上角（`ChinesePadView.drawFunction` 即時攞，唔係 `Key.hint`，
-因為 `boxes` 唔會逐次重砌）。打多一個普通字就喺 `selectWord()` 度清走。
+同音鍵左上角一個位、兩樣嘢，**攤開緊個表嗰陣行 `homoWord`，揀完先至行
+`homoCodeHint`**：
+
+- `Q9Engine.homoWord` = 而家搵緊邊隻字嘅同音（兩條入口都會 set）。成頁都係
+  同音字，唔擺個字出嚟就唔知係邊隻字嘅音。`cancel()` 會清走佢。
+- `homoCodeHint` = 用同音字打完之後，嗰個字**正路點打**（`db.getCode()`），
+  提你返轉頭應該撳邊幾個掣。打多一個普通字就喺 `selectWord()` 度清走。
+
+兩樣都係 `ChinesePadView.drawFunction` 即時問 engine 攞，唔係 `Key.hint`，
+因為 `boxes` 唔會逐次重砌。
 **注意有啲字（例如「嘅」「喺」）根本冇 `word_meta` 記錄**，`getHomo()` 回空，
 嗰陣 `selectWord()` 會直接 `cancel()`。
 
@@ -326,8 +419,16 @@ app 入面所有 user 見到嘅字（設定頁、toast、鍵面、空狀態提�
 每次 `emojiQuery` 一變就會 `syncEmojiComposing()` set 做 composing text，
 揀咗 emoji 或者打多個字都會自然取代／清走（`commitText` 蓋咗 composing 區），
 `endEmojiSearch()` 見到仲有殘留就 `commitText("", 1)` 清走。
-所以英文（打 `cat`）同中文九宮格（打「貓」）都搵得到。
 `switchMode()` 去到 LATIN／CHINESE 以外就會自動熄咗佢。
+
+**搜尋嗰陣英文鍵盤底行淨係得兩粒：「退出表情搜尋」＋ `␣`**（2026-08-25 user 要求）。
+`?123`、`中`、`⏎`、標點喺呢頁一粒都用唔著（啲字淨係用嚟篩，唔會入落個欄），
+粒退出掣亦都**寫明幾隻字**，唔再係得個 😀 冇人知撳落去做乜。
+代價：搜尋期間去唔到中文九宮格打中文關鍵字（要先退出再由中文鍵盤開 emoji）。
+
+搜尋個「放大鏡」一律用**單色** `⌕`（`KeyDef.kt` 嘅 `SEARCH_GLYPH`），
+唔用彩色 emoji 🔍 —— 搜尋欄嘅 `⏎`（`enterLabelFor`）同 emoji 表嗰粒搵字掣兩處都係。
+字型冇 `⌕`（`Paint.hasGlyph`）就寫返「搜尋」兩隻字，唔可以出一格豆腐。
 
 ## 中文使用習慣統計：bigram 同每字次數
 
@@ -335,6 +436,18 @@ app 入面所有 user 見到嘅字（設定頁、toast、鍵面、空狀態提�
 兩個中文字（`Q9Engine.bigramPrev`）、同每隻字打咗幾多次。淨係計**單字**
 （`isHanChar()` 篩走標點同多字詞），揀咗多字詞、標點、或者換咗行
 （`onLineBreak()`）都會斷咗個 bigram 鏈，唔會屈埋唔啱嘅組合。
+
+設定頁「使用習慣統計」嗰段可以**匯出／匯入／清除**成個 `usage_stats.db`
+（`UsageStats.exportTo` / `importFrom` / `clear`）。三樣嘢一開頭都要行
+`closeSync()`：背景 io thread 排緊嘅寫要等佢寫完、WAL 要 checkpoint，
+唔係抄出去嗰份會少咗最後幾下；`instance` 清走之後下次 `get()` 會重新開返個檔。
+匯入要驗到有齊 `bigram` / `char_freq` 兩張表先至覆蓋，覆蓋之前連
+`-wal` / `-shm` / `-journal` 都要刪埋（唔清就會攞住舊 WAL 蓋返落新 db 度）。
+
+同一段仲有「**常用字排前**」開關（`Prefs.KEY_USAGE_REORDER`，預設開）：
+熄咗淨係 `Q9Engine.usageReorder = false`（`reorderByUsage()` 即刻 return），
+**照樣繼續記數**。設定頁改完唔會 restart 個 service，所以 `onStartInputView`
+每次都要重新讀一次。
 
 `Q9Engine.reorderByUsage()` 淨係喺 `processResult()`（打碼揀字嗰條主線）用：
 第一頁（頭 9 個）睇 bigram（夠 3 次先郁，次數越大越前），第九個之後睇單字
@@ -418,16 +531,38 @@ user 報過滑 `7→9→0` 出到字之後，最尾嗰個 `0` 走咗去揭第二
 
 畫線同出鍵要一齊停 —— 得個線繼續行但係冇反應，user 會以為部嘢壞咗。
 
-#### 選字揭頁：「下頁」拆兩粒，唔好再做 flick
+#### 選字揭頁：三種排法，唔好再做 flick
 
 `0` 撳一下係「下頁」。返上一頁本來係**撳住「下頁」向左掃**（`KeyboardBaseView`
 一套 `canFlick` / `onFlick`），2026-08-25 user 話「swipe 左變咗下頁，好難用」，
 成套 flick 連 `ChinesePadView` 嗰個 override 一齊**刪咗**，唔好再加返。
 
-而家改成排位度解決：`ChinesePadView.wantSplitPager()`（＝`selectMode &&
-totalPage > 1`）為真嗰陣，兩格闊嘅 `0` 拆做兩粒正常闊 ——
-左邊仲係 `0`（＝「下頁」，撳開嗰個位唔變），右邊係新嘅
-`KeyAction.PREV_PAGE`（「上頁」→ `Q9Cmd.PREV`）。
+而家改成排位度解決，而且**三種排法由設定頁揀**（`Prefs.PagerLayout`，
+設定頁「一般 → 選字翻頁」）。三種都淨係喺 `selectMode && totalPage > 1`
+（`ChinesePadView.paging()`）嗰陣先生效：
+
+| `PagerLayout` | 底行 |
+| --- | --- |
+| `PREV_NEXT` | 拆兩粒正常闊：左「上頁」、右 `0`（＝「下頁」） |
+| `NEXT_PREV` | 拆兩粒正常闊：左 `0`（＝「下頁」）、右「上頁」 |
+| `WIDE_NEXT`（**預設**） | 唔拆，成兩格闊嗰粒 `0` 就係「下頁」，**長撳 = 上頁** |
+
+「上頁」係 `KeyAction.PREV_PAGE` → `Q9Cmd.PREV`。
+
+粒「下頁」**寫住 `1/10`**（`Q9Engine.pageHint`，由 1 起計，唔係 0）。
+同同音鍵一樣係喺 `drawDigit` 度即時問 engine 攞，唔係 `Key.hint`（`boxes`
+唔會逐次重砌）。拆兩粒嗰兩個排法擺喺**左上角**，冇分頁嗰陣 `pageHint` 係空，
+個位就讓返俾長撳提示 `「」`。
+
+`WIDE_NEXT` 有兩件事同其餘兩個唔同，改嗰陣兩邊都要一齊改：
+
+- **排位由頭到尾唔郁**（`wantSplitPager()` 見到 `WIDE_NEXT` 一律回 false），
+  所以粒鍵嘅 `Key` object 唔會重砌 —— 「而家係咪揭緊頁」一定要即場問
+  `ChinesePadView.wideNextPage()`，唔可以入 `Key` 度。
+- **長撳嗰個「」讓咗俾「上頁」**：`TQ9InputMethodService.onLongPress` 嘅
+  `digit == 0` 嗰路要先問 `chinesePad?.wideNextPage()`，係就 `Q9Cmd.PREV`，
+  唔係先至照舊 `Q9Cmd.OPENCLOSE`。畫面上左上角寫「上頁」（＝長撳做乜，
+  同其他鍵一致），頁數讓咗去**右上角**（`drawCornerHintRight`）。
 
 排位跟住 engine 狀態變，所以 `Q9Engine.Host.onStateChanged()` 唔可以淨係
 `invalidate()`：要行 `ChinesePadView.onEngineState()`，佢見到 `splitPager`

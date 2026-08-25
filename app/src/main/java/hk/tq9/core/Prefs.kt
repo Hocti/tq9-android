@@ -23,6 +23,20 @@ enum class BarMode(val label: String) {
 }
 
 /**
+ * 選字夠兩頁嗰陣，底行兩格闊嗰粒 `0` 點排（設定頁揀，預設 [WIDE_NEXT]）。
+ *
+ * [PREV_NEXT] / [NEXT_PREV] 都係拆做兩粒正常闊，淨係左右調轉；
+ * [WIDE_NEXT] 唔拆，成兩格闊嗰粒直接做「下頁」，返上一頁改為**長撳**佢
+ * （所以嗰個狀態下長撳嘅「成對標點」冇咗，個位讓咗俾「上頁」——
+ * 見 `ChinesePadView.drawDigit` 同 `TQ9InputMethodService.onLongPress`）。
+ */
+enum class PagerLayout(val label: String) {
+    PREV_NEXT("拆兩粒：上頁、下頁"),
+    NEXT_PREV("拆兩粒：下頁、上頁"),
+    WIDE_NEXT("大格「下頁」（長按 = 上頁）");
+}
+
+/**
  * 可以喺設定度換走嘅鍵功能（而家用喺左上角嗰粒）。
  * 除咗 [EMOJI]，粒面全部改返寫中文，唔再用意義不明嘅 icon。
  *
@@ -76,11 +90,15 @@ object Prefs {
     const val KEY_SWIPE_DWELL = "swipe_dwell_ms"
     const val KEY_SWIPE_ANGLE = "swipe_angle_deg"
     const val KEY_VIBRATE = "vibrate"
+    /** 震動強度 0～3（0 = 冇震）。舊版嗰個 boolean [KEY_VIBRATE] 照留返做 migration */
+    const val KEY_VIBRATE_LEVEL = "vibrate_level"
     const val KEY_SOUND = "sound"
     const val KEY_LONG_PRESS_MS = "long_press_ms"
     const val KEY_STT_LOCALE = "stt_locale"
     const val KEY_DB_LABEL = "db_label"
     const val KEY_LATIN_NUM_ROW = "latin_num_row"  // 英文鍵盤上面加一行數字
+    const val KEY_USAGE_REORDER = "usage_reorder"  // 打得多嘅字推前（usage_stats.db）
+    const val KEY_PAGER_LAYOUT = "pager_layout"    // PagerLayout.name（選字揭頁嗰兩粒點排）
 
     // 左上角嗰粒鍵
     const val KEY_TL_TAP = "topleft_tap"
@@ -118,6 +136,48 @@ object Prefs {
     const val DEFAULT_AI_BODY =
         "{\"model\":\"%model%\",\"messages\":[{\"role\":\"user\",\"content\":\"%prompt%\"}]}"
     const val DEFAULT_AI_RESPONSE_PATH = "choices.0.message.content"
+
+    /**
+     * AI 改寫（✨）成個功能嘅總開關。熄咗就算入咗 API key，工具列都唔會出粒 ✨
+     * （見 `TQ9InputMethodService.applyAiState`）。
+     */
+    const val KEY_AI_REWRITE_ON = "ai_rewrite_on"
+
+    /**
+     * 用 AI 做語音輸入（取代系統嗰個 `SpeechRecognizer`）。
+     * **淨係 Gemini 做得**（要送成段錄音上去），所以 [KEY_AI_USE_CUSTOM] 開咗就唔准開。
+     * 見 `AiStt` 同 `TQ9InputMethodService.startAiStt`。
+     */
+    const val KEY_AI_STT_ON = "ai_stt_on"
+    const val KEY_AI_STT_PROMPT = "ai_stt_prompt"
+
+    /**
+     * STT 個 prompt 寫到咁死板係有原因嘅：Gemini 好鍾意喺結果前面加句
+     * 「以下是錄音的轉錄內容：」，又鍾意自動幫你執順啲句子。呢兩樣落到輸入框
+     * 都係垃圾，所以逐條寫死唔准做乜。`%text%` 會換成輸入框而家嘅內容（上下文）。
+     */
+    const val DEFAULT_AI_STT_PROMPT =
+        "You are a speech-to-text transcription engine. Transcribe the attached audio " +
+        "recording into Traditional Chinese (Hong Kong usage).\n" +
+        "\n" +
+        "Rules, all mandatory:\n" +
+        "1. Output ONLY the transcription itself. No preamble, no closing remark, " +
+        "no explanation, no apology, no quotation marks, no markdown, and no label " +
+        "such as \"Transcription:\".\n" +
+        "2. Transcribe verbatim. Do NOT translate, paraphrase, summarise, reorder, " +
+        "shorten, expand, or \"improve\" the wording in any way.\n" +
+        "3. The ONLY corrections allowed are removing obvious stutters, repeated " +
+        "false starts, and filler sounds.\n" +
+        "4. Keep the speaker's own words, including English words, numbers, slang and " +
+        "proper nouns, exactly as spoken.\n" +
+        "5. Use Traditional Chinese characters only, never Simplified. Add natural " +
+        "punctuation.\n" +
+        "6. If the audio contains no intelligible speech, output nothing at all.\n" +
+        "\n" +
+        "The text below is what is already typed in the input field. It is context " +
+        "only - do NOT repeat it, translate it, or include any part of it in your " +
+        "output:\n" +
+        "%text%"
 
     /** 成套 AI 設定（provider／key／model／prompt／自訂範本）打包做一個 profile，存喺呢個 key 底下嘅一個 JSON object */
     const val KEY_AI_PROFILES = "ai_profiles"
@@ -208,13 +268,55 @@ object Prefs {
     private fun func(ctx: Context, key: String, def: PadFunc): PadFunc =
         runCatching { PadFunc.valueOf(sp(ctx).getString(key, def.name)!!) }.getOrDefault(def)
 
+    /**
+     * 候選字要唔要按打過幾多次推前（見 `Q9Engine.reorderByUsage`）。
+     * 預設開住；熄咗就完全跟返字碼表本身嘅次序，但 `UsageStats` 照樣繼續記數。
+     */
+    fun usageReorder(ctx: Context) = sp(ctx).getBoolean(KEY_USAGE_REORDER, true)
+
     fun swipeEnabled(ctx: Context) = sp(ctx).getBoolean(KEY_SWIPE, true)
     fun swipeDwellMs(ctx: Context) = sp(ctx).getInt(KEY_SWIPE_DWELL, 150).toLong()
     fun swipeAngleDeg(ctx: Context) = sp(ctx).getInt(KEY_SWIPE_ANGLE, 55).toFloat()
 
-    fun vibrate(ctx: Context) = sp(ctx).getBoolean(KEY_VIBRATE, true)
+    /**
+     * 震動強度 0～3：0 = 完全冇震，1 = 以前唯一嗰個力度（最細），2／3 逐級大力啲。
+     * 舊版淨係得個 boolean，未寫過新 key 就由 [KEY_VIBRATE] 轉返過嚟（開 = 1、閂 = 0）。
+     */
+    fun vibrateLevel(ctx: Context): Int {
+        val sp = sp(ctx)
+        if (!sp.contains(KEY_VIBRATE_LEVEL)) return if (sp.getBoolean(KEY_VIBRATE, true)) 1 else 0
+        return sp.getInt(KEY_VIBRATE_LEVEL, 1).coerceIn(0, MAX_VIBRATE_LEVEL)
+    }
+
+    /** 順手寫返個舊 boolean，萬一有邊度仲讀緊佢都唔會同新設定唔夾 */
+    fun setVibrateLevel(ctx: Context, level: Int) {
+        val v = level.coerceIn(0, MAX_VIBRATE_LEVEL)
+        sp(ctx).edit().putInt(KEY_VIBRATE_LEVEL, v).putBoolean(KEY_VIBRATE, v > 0).apply()
+    }
+
+    const val MAX_VIBRATE_LEVEL = 3
+
+    /** 每級震幾耐（index = level，0 = 唔震） */
+    fun vibrateDurationMs(level: Int): Long =
+        longArrayOf(0L, 12L, 18L, 26L)[level.coerceIn(0, MAX_VIBRATE_LEVEL)]
+
+    /** 每級幾大力（1～255，部機唔支援自訂震幅就用返 DEFAULT_AMPLITUDE） */
+    fun vibrateAmplitude(level: Int): Int =
+        intArrayOf(0, 40, 110, 200)[level.coerceIn(0, MAX_VIBRATE_LEVEL)]
+
+    fun vibrateLevelLabel(level: Int): String =
+        arrayOf("關閉", "1（最輕）", "2（中）", "3（最強）")[level.coerceIn(0, MAX_VIBRATE_LEVEL)]
+
     fun sound(ctx: Context) = sp(ctx).getBoolean(KEY_SOUND, false)
     fun longPressMs(ctx: Context) = sp(ctx).getInt(KEY_LONG_PRESS_MS, 380).toLong()
+
+    /** 選字揭頁嗰兩粒點排（見 [PagerLayout]） */
+    fun pagerLayout(ctx: Context): PagerLayout =
+        runCatching { PagerLayout.valueOf(sp(ctx).getString(KEY_PAGER_LAYOUT, PagerLayout.WIDE_NEXT.name)!!) }
+            .getOrDefault(PagerLayout.WIDE_NEXT)
+
+    fun setPagerLayout(ctx: Context, p: PagerLayout) =
+        sp(ctx).edit().putString(KEY_PAGER_LAYOUT, p.name).apply()
     fun sttLocale(ctx: Context): String = sp(ctx).getString(KEY_STT_LOCALE, "yue-Hant-HK")!!
 
     fun aiApiKey(ctx: Context): String = sp(ctx).getString(KEY_AI_KEY, "")!!
@@ -224,6 +326,20 @@ object Prefs {
         sp(ctx).getString(KEY_AI_PROMPT, DEFAULT_AI_PROMPT)!!.ifBlank { DEFAULT_AI_PROMPT }
 
     fun aiUseCustom(ctx: Context) = sp(ctx).getBoolean(KEY_AI_USE_CUSTOM, false)
+
+    /** ✨ 改寫功能開唔開（熄咗連粒掣都唔出） */
+    fun aiRewriteOn(ctx: Context) = sp(ctx).getBoolean(KEY_AI_REWRITE_ON, true)
+
+    /**
+     * AI 語音輸入開唔開。**自訂 API 一律當閂咗**——送錄音上去嗰段係
+     * Gemini 專用格式（`inline_data`），自訂範本冇得表達，所以就算個 pref
+     * 之前開過，切咗去自訂 API 都要跌返落系統內置嗰個 STT。
+     */
+    fun aiSttOn(ctx: Context) =
+        sp(ctx).getBoolean(KEY_AI_STT_ON, false) && !aiUseCustom(ctx)
+
+    fun aiSttPrompt(ctx: Context): String =
+        sp(ctx).getString(KEY_AI_STT_PROMPT, DEFAULT_AI_STT_PROMPT)!!.ifBlank { DEFAULT_AI_STT_PROMPT }
     fun aiCustomUrl(ctx: Context): String =
         sp(ctx).getString(KEY_AI_URL, DEFAULT_AI_URL)!!.ifBlank { DEFAULT_AI_URL }
     fun aiCustomHeaders(ctx: Context): String =
@@ -257,6 +373,10 @@ object Prefs {
             put("headers", aiCustomHeaders(ctx))
             put("body", aiCustomBody(ctx))
             put("responsePath", aiCustomResponsePath(ctx))
+            put("rewriteOn", aiRewriteOn(ctx))
+            // 唔用 aiSttOn()：嗰個會俾「自訂 API」壓成 false，存 profile 要存返個原本設定
+            put("sttOn", sp(ctx).getBoolean(KEY_AI_STT_ON, false))
+            put("sttPrompt", aiSttPrompt(ctx))
         }
         profiles.put(name, p)
         sp(ctx).edit().putString(KEY_AI_PROFILES, profiles.toString()).apply()
@@ -274,6 +394,9 @@ object Prefs {
             .putString(KEY_AI_HEADERS, p.optString("headers", DEFAULT_AI_HEADERS))
             .putString(KEY_AI_BODY, p.optString("body", DEFAULT_AI_BODY))
             .putString(KEY_AI_RESPONSE_PATH, p.optString("responsePath", DEFAULT_AI_RESPONSE_PATH))
+            .putBoolean(KEY_AI_REWRITE_ON, p.optBoolean("rewriteOn", true))
+            .putBoolean(KEY_AI_STT_ON, p.optBoolean("sttOn", false))
+            .putString(KEY_AI_STT_PROMPT, p.optString("sttPrompt", DEFAULT_AI_STT_PROMPT))
             .apply()
         return true
     }

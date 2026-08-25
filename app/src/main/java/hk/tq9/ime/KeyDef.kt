@@ -63,6 +63,20 @@ data class Key(
     val literal: Boolean = false
 )
 
+/**
+ * 「搜尋」個樣：**單色符號**，唔用彩色 emoji 🔍。
+ *
+ * 搜尋欄嘅 `⏎`（見 `TQ9InputMethodService.enterLabelFor`）同 emoji 表嗰粒搵字掣
+ * 兩處都用呢個 —— 鍵面其餘全部都係單色，一粒彩色 emoji 夾埋一齊好突兀，
+ * 而且好多機嘅 emoji 字型會畫到成粒鍵咁大。
+ *
+ * `⌕`（U+2315）唔係每個字型都有，冇就會出一格豆腐，所以開頭問一問
+ * [android.graphics.Paint.hasGlyph]，真係冇先寫返「搜尋」兩隻字。
+ */
+val SEARCH_GLYPH: String by lazy {
+    if (android.graphics.Paint().hasGlyph("⌕")) "⌕" else "搜尋"
+}
+
 /** 一格空位（英文第二行兩頭）。淨係佔 [weight] 咁多闊，唔畫亦都撳唔到。 */
 fun spacerKey(weight: Float) = Key(KeyAction.NOOP, weight = weight, spacer = true)
 

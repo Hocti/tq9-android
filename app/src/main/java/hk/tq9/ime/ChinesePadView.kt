@@ -5,6 +5,7 @@ import android.graphics.Canvas
 import android.graphics.Rect
 import android.graphics.RectF
 import hk.tq9.core.PadFunc
+import hk.tq9.core.PagerLayout
 import hk.tq9.core.Prefs
 import hk.tq9.core.Q9Engine
 import hk.tq9.swipe.GestureKeyTracker
@@ -20,8 +21,9 @@ import kotlin.math.roundToInt
  *   [?123]     7 8 9  [␣]
  *   [Eng]      0 0 取消 [⏎]
  *
- * 選字夠兩頁嗰陣底行兩格闊嗰粒 `0` 會拆做「下頁」＋「上頁」兩粒正常闊
- * （以前係撳住「下頁」向左掃先返到上一頁，太難撳，收咗）。
+ * 選字夠兩頁嗰陣底行兩格闊嗰粒 `0` 點變，由設定頁嗰個 [PagerLayout] 話事
+ * （以前係撳住「下頁」向左掃先返到上一頁，太難撳，收咗）：拆做「下頁」＋「上頁」
+ * 兩粒正常闊（左右次序兩個選擇），或者唔拆、成兩格闊嗰粒做「下頁」＋長撳做「上頁」。
  *
  * 🎤 搬咗上面條工具 bar（貼上隔籬），左上角嗰粒都揀得。
  * 🌐（轉輸入法）收埋咗，長撳「Eng」照樣叫得出嚟（見 [KeyAction.IME_SWITCH]）。
@@ -51,7 +53,19 @@ class ChinesePadView(context: Context, private val engine: Q9Engine) : KeyboardB
      */
     private var splitPager = false
 
-    private fun wantSplitPager() = engine.selectMode && engine.totalPage > 1
+    /** 而家係咪「選字、夠兩頁」——三個 [PagerLayout] 都係喺呢個狀態先變樣 */
+    private fun paging() = engine.selectMode && engine.totalPage > 1
+
+    /** 拆兩粒嗰兩個選擇先至要重排；[PagerLayout.WIDE_NEXT] 排位由頭到尾唔郁 */
+    private fun wantSplitPager() =
+        paging() && Prefs.pagerLayout(context) != PagerLayout.WIDE_NEXT
+
+    /**
+     * 大格「下頁」模式：兩格闊嗰粒 `0` 而家係「下頁」，長撳 = 上頁。
+     * 呢個狀態下長撳嘅「成對標點」（`「」`）冇咗 —— 左上角個位讓咗俾「上頁」，
+     * 右上角寫頁數（見 [drawDigit]、`TQ9InputMethodService.onLongPress`）。
+     */
+    fun wideNextPage() = paging() && Prefs.pagerLayout(context) == PagerLayout.WIDE_NEXT
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         val w = MeasureSpec.getSize(widthMeasureSpec)
@@ -96,8 +110,15 @@ class ChinesePadView(context: Context, private val engine: Q9Engine) : KeyboardB
         // 選字夠兩頁嗰陣兩格闊嗰粒 0 就拆做「下頁」＋「上頁」兩粒正常闊（見 [splitPager]）
         splitPager = wantSplitPager()
         if (splitPager) {
-            add(Key(KeyAction.DIGIT, digit = 0, hint = "「」"), 1f, 3)
-            add(Key(KeyAction.PREV_PAGE, label = "上頁"), 2f, 3)
+            val next = Key(KeyAction.DIGIT, digit = 0, hint = "「」")
+            val prev = Key(KeyAction.PREV_PAGE, label = "上頁")
+            // 「上頁」擺前定擺後由設定話事。粒 `0`（＝「下頁」）跟住郁位，
+            // 因為呢個狀態下佢已經唔再係數字鍵，冇「撳開嗰個位」可言
+            if (Prefs.pagerLayout(context) == PagerLayout.PREV_NEXT) {
+                add(prev, 1f, 3); add(next, 2f, 3)
+            } else {
+                add(next, 1f, 3); add(prev, 2f, 3)
+            }
         } else {
             add(Key(KeyAction.DIGIT, digit = 0, swipeable = true, hint = "「」"), 1f, 3, 2f)
         }
@@ -159,7 +180,8 @@ class ChinesePadView(context: Context, private val engine: Q9Engine) : KeyboardB
 
     /**
      * **淨係打碼階段先至滑得**。入咗選字模式啲數字鍵已經唔再係碼，
-     * 而係「揀第幾個字」同埋 `0` = 揭下一頁，滑過去等於亂咁揀字揭頁。
+     * 而係「揀第幾個字」同埋 `0` = 揭下一頁，滑過去等於亂咁揀字揭頁
+     * （三個 [PagerLayout] 都一樣，大格「下頁」嗰個一樣係選字模式）。
      */
     override fun canSwipe(key: Key) =
         key.action == KeyAction.DIGIT && Prefs.swipeEnabled(context) && !engine.selectMode
@@ -204,7 +226,16 @@ class ChinesePadView(context: Context, private val engine: Q9Engine) : KeyboardB
         if (d == 0) {
             drawFace(canvas, box, faceColor(box, isDown))
             drawLabel(canvas, box, engine.key0Label, sizeRatio = 0.40f)
-            drawCornerHint(canvas, box, box.key.hint)
+            if (wideNextPage()) {
+                // 大格「下頁」：長撳唔再係 `「」` 而係「上頁」，所以左上角寫返「上頁」
+                // （同其他鍵一樣，左上角細字＝長撳做乜），頁數讓去右上角
+                drawCornerHint(canvas, box, "上頁")
+                drawCornerHintRight(canvas, box, engine.pageHint)
+                return
+            }
+            // 「下頁」嗰陣左上角寫住而家第幾頁／總共幾頁（`1/10`，由 1 起計），
+            // 唔使數住撳咗幾多下。冇分頁先讓返個位俾長撳提示（`「」`）。
+            drawCornerHint(canvas, box, engine.pageHint.ifEmpty { box.key.hint })
             return
         }
         val pk = engine.keys[d]
@@ -247,8 +278,13 @@ class ChinesePadView(context: Context, private val engine: Q9Engine) : KeyboardB
             sizeRatio = if (k.action == KeyAction.CANCEL) 0.36f else 0.40f,
             color = if (usable) theme.text else theme.textDim
         )
-        // 同音鍵：啱啱打完同音字就喺左上角寫返個字正路應該點打
-        val hint = if (k.action == KeyAction.HOMO) engine.homoCodeHint else k.hint
+        // 同音鍵左上角：攤開緊同音字表就寫住而家搵緊邊隻字嘅同音（成頁都係同音字，
+        // 冇個字擺喺度就唔知搵緊邊隻）；揀完就換做嗰個字正路應該點打嘅字碼
+        val hint = when {
+            k.action != KeyAction.HOMO -> k.hint
+            engine.homoWord.isNotEmpty() -> engine.homoWord
+            else -> engine.homoCodeHint
+        }
         if (hint.isNotEmpty()) {
             drawCornerHint(
                 canvas, box, hint,

@@ -173,11 +173,15 @@ class LatinPadView(context: Context) : RowsPadView(context) {
         ) + "zxcvbnm".map { ch(it.toString()) } +
             listOf(Key(KeyAction.BACKSPACE, label = "⌫", weight = 1.75f, repeatable = true))
         val r3 = ArrayList<Key>()
+        // 搵 emoji 嗰陣底行淨係要「退出」同 ␣ 兩粒：`?123`、`中`、`⏎`、標點喺呢頁
+        // 一粒都用唔著（打嘅字淨係用嚟篩 emoji，唔會入落個欄）。粒退出掣**寫明幾隻字**
+        // —— 以前淨係得個 😀，冇人知撳落去係唔搵住定係入咗個 emoji
         if (emojiSearchMode) {
-            r3.add(Key(KeyAction.TO_EMOJI, label = "😀", weight = 1.3f, bigLabel = true))
-        } else {
-            r3.add(Key(KeyAction.TO_CHINESE, label = "中", weight = 1.3f, bigLabel = true))
+            r3.add(Key(KeyAction.TO_EMOJI, label = "退出表情搜尋", weight = 3f))
+            r3.add(Key(KeyAction.SPACE, label = "␣", weight = 4f))
+            return if (numRow) listOf(digits, r0, r1, r2, r3) else listOf(r0, r1, r2, r3)
         }
+        r3.add(Key(KeyAction.TO_CHINESE, label = "中", weight = 1.3f, bigLabel = true))
         // 長撳 ?123 唔使經符號頁，直接跳去純數字 keypad
         r3.add(Key(KeyAction.TO_SYMBOL, label = "?123", weight = 1.3f,
             longAction = KeyAction.TO_NUMBER))
@@ -195,19 +199,11 @@ class LatinPadView(context: Context) : RowsPadView(context) {
             ))
             r3.add(punct("/"))
         } else {
-            // 搵 emoji 嗰陣 `/` 個位讓返俾「中」（打中文關鍵字，例如「貓」）
-            if (emojiSearchMode) {
-                r3.add(Key(KeyAction.TO_CHINESE, label = "中", weight = 1f))
-                r3.add(Key(KeyAction.SPACE, label = "␣", weight = 3.4f))
-                r3.add(punct(","))
-                r3.add(punct("."))
-            } else {
-                r3.add(Key(KeyAction.SPACE, label = "␣", weight = 3.4f))
-                // space 右邊順住排 `, . /` 三粒，三粒都有長撳 popup
-                r3.add(punct(","))
-                r3.add(punct("."))
-                r3.add(punct("/"))
-            }
+            r3.add(Key(KeyAction.SPACE, label = "␣", weight = 3.4f))
+            // space 右邊順住排 `, . /` 三粒，三粒都有長撳 popup
+            r3.add(punct(","))
+            r3.add(punct("."))
+            r3.add(punct("/"))
         }
         r3.add(Key(KeyAction.ENTER, label = "⏎", weight = 1.7f, accent = true))
         return if (numRow) listOf(digits, r0, r1, r2, r3) else listOf(r0, r1, r2, r3)

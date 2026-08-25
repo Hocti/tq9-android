@@ -3,7 +3,12 @@ package hk.tq9.core
 import android.content.Context
 import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
+import java.io.File
+import java.io.InputStream
+import java.io.OutputStream
+import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 
 /**
  * 用戶自己嘅打字習慣：連續兩個中文字（bigram）用咗幾多次、同每隻字打咗幾多次。
@@ -75,6 +80,9 @@ class UsageStats private constructor(ctx: Context) :
         private const val DB_NAME = "usage_stats.db"
         private const val VERSION = 1
 
+        /** 匯入嗰陣要有齊呢兩張表先當係有效嘅使用記錄檔 */
+        private val TABLES = listOf("bigram", "char_freq")
+
         @Volatile private var instance: UsageStats? = null
 
         fun get(ctx: Context): UsageStats {
@@ -85,6 +93,85 @@ class UsageStats private constructor(ctx: Context) :
                 instance = created
                 created.io.execute { created.ensureLoaded() } // 偷偷背景載，唔阻住第一次真正查詢
                 return created
+            }
+        }
+
+        fun file(ctx: Context): File = ctx.applicationContext.getDatabasePath(DB_NAME)
+
+        /** 設定頁攞嚟寫「目前記錄：X 個字、Y 組前後組合」 */
+        fun counts(ctx: Context): Pair<Int, Int> {
+            val u = get(ctx)
+            u.ensureLoaded()
+            return u.charCache.size to u.bigramCache.size
+        }
+
+        /**
+         * 匯出而家個 `usage_stats.db`（設定頁用 SAF 揀檔案）。
+         *
+         * 一定要先 [closeSync] —— 背景 thread 排緊嘅寫未落到 sqlite、WAL 又未
+         * checkpoint 嘅話，抄出去嗰份會少咗最後嗰幾下。
+         */
+        fun exportTo(ctx: Context, out: OutputStream): Result<Unit> = runCatching {
+            closeSync()
+            val f = file(ctx)
+            require(f.exists() && f.length() > 0) { "尚未有任何使用記錄" }
+            f.inputStream().use { it.copyTo(out) }
+        }
+
+        /** 匯入：驗到有齊 [TABLES] 先至覆蓋（舊嗰份唔會保留，同換字碼庫一樣） */
+        fun importFrom(ctx: Context, input: InputStream): Result<Unit> = runCatching {
+            val tmp = File(ctx.cacheDir, "incoming_usage.db")
+            tmp.outputStream().use { input.copyTo(it) }
+            try {
+                validate(tmp)
+                closeSync()
+                val target = file(ctx)
+                target.parentFile?.mkdirs()
+                // 舊 db 嘅 -wal / -shm 唔清，下次開返會攞住舊 WAL 蓋返落新 db 度
+                deleteDbFiles(target)
+                tmp.copyTo(target, overwrite = true)
+            } finally {
+                tmp.delete()
+            }
+        }
+
+        /** 清走所有記錄（等於換返一個新表：下次 [get] 會由 [onCreate] 重新起） */
+        fun clear(ctx: Context): Result<Unit> = runCatching {
+            closeSync()
+            deleteDbFiles(file(ctx))
+        }
+
+        /**
+         * 關咗個 helper，順手等埋背景 thread 排緊嗰啲寫。
+         * `instance` 清走之後，下次 [get] 會重新開返個檔（匯入／清除完照用得）。
+         */
+        private fun closeSync() {
+            val inst = synchronized(this) { instance.also { instance = null } } ?: return
+            val done = CountDownLatch(1)
+            // 排喺 io queue 最後，即係前面嗰啲 bump 一定寫完先 close
+            runCatching { inst.io.execute { runCatching { inst.close() }; done.countDown() } }
+                .onFailure { runCatching { inst.close() }; return }
+            runCatching { done.await(2, TimeUnit.SECONDS) }
+        }
+
+        private fun deleteDbFiles(f: File) {
+            f.delete()
+            File(f.path + "-wal").delete()
+            File(f.path + "-shm").delete()
+            File(f.path + "-journal").delete()
+        }
+
+        private fun validate(f: File) {
+            val d = SQLiteDatabase.openDatabase(f.absolutePath, null, SQLiteDatabase.OPEN_READONLY)
+            d.use {
+                val have = HashSet<String>()
+                it.rawQuery("SELECT name FROM sqlite_master WHERE type='table'", null).use { c ->
+                    while (c.moveToNext()) have.add(c.getString(0))
+                }
+                val missing = TABLES.filter { t -> t !in have }
+                require(missing.isEmpty()) {
+                    "不是有效的使用記錄檔，缺少：" + missing.joinToString(", ")
+                }
             }
         }
     }

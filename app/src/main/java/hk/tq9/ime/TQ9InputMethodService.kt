@@ -30,22 +30,26 @@ import android.view.inputmethod.InputMethodManager
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.ProgressBar
+import android.widget.TextView
 import android.widget.Toast
 import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import hk.tq9.core.AiRewrite
+import hk.tq9.core.AiStt
 import hk.tq9.core.BarMode
 import hk.tq9.core.ClipHistory
 import hk.tq9.core.EmojiDict
 import hk.tq9.core.EnDict
 import hk.tq9.core.NextWordModel
 import hk.tq9.core.PadAlign
+import hk.tq9.core.PagerLayout
 import hk.tq9.core.Prefs
 import hk.tq9.core.Q9Db
 import hk.tq9.core.Q9Cmd
 import hk.tq9.core.Q9Engine
 import hk.tq9.core.UsageStats
+import hk.tq9.core.WavRecorder
 import hk.tq9.swipe.GestureDecoder
 import hk.tq9.ui.MicPermissionActivity
 import kotlin.math.abs
@@ -130,6 +134,17 @@ class TQ9InputMethodService : android.inputmethodservice.InputMethodService(),
     private var listening = false
     private val ui = Handler(Looper.getMainLooper())
 
+    // ---- AI 語音輸入（[Prefs.aiSttOn] 開咗就頂走上面嗰個系統 recognizer）--------
+    /** 錄緊嘢就唔係 null。放咗手／出咗結果就清返 */
+    private var sttRecorder: WavRecorder? = null
+    /** 撳實 🎤 錄嗰種（放手就收工）；撳一下開始嗰種係 false，要再撳一下先停 */
+    private var sttHold = false
+    /** 錄緊或者等緊 Gemini 回覆：成個鍵盤蓋住咗，唔好再開多一次 */
+    private var sttBusy = false
+    /** 同 [aiGeneration] 一樣：逾時之後遲到嘅回覆要當第 */
+    private var sttGeneration = 0
+    private var sttTimerLabel: TextView? = null
+
     private val clipListener = ClipboardManager.OnPrimaryClipChangedListener {
         runCatching { ClipHistory.current(this) }
     }
@@ -150,6 +165,7 @@ class TQ9InputMethodService : android.inputmethodservice.InputMethodService(),
         })
         engine.host = this
         engine.scOutput = Prefs.scOutput(this)
+        engine.usageReorder = Prefs.usageReorder(this)
         barMode = Prefs.barMode(this)
         quickPicks = runCatching { db?.keyInput(1000).orEmpty() }.getOrDefault(emptyList())
             .filter { it.isNotEmpty() && it != "*" }
@@ -159,6 +175,7 @@ class TQ9InputMethodService : android.inputmethodservice.InputMethodService(),
 
     override fun onDestroy() {
         stopStt()
+        cancelAiStt()
         clipboard()?.removePrimaryClipChangedListener(clipListener)
         db?.close()
         super.onDestroy()
@@ -220,6 +237,8 @@ class TQ9InputMethodService : android.inputmethodservice.InputMethodService(),
     override fun onStartInputView(info: EditorInfo, restarting: Boolean) {
         super.onStartInputView(info, restarting)
         engine.scOutput = Prefs.scOutput(this)
+        // 設定頁改完個開關唔會 restart 個 service，所以每次入欄都要重新讀
+        engine.usageReorder = Prefs.usageReorder(this)
         barMode = Prefs.barMode(this)
         latinComposing.setLength(0)
         latinSuggestions = emptyList()
@@ -268,6 +287,8 @@ class TQ9InputMethodService : android.inputmethodservice.InputMethodService(),
     override fun onFinishInputView(finishingInput: Boolean) {
         super.onFinishInputView(finishingInput)
         stopStt()
+        // 個欄冇咗就冇地方入返段字，唔好嘥個 API call（亦都唔好留住支咪）
+        cancelAiStt()
         finishLatinComposing()
     }
 
@@ -286,11 +307,11 @@ class TQ9InputMethodService : android.inputmethodservice.InputMethodService(),
             !currentInputConnection?.getTextAfterCursor(1, 0).isNullOrEmpty())
     }
 
-    /** 搜尋欄要出放大鏡，唔係就照出 ⏎ */
+    /** 搜尋欄要出放大鏡（單色，見 [SEARCH_GLYPH]），唔係就照出 ⏎ */
     private fun enterLabelFor(ei: EditorInfo?): String {
         val action = ei?.imeOptions?.and(EditorInfo.IME_MASK_ACTION) ?: EditorInfo.IME_ACTION_NONE
         val noEnter = (ei?.imeOptions?.and(EditorInfo.IME_FLAG_NO_ENTER_ACTION) ?: 0) != 0
-        return if (!noEnter && action == EditorInfo.IME_ACTION_SEARCH) "🔍" else "⏎"
+        return if (!noEnter && action == EditorInfo.IME_ACTION_SEARCH) SEARCH_GLYPH else "⏎"
     }
 
     // ---- view 切換 --------------------------------------------------------
@@ -456,6 +477,10 @@ class TQ9InputMethodService : android.inputmethodservice.InputMethodService(),
     }
 
     override fun onLongPress(key: Key): Boolean {
+        // 左上角揀咗做 🎤 嗰粒鍵，長撳一樣係「撳實一路錄」（同工具列嗰粒一致）——
+        // 但淨係喺個位本身冇長撳功能嗰陣，唔可以食咗 user 特登揀咗嘅長撳動作
+        if (key.action == KeyAction.STT && key.longAction == KeyAction.NOOP &&
+            onSttHoldStart()) return true
         // 設定頁換得嘅鍵（左上角嗰粒）自己帶住長撳做乜
         if (key.longAction != KeyAction.NOOP) {
             onKey(key.copy(action = key.longAction, longAction = KeyAction.NOOP))
@@ -464,7 +489,13 @@ class TQ9InputMethodService : android.inputmethodservice.InputMethodService(),
         when (key.action) {
             KeyAction.DIGIT -> {
                 // 本身 "/" 鍵嘅開關標點，改成長撳 0
-                if (key.digit == 0) { engine.cmd(Q9Cmd.OPENCLOSE); return true }
+                if (key.digit == 0) {
+                    // 大格「下頁」模式（[PagerLayout.WIDE_NEXT]）選字揭緊頁嗰陣，
+                    // 長撳讓咗俾「上頁」——「」冇位，粒鍵左上角亦都寫住「上頁」
+                    if (chinesePad?.wideNextPage() == true) { engine.cmd(Q9Cmd.PREV); return true }
+                    engine.cmd(Q9Cmd.OPENCLOSE)
+                    return true
+                }
                 // 選字模式長撳一格 = 開嗰個字嘅同音字表（唔使先撳「同音」）。
                 // 就算查唔到同音字都照食咗呢下長撳 —— 唔好跌返落「長撳 = 連撳」，
                 // 唔係就會即刻揀咗個字，跟住放手嗰下再攞個數字起新碼。
@@ -489,13 +520,21 @@ class TQ9InputMethodService : android.inputmethodservice.InputMethodService(),
         return false
     }
 
+    /** 撳實鍵盤上嗰粒 🎤 錄完放手（見 [onSttHoldStart]） */
+    override fun onLongPressEnd(key: Key) {
+        if (key.action == KeyAction.STT) onSttHoldEnd()
+    }
+
     override fun feedback(key: Key) {
-        if (Prefs.vibrate(this)) {
+        val level = Prefs.vibrateLevel(this)
+        if (level > 0) {
             vibrator()?.let { v ->
                 // 部分機款（如部分 Sony Xperia）唔支援自訂震幅，
-                // 硬傳 amplitude 會令震動完全無反應，要用 DEFAULT_AMPLITUDE 做後備
-                val amplitude = if (v.hasAmplitudeControl()) 40 else VibrationEffect.DEFAULT_AMPLITUDE
-                v.vibrate(VibrationEffect.createOneShot(12, amplitude))
+                // 硬傳 amplitude 會令震動完全無反應，要用 DEFAULT_AMPLITUDE 做後備。
+                // 嗰啲機就淨係靠時間長短分開三級。
+                val amplitude = if (v.hasAmplitudeControl()) Prefs.vibrateAmplitude(level)
+                                else VibrationEffect.DEFAULT_AMPLITUDE
+                v.vibrate(VibrationEffect.createOneShot(Prefs.vibrateDurationMs(level), amplitude))
             }
         }
         if (Prefs.sound(this)) {
@@ -791,8 +830,9 @@ class TQ9InputMethodService : android.inputmethodservice.InputMethodService(),
     override fun onEmojiBackspace() = backspace()
 
     /**
-     * 撳 🔍：轉去英文鍵盤打字，但啲字唔會入落個欄，
+     * 撳 emoji 表嗰粒搵字掣：轉去英文鍵盤打字，但啲字唔會入落個欄，
      * 淨係即時篩 emoji，夾到嗰啲出喺上面條 bar 度撳。
+     * 底行嗰陣淨係得「退出表情搜尋」同 ␣（見 [LatinPadView.emojiSearchMode]）。
      */
     override fun onEmojiSearch() {
         emojiSearch = true
@@ -964,10 +1004,12 @@ class TQ9InputMethodService : android.inputmethodservice.InputMethodService(),
 
     /**
      * ✨ 撳唔撳得：**唔使揀住字都用得** —— 個欄有字就當「改寫成個欄」（見 [runAi]）。
-     * 完全冇入 API key 就連粒掣都唔出（[OptionBarsView.setAiVisible]）。
+     * 完全冇入 API key、或者設定頁熄咗「AI 改寫」，就連粒掣都唔出
+     * （[OptionBarsView.setAiVisible]）。
      */
     private fun applyAiState(hasText: Boolean) {
-        val keySet = Prefs.aiApiKey(this).isNotBlank()
+        // 設定頁熄咗「AI 改寫」就當冇入過 key 咁處理 —— 成粒 ✨ 唔出
+        val keySet = Prefs.aiApiKey(this).isNotBlank() && Prefs.aiRewriteOn(this)
         val usable = keySet && hasText
         if (keySet == aiKeySet && usable == aiUsable) return
         aiKeySet = keySet
@@ -1031,6 +1073,7 @@ class TQ9InputMethodService : android.inputmethodservice.InputMethodService(),
         val next = Prefs.align(this).next()
         Prefs.setAlign(this, next)
         chinesePad?.onSettingsChanged()
+        numberPad?.rebuild()   // 純數字頁而家一齊跟住靠左／靠右
         bars.refreshAlignLabel()
         // 轉咗顯示方式可能就啱啱夠窄／唔再夠窄，側邊欄要跟住出現或者消失
         refreshBars()
@@ -1051,7 +1094,22 @@ class TQ9InputMethodService : android.inputmethodservice.InputMethodService(),
         if (next == cur) return
         Prefs.setWidthScale(this, next)
         chinesePad?.onSettingsChanged()
+        numberPad?.rebuild()   // 純數字頁而家跟返中文本體嘅闊度（見 [NumberPadView.contentBounds]）
         refreshBars()
+    }
+
+    /**
+     * 長撳「靠左／靠右」嗰粒（撳實唔拉）：中文本體一下子拉到最闊 ——
+     * [Prefs.MAX_WIDTH_SCALE] 之下 `PadMetrics` 個 `cellW` 一定會頂到 `availW / cols`，
+     * 即係成個螢幕咁闊，同「拉闊」睇落一樣。拉窄咗之後想還原唔使一路拖返出去。
+     */
+    override fun onMaxWidth() {
+        if (Prefs.widthScale(this) >= Prefs.MAX_WIDTH_SCALE) { toast("鍵盤闊度已是最大"); return }
+        Prefs.setWidthScale(this, Prefs.MAX_WIDTH_SCALE)
+        chinesePad?.onSettingsChanged()
+        numberPad?.rebuild()   // 純數字頁而家跟返中文本體嘅闊度
+        refreshBars()
+        toast("鍵盤闊度已設為最大")
     }
 
     /** 上下拖 = 拉高／拉低成個鍵盤（鍵盤永遠貼實底，唔會提起留個窿）。自由移動已經冇咗。 */
@@ -1082,6 +1140,22 @@ class TQ9InputMethodService : android.inputmethodservice.InputMethodService(),
 
     override fun onTool(action: KeyAction) = onKey(Key(action))
 
+    /**
+     * 撳實 🎤 一路錄。淨係 AI 語音輸入做得到（系統嗰個 recognizer 冇呢個模式），
+     * 所以其餘情況回 false，粒掣照跌返落短撳。
+     */
+    override fun onSttHoldStart(): Boolean {
+        if (!aiSttOn() || sttBusy) return false
+        startAiStt(hold = true)
+        // 就算開唔到咪（要去問權限、俾第二個 app 霸咗）都照當收咗呢下長撳：
+        // 唔收嘅話放手嗰下會補返一下短撳，即刻再試多次，得個彈多次權限視窗
+        return true
+    }
+
+    override fun onSttHoldEnd() {
+        if (sttHold && sttRecorder != null) stopAiStt(commit = true)
+    }
+
     // ---- AI 改寫 -----------------------------------------------------------
 
     /**
@@ -1094,6 +1168,7 @@ class TQ9InputMethodService : android.inputmethodservice.InputMethodService(),
     private fun runAi() {
         val ic = currentInputConnection ?: return
         if (Prefs.aiApiKey(this).isBlank()) { toast("請先在設定頁輸入 Gemini API key"); return }
+        if (!Prefs.aiRewriteOn(this)) { toast("AI 改寫已在設定頁關閉"); return }
         var selected = ic.getSelectedText(0)?.toString().orEmpty()
         val wholeField = selected.isBlank()
         if (wholeField) {
@@ -1141,19 +1216,31 @@ class TQ9InputMethodService : android.inputmethodservice.InputMethodService(),
 
     /** AI 處理緊嗰陣：成個 UI disable，中間出個轉緊嘅圈 */
     private fun showAiLoading() {
-        if (!::outer.isInitialized) return
+        showBlockingOverlay(ProgressBar(this))
+    }
+
+    /**
+     * 喺成個鍵盤上面冚一塊半透明嘅嘢：底下啲鍵變灰，亦都撳唔到
+     * （`isClickable` 食晒啲掂觸）。AI 改寫、AI 錄音、等緊辨識結果三樣都用呢個。
+     *
+     * 高度**寫死做 `root` 而家嘅高度**（度唔到就用預設鍵盤高度）：`outer` 係
+     * wrap_content，用 MATCH_PARENT 會撐大咗成個 IME window。
+     */
+    private fun showBlockingOverlay(content: View): FrameLayout? {
+        if (!::outer.isInitialized) return null
         hideAiLoading()
         val h = root.height.takeIf { it > 0 } ?: PadMetrics.defaultPadHeightPx(this).roundToInt()
         val overlay = FrameLayout(this).apply {
             setBackgroundColor(Color.argb(170, 0, 0, 0))
             isClickable = true
             isFocusable = true
-            addView(ProgressBar(this@TQ9InputMethodService), FrameLayout.LayoutParams(
+            addView(content, FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT
             ).apply { gravity = Gravity.CENTER })
         }
         aiOverlay = overlay
         outer.addView(overlay, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, h))
+        return overlay
     }
 
     private fun hideAiLoading() {
@@ -1163,13 +1250,21 @@ class TQ9InputMethodService : android.inputmethodservice.InputMethodService(),
     }
 
     /** load fail 嗰下嘟一聲，唔靠 [Prefs.sound]（嗰個係按鍵聲，呢個係錯誤提示） */
-    private fun playErrorTone() {
+    private fun playErrorTone() = playTone(ToneGenerator.TONE_PROP_NACK, 300)
+
+    /**
+     * 提示音。每次開一個新 [ToneGenerator] 再 release —— 留住一個唔用就霸住個
+     * audio session，IME 好多時喺背景瞓覺，霸住會累到人哋部機播歌都細聲咗。
+     */
+    private fun playTone(tone: Int, ms: Int) {
         runCatching {
             val tg = ToneGenerator(AudioManager.STREAM_NOTIFICATION, 80)
-            tg.startTone(ToneGenerator.TONE_PROP_NACK, 300)
-            ui.postDelayed({ runCatching { tg.release() } }, 400)
+            tg.startTone(tone, ms)
+            ui.postDelayed({ runCatching { tg.release() } }, (ms + 100).toLong())
         }
     }
+
+    private fun dpPx(v: Int) = (v * resources.displayMetrics.density).roundToInt()
 
     private fun toast(s: String) = Toast.makeText(this, s, Toast.LENGTH_SHORT).show()
 
@@ -1294,15 +1389,14 @@ class TQ9InputMethodService : android.inputmethodservice.InputMethodService(),
     // ---- 語音輸入 (廣東話) -------------------------------------------------
 
     private fun toggleStt() {
-        if (listening) { stopStt(); return }
-        // 粒 🎤 而家喺工具 bar 度（貼上隔籬），聽緊嘢就著燈
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
-            != PackageManager.PERMISSION_GRANTED
-        ) {
-            startActivity(Intent(this, MicPermissionActivity::class.java)
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        // AI 語音輸入開咗就完全頂走系統嗰個 recognizer（撳一下開始，再撳一下停）
+        if (aiSttOn()) {
+            if (sttRecorder != null) stopAiStt(commit = true) else startAiStt(hold = false)
             return
         }
+        if (listening) { stopStt(); return }
+        // 粒 🎤 而家喺工具 bar 度（貼上隔籬），聽緊嘢就著燈
+        if (!ensureMicPermission()) return
         if (!SpeechRecognizer.isRecognitionAvailable(this)) {
             toast("此裝置沒有語音輸入服務")
             return
@@ -1368,11 +1462,206 @@ class TQ9InputMethodService : android.inputmethodservice.InputMethodService(),
         }
     }
 
+    /** 冇錄音權限就彈個透明 activity 去問，回 false = 而家未用得 */
+    private fun ensureMicPermission(): Boolean {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
+            == PackageManager.PERMISSION_GRANTED
+        ) return true
+        startActivity(Intent(this, MicPermissionActivity::class.java)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        return false
+    }
+
+    // ---- AI 語音輸入 -------------------------------------------------------
+
+    /**
+     * 用 AI 做語音輸入（`AiStt`）而唔係系統嗰個 `SpeechRecognizer`。
+     * 要設定頁開咗、有 API key、而且**用緊 Gemini**（自訂 API 送唔到錄音上去，
+     * 見 [Prefs.aiSttOn]）。差一樣就照跌返落 [toggleStt] 原本嗰條路。
+     */
+    private fun aiSttOn() = Prefs.aiSttOn(this) && Prefs.aiApiKey(this).isNotBlank()
+
+    /**
+     * 開始錄音。[hold] = 撳實錄嗰種（放手就收工），false = 撳一下開始、再撳一下停。
+     *
+     * 錄緊同埋等緊結果嗰陣成個鍵盤俾 [showBlockingOverlay] 蓋住（變灰兼撳唔到），
+     * 所以「再撳一下停」係撳嗰塊 overlay，唔係撳返粒 🎤。
+     */
+    private fun startAiStt(hold: Boolean) {
+        if (sttBusy || sttRecorder != null) return
+        if (!ensureMicPermission()) return
+        val rec = WavRecorder()
+        if (!rec.start()) {
+            playSttTone(SttTone.FAIL)
+            toast("開唔到麥克風，請檢查權限或其他正在錄音的程式")
+            return
+        }
+        sttRecorder = rec
+        sttHold = hold
+        sttBusy = true
+        setSttLight(true)
+        playSttTone(SttTone.START)
+        showSttRecording(hold)
+    }
+
+    /**
+     * 收工。[commit] = false 就淨係丟咗段錄音（收返啲資源，唔叫 API）。
+     * 段錄音太短（撳錯／彈手）`WavRecorder.stop()` 會回 null，一樣唔叫 API。
+     */
+    private fun stopAiStt(commit: Boolean) {
+        val rec = sttRecorder ?: return
+        sttRecorder = null
+        sttHold = false
+        stopSttTimer()
+        setSttLight(false)
+        val wav = if (commit) rec.stop() else { rec.cancel(); null }
+        if (wav == null) {
+            sttBusy = false
+            hideAiLoading()
+            if (commit) { playSttTone(SttTone.FAIL); toast("錄音太短") }
+            return
+        }
+        playSttTone(SttTone.STOP)
+        showSttWaiting()
+
+        val myGen = ++sttGeneration
+        val timeout = Runnable {
+            if (myGen != sttGeneration) return@Runnable
+            sttGeneration++
+            sttBusy = false
+            hideAiLoading()
+            playSttTone(SttTone.FAIL)
+            toast("語音輸入逾時")
+        }
+        ui.postDelayed(timeout, STT_TIMEOUT_MS)
+
+        AiStt.transcribe(this, wav, sttContext()) { r ->
+            if (myGen != sttGeneration) return@transcribe // 已經逾時處理咗
+            ui.removeCallbacks(timeout)
+            sttGeneration++
+            sttBusy = false
+            hideAiLoading()
+            r.onSuccess { out ->
+                val text = out.trim()
+                if (text.isEmpty()) {
+                    playSttTone(SttTone.FAIL)
+                    toast("聽唔到內容")
+                    return@onSuccess
+                }
+                playSttTone(SttTone.OK)
+                currentInputConnection?.commitText(
+                    if (engine.scOutput) db?.tcsc(text) ?: text else text, 1)
+            }.onFailure {
+                playSttTone(SttTone.FAIL)
+                toast("語音輸入失敗：" + (it.message ?: "未知錯誤"))
+            }
+        }
+    }
+
+    /**
+     * 送埋落 prompt 嘅上下文：輸入框而家嘅內容（節錄）。
+     * 前面攞多啲（剛講完嘅嘢通常喺 caret 前面），後面攞少少夠知個句點喺邊就得。
+     */
+    private fun sttContext(): String {
+        val ic = currentInputConnection ?: return ""
+        val before = ic.getTextBeforeCursor(STT_CONTEXT_BEFORE, 0)?.toString().orEmpty()
+        val after = ic.getTextAfterCursor(STT_CONTEXT_AFTER, 0)?.toString().orEmpty()
+        return (before + after).trim()
+    }
+
+    /** 錄緊嘢：成個鍵盤蓋住，中間出個計時器 */
+    private fun showSttRecording(hold: Boolean) {
+        val timer = TextView(this).apply {
+            setTextColor(Color.WHITE)
+            textSize = 30f
+            gravity = Gravity.CENTER
+        }
+        sttTimerLabel = timer
+        val col = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+            addView(timer)
+            addView(TextView(this@TQ9InputMethodService).apply {
+                text = if (hold) "🎤 放開即停" else "🎤 輕觸任何位置停止"
+                setTextColor(Color.argb(210, 255, 255, 255))
+                textSize = 14f
+                gravity = Gravity.CENTER
+            })
+        }
+        // 撳實錄嗰種唔使理呢下撳（放手自然會停），但擺住都冇壞：
+        // 手指仲撳實住粒 🎤，成串 event 都會繼續派返俾佢，唔會落到呢度
+        showBlockingOverlay(col)?.setOnClickListener { stopAiStt(commit = true) }
+        updateSttTimer()
+        ui.post(sttTimerTick)
+    }
+
+    /** 等緊 Gemini：一樣蓋住，中間換做個轉緊嘅圈 */
+    private fun showSttWaiting() {
+        val col = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+            addView(ProgressBar(this@TQ9InputMethodService))
+            addView(TextView(this@TQ9InputMethodService).apply {
+                text = "辨識中…"
+                setTextColor(Color.argb(210, 255, 255, 255))
+                textSize = 14f
+                gravity = Gravity.CENTER
+                setPadding(0, dpPx(10), 0, 0)
+            })
+        }
+        showBlockingOverlay(col)
+    }
+
+    private val sttTimerTick = object : Runnable {
+        override fun run() {
+            val rec = sttRecorder ?: return
+            updateSttTimer()
+            // 封頂：一 request 掟幾十 MB 上去實 timeout，夠鐘就當 user 撳咗停
+            if (rec.elapsedMs >= AiStt.MAX_RECORD_MS) { stopAiStt(commit = true); return }
+            ui.postDelayed(this, 100)
+        }
+    }
+
+    private fun updateSttTimer() {
+        val ms = sttRecorder?.elapsedMs ?: return
+        val tenths = ms / 100
+        sttTimerLabel?.text = "● %d:%02d.%d".format(tenths / 600, (tenths / 10) % 60, tenths % 10)
+    }
+
+    private fun stopSttTimer() {
+        ui.removeCallbacks(sttTimerTick)
+        sttTimerLabel = null
+    }
+
+    /** 唔要而家錄緊／等緊嗰次（離開個欄、service 收工）：唔叫 API，亦都唔出聲 */
+    private fun cancelAiStt() {
+        sttGeneration++ // 遲到嘅回覆當第
+        if (sttRecorder != null) stopAiStt(commit = false)
+        sttBusy = false
+        stopSttTimer()
+        hideAiLoading()
+    }
+
+    /** 四個階段四把唔同嘅聲：開始錄、錄完、成功、失敗 */
+    private enum class SttTone { START, STOP, OK, FAIL }
+
+    private fun playSttTone(t: SttTone) = when (t) {
+        SttTone.START -> playTone(ToneGenerator.TONE_PROP_BEEP, 120)
+        SttTone.STOP -> playTone(ToneGenerator.TONE_PROP_BEEP2, 200)
+        SttTone.OK -> playTone(ToneGenerator.TONE_PROP_ACK, 200)
+        SttTone.FAIL -> playTone(ToneGenerator.TONE_PROP_NACK, 300)
+    }
+
     companion object {
         private const val TAG = "TQ9"
         /** 連撳兩下 shift 幾快先當 capslock */
         private const val DOUBLE_TAP_MS = 400L
         /** AI 攞 10 秒都未有回應就當 error */
         private const val AI_TIMEOUT_MS = 10_000L
+        /** 語音辨識要成段錄音上傳，比改寫慢好多，所以放鬆到 100 秒 */
+        private const val STT_TIMEOUT_MS = 100_000L
+        /** 送去 AI 做上下文嘅字數：caret 前面／後面各攞幾多 */
+        private const val STT_CONTEXT_BEFORE = 400
+        private const val STT_CONTEXT_AFTER = 100
     }
 }

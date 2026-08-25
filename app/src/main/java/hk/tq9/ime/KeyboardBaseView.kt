@@ -33,6 +33,11 @@ abstract class KeyboardBaseView(context: Context) : View(context) {
         fun onKey(key: Key)
         /** 回傳 true = 已經處理咗，唔使再當短撳 */
         fun onLongPress(key: Key): Boolean
+        /**
+         * [onLongPress] 收咗嗰下之後放手／取消。長撳錄音要知幾時收工
+         * （撳實 🎤 一路錄，放手就停），其餘長撳唔使理，所以預設乜都唔做。
+         */
+        fun onLongPressEnd(key: Key) {}
         fun feedback(key: Key)
         /** 長撳 ␣ 之後拖手指：一格一格咁郁 caret */
         fun moveCursor(dx: Int, dy: Int)
@@ -68,6 +73,11 @@ abstract class KeyboardBaseView(context: Context) : View(context) {
     private var downY = 0f
     private var swiping = false
     private var longFired = false
+    /**
+     * 長撳嗰下係俾 [Host.onLongPress] 收咗（唔係變體 popup、唔係郁 caret、
+     * 唔係「長撳當連撳」）。放手嗰陣要通知返 host（見 [Host.onLongPressEnd]）。
+     */
+    private var longKey: Key? = null
     /** 子類喺 gesture 中途叫咗停（見 [abortSwipe]）：唔再出鍵，連條線都唔畫 */
     private var swipeAborted = false
     // 長撳 ␣ 之後入咗「郁 caret」模式
@@ -112,6 +122,7 @@ abstract class KeyboardBaseView(context: Context) : View(context) {
             invalidate()
         } else if (host?.onLongPress(b.key) == true) {
             longFired = true
+            longKey = b.key
             host?.feedback(b.key)
             invalidate()
         } else if (b.key.holdRepeat) {
@@ -277,6 +288,7 @@ abstract class KeyboardBaseView(context: Context) : View(context) {
                 downX = x; downY = y
                 swiping = false
                 longFired = false
+                longKey = null
                 swipeAborted = false
                 cursorMode = false
                 host?.feedback(b.key)
@@ -332,6 +344,7 @@ abstract class KeyboardBaseView(context: Context) : View(context) {
             MotionEvent.ACTION_UP -> {
                 cancelPending()
                 dismissHover()
+                endLongPress()
                 if (popupItems.isNotEmpty()) {
                     closeVariantPopup(commit = true)
                     pressed = null
@@ -368,6 +381,7 @@ abstract class KeyboardBaseView(context: Context) : View(context) {
             MotionEvent.ACTION_CANCEL -> {
                 cancelPending()
                 dismissHover()
+                endLongPress()
                 closeVariantPopup(commit = false)
                 tracker.cancel()
                 swiping = false
@@ -438,6 +452,12 @@ abstract class KeyboardBaseView(context: Context) : View(context) {
         super.onDetachedFromWindow()
         variantPopup.dismiss()
         dismissHover()
+    }
+
+    private fun endLongPress() {
+        val k = longKey ?: return
+        longKey = null
+        host?.onLongPressEnd(k)
     }
 
     private fun cancelPending() {
