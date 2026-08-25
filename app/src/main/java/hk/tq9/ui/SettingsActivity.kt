@@ -65,6 +65,9 @@ import hk.tq9.ime.Theme
 class SettingsActivity : AppCompatActivity() {
 
     companion object {
+        /** 開源版本喺邊度（設定頁最底、版本號下面嗰條 link） */
+        private const val PROJECT_URL = "https://github.com/Hocti/tq9-android"
+
         /**
          * 「試打」同「預覽」兩段收埋咗（user 要求），但係 code 一個字都冇刪 ——
          * 想 debug 鍵盤排位嗰陣改返做 true 就會即刻出返。
@@ -441,8 +444,9 @@ class SettingsActivity : AppCompatActivity() {
     private fun buildSttCategory() {
         val custom = Prefs.aiUseCustom(this)
         val hasKey = Prefs.aiApiKey(this).isNotBlank()
-        note("開啟後，工具列的 🎤 會由系統內置的語音輸入改為交給 AI 辨識：" +
-            "按一下開始錄音，再按一次（或輕觸畫面）停止；按住 🎤 不放則會一直錄，放手即停。" +
+        note("開啟後，工具列的「語音輸入」鍵會由系統內置的語音輸入改為交給 AI 辨識：" +
+            "按一下開始錄音，再按一次（或輕觸畫面）停止；按住不放則會一直錄，放手即停。" +
+            "太短或聽不到說話的錄音會直接當成按錯，不會上傳。" +
             "錄音與等待結果期間鍵盤會變灰不能按，錄音時顯示計時器，等待時顯示載入動畫；" +
             "開始錄音、錄音完結、成功、失敗會分別發出四種不同的提示音。")
         if (custom) {
@@ -474,15 +478,15 @@ class SettingsActivity : AppCompatActivity() {
      * （見 `TQ9InputMethodService.applyAiState`）。
      */
     private fun buildRewriteCategory() {
-        note("在任何應用程式中按工具列的 ✨ 即可用 AI 改寫：" +
+        note("在任何應用程式中按工具列的「AI 改寫」鍵即可用 AI 改寫：" +
             "有選取文字就只改選取的部分，沒有選取則會改寫整個輸入框的內容。")
         switch("啟用 AI 改寫", Prefs.KEY_AI_REWRITE_ON, true) { rebuildAiSection() }
         if (!Prefs.aiRewriteOn(this)) {
-            note("已關閉：工具列不會出現 ✨ 按鍵。")
+            note("已關閉：工具列不會出現「AI 改寫」按鍵。")
             return
         }
         if (Prefs.aiApiKey(this).isBlank()) {
-            note("⚠️ 尚未設定 API key，✨ 按鍵不會出現。請先在「AI 設定」貼上 API key。")
+            note("⚠️ 尚未設定 API key，「AI 改寫」按鍵不會出現。請先在「AI 設定」貼上 API key。")
         }
         textField("Prompt（%text% 代表要改寫的文字）", Prefs.KEY_AI_PROMPT, Prefs.DEFAULT_AI_PROMPT,
             multiline = true)
@@ -625,7 +629,7 @@ class SettingsActivity : AppCompatActivity() {
     private fun refreshAiKeyLabel() {
         val key = Prefs.aiApiKey(this)
         aiKeyLabel?.text = when {
-            key.isEmpty() -> "尚未設定（✨ 按鍵不會出現）"
+            key.isEmpty() -> "尚未設定（「AI 改寫」按鍵不會出現）"
             aiKeyShown -> key
             key.length <= 8 -> "已設定（" + "•".repeat(key.length) + "）"
             else -> "已設定（" + key.take(4) + "…" + key.takeLast(4) + "）"
@@ -721,15 +725,20 @@ class SettingsActivity : AppCompatActivity() {
             Prefs.setVibrateLevel(this, v)
             previewVibrate(v)
         }
-        note("0 為完全關閉，1 是最輕（舊版唯一的力度），數字越大震得越明顯，放手時會震一下試效果。" +
+        note("0 為完全關閉，1 是最輕（舊版唯一的力度），2 與 3 除了加大震幅，時間也拉長了" +
+            "（34 與 60 毫秒），感覺會明顯得多，放手時會震一下試效果。" +
             "部分機款不支援自訂震幅，那些機只感覺到震動時間長短的分別。")
         switch("按鍵聲音", Prefs.KEY_SOUND, false)
         slider("長按時間", 200, 700, Prefs.longPressMs(this).toInt(), "ms", step = 10) { v ->
             Prefs.sp(this).edit().putInt(Prefs.KEY_LONG_PRESS_MS, v).apply()
         }
         note("長按 0 = 開關成對標點（「」之類）；長按「同音」= 關聯字；" +
-            "長按 📋 = 剪貼簿記錄。九宮格 1~9 長按 = 連按兩下（長按 7 再拖到 0 = 770），" +
+            "長按工具列的「貼上」= 剪貼簿記錄。九宮格 1~9 長按 = 連按兩下（長按 7 再拖到 0 = 770），" +
             "滑到最後一格停留足夠時間才放手亦作兩下計。純數字鍵盤全頁沒有長按功能。")
+        switch("長按 1~9 開速選字表", Prefs.KEY_LONG_PRESS_SHORTCUT, false)
+        note("開啟後，尚未輸入任何字碼時長按 1~9 會直接打開該格的速選字表，" +
+            "不必先按字碼再按「速選」。代價是那一下長按不再等於「連按兩下」，" +
+            "要輸入 77、88 這類字碼時請關閉。已經輸入字碼後長按仍然是連按兩下，不受影響。")
 
         buildVersionFooter()
     }
@@ -751,6 +760,28 @@ class SettingsActivity : AppCompatActivity() {
             setPadding(0, dp(28), 0, dp(4))
         }, LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+        content.addView(TextView(this).apply {
+            text = PROJECT_URL
+            textSize = 12f
+            gravity = Gravity.CENTER
+            setTextColor(linkColor())
+            paintFlags = paintFlags or android.graphics.Paint.UNDERLINE_TEXT_FLAG
+            setPadding(0, 0, 0, dp(24))
+            setOnClickListener { openUrl(PROJECT_URL) }
+        }, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+    }
+
+    /** 深色主題用淺藍，唔係用返系統嗰隻深藍會睇唔到 */
+    private fun linkColor(): Int =
+        if (Theme.of(this).dark) Color.parseColor("#7FB3FF") else Color.parseColor("#1A56C4")
+
+    /** 部機（例如冇裝過瀏覽器嘅模擬器）開唔到就講聲，唔好死 app */
+    private fun openUrl(url: String) {
+        runCatching {
+            startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        }.onFailure { toast("無法開啟：$url") }
     }
 
     /** 拖完震一下，等 user 即刻感覺到揀咗嗰級有幾大力 */

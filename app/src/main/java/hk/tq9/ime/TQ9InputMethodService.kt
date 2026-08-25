@@ -49,7 +49,8 @@ import hk.tq9.core.Q9Db
 import hk.tq9.core.Q9Cmd
 import hk.tq9.core.Q9Engine
 import hk.tq9.core.UsageStats
-import hk.tq9.core.WavRecorder
+import hk.tq9.core.VoiceClip
+import hk.tq9.core.VoiceRecorder
 import hk.tq9.swipe.GestureDecoder
 import hk.tq9.ui.MicPermissionActivity
 import kotlin.math.abs
@@ -136,7 +137,7 @@ class TQ9InputMethodService : android.inputmethodservice.InputMethodService(),
 
     // ---- AI 語音輸入（[Prefs.aiSttOn] 開咗就頂走上面嗰個系統 recognizer）--------
     /** 錄緊嘢就唔係 null。放咗手／出咗結果就清返 */
-    private var sttRecorder: WavRecorder? = null
+    private var sttRecorder: VoiceRecorder? = null
     /** 撳實 🎤 錄嗰種（放手就收工）；撳一下開始嗰種係 false，要再撳一下先停 */
     private var sttHold = false
     /** 錄緊或者等緊 Gemini 回覆：成個鍵盤蓋住咗，唔好再開多一次 */
@@ -500,8 +501,10 @@ class TQ9InputMethodService : android.inputmethodservice.InputMethodService(),
                 // 就算查唔到同音字都照食咗呢下長撳 —— 唔好跌返落「長撳 = 連撳」，
                 // 唔係就會即刻揀咗個字，跟住放手嗰下再攞個數字起新碼。
                 if (engine.selectMode) { engine.homoAt(key.digit); return true }
-                // 未打過碼長撳 1~9 = 直接開嗰格嘅速選字表（打緊碼就照舊「長撳 = 連撳」）
-                if (engine.shortcutDigit(key.digit)) return true
+                // 未打過碼長撳 1~9 = 直接開嗰格嘅速選字表（打緊碼就照舊「長撳 = 連撳」）。
+                // 預設熄咗：呢下會食咗「長撳 = 連撳」嘅頭一下，打 77x 呢啲碼嘅人會
+                // 覺得撳極都唔出，所以要 user 自己喺設定頁開（[Prefs.longPressShortcut]）
+                if (Prefs.longPressShortcut(this) && engine.shortcutDigit(key.digit)) return true
             }
             KeyAction.HOMO -> { engine.cmd(Q9Cmd.RELATE); return true }
             KeyAction.PASTE -> { onPasteHistory(); return true }
@@ -1490,7 +1493,7 @@ class TQ9InputMethodService : android.inputmethodservice.InputMethodService(),
     private fun startAiStt(hold: Boolean) {
         if (sttBusy || sttRecorder != null) return
         if (!ensureMicPermission()) return
-        val rec = WavRecorder()
+        val rec = VoiceRecorder()
         if (!rec.start()) {
             playSttTone(SttTone.FAIL)
             toast("開唔到麥克風，請檢查權限或其他正在錄音的程式")
@@ -1506,7 +1509,10 @@ class TQ9InputMethodService : android.inputmethodservice.InputMethodService(),
 
     /**
      * 收工。[commit] = false 就淨係丟咗段錄音（收返啲資源，唔叫 API）。
-     * 段錄音太短（撳錯／彈手）`WavRecorder.stop()` 會回 null，一樣唔叫 API。
+     *
+     * `VoiceRecorder.stop()` 自己會篩：太短（撳錯／彈手）同埋由頭到尾冇人講過嘢
+     * （[VoiceClip.Silent]）兩種都**唔會**叫 API —— 一個 request 掟幾百 KB 上去
+     * 等足幾秒，出返一句「（沒有聲音）」係好嘥。
      */
     private fun stopAiStt(commit: Boolean) {
         val rec = sttRecorder ?: return
@@ -1514,11 +1520,14 @@ class TQ9InputMethodService : android.inputmethodservice.InputMethodService(),
         sttHold = false
         stopSttTimer()
         setSttLight(false)
-        val wav = if (commit) rec.stop() else { rec.cancel(); null }
-        if (wav == null) {
+        val clip = if (commit) rec.stop() else { rec.cancel(); null }
+        if (clip !is VoiceClip.Ready) {
             sttBusy = false
             hideAiLoading()
-            if (commit) { playSttTone(SttTone.FAIL); toast("錄音太短") }
+            if (commit) {
+                playSttTone(SttTone.FAIL)
+                toast(if (clip is VoiceClip.Silent) "沒有聽到說話，已取消" else "錄音太短")
+            }
             return
         }
         playSttTone(SttTone.STOP)
@@ -1535,7 +1544,7 @@ class TQ9InputMethodService : android.inputmethodservice.InputMethodService(),
         }
         ui.postDelayed(timeout, STT_TIMEOUT_MS)
 
-        AiStt.transcribe(this, wav, sttContext()) { r ->
+        AiStt.transcribe(this, clip, sttContext()) { r ->
             if (myGen != sttGeneration) return@transcribe // 已經逾時處理咗
             ui.removeCallbacks(timeout)
             sttGeneration++

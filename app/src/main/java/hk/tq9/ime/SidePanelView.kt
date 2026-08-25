@@ -49,6 +49,9 @@ class SidePanelView(context: Context) : LinearLayout(context) {
     private val candScroll = ScrollView(context)
     private val candFlow = FlowLayout(context)
 
+    /** 邊粒掣用邊個圖案（＋TalkBack 讀嘅名），轉主題重新畫嗰陣要用 */
+    private val icons = LinkedHashMap<TextView, Pair<ToolIcon, String>>()
+
     private var candidates: List<String> = emptyList()
     private var aiReady = false
     private var sttActive = false
@@ -68,9 +71,9 @@ class SidePanelView(context: Context) : LinearLayout(context) {
             // 撳實唔拉 = 一下子拉到最闊（同工具 bar 嗰粒一樣）
             setOnLongClickListener { listener?.onMaxWidth(); true }
         }
-        tool(pasteBtn, "📋", KeyAction.PASTE)
+        tool(pasteBtn, ToolIcon.PASTE, "貼上", KeyAction.PASTE)
         pasteBtn.setOnLongClickListener { listener?.onPasteHistory(); true }
-        tool(sttBtn, "🎤", KeyAction.STT)
+        tool(sttBtn, ToolIcon.MIC, "語音輸入", KeyAction.STT)
         // 撳實 🎤 = 一路錄，放手就停（淨係 AI 語音輸入先做得到，所以由 host 話
         // 收唔收呢下長撳）。onTouch 回 false，粒掣本身嘅短撳／長撳照行；
         // ACTION_UP 一定喺 performClick 之前到，所以撳一下唔會誤當放手收工。
@@ -81,8 +84,8 @@ class SidePanelView(context: Context) : LinearLayout(context) {
                 e.actionMasked == MotionEvent.ACTION_CANCEL) listener?.onSttHoldEnd()
             false
         }
-        tool(emojiBtn, "😀", KeyAction.TO_EMOJI)
-        tool(aiBtn, "✨", KeyAction.AI)
+        tool(emojiBtn, ToolIcon.EMOJI, "表情符號", KeyAction.TO_EMOJI)
+        tool(aiBtn, ToolIcon.AI, "AI 改寫", KeyAction.AI)
         closeBtn.apply {
             text = "✖"
             gravity = Gravity.CENTER
@@ -116,13 +119,20 @@ class SidePanelView(context: Context) : LinearLayout(context) {
         refreshAlignLabel()
     }
 
-    private fun tool(v: TextView, icon: String, action: KeyAction) {
-        v.apply {
-            text = icon
-            gravity = Gravity.CENTER
-            textSize = 17f
-            setOnClickListener { listener?.onTool(action) }
-        }
+    /** 同 [OptionBarsView.tool] 一樣：單色圖案（唔係彩色 emoji），顏色跟主題行 */
+    private fun tool(v: TextView, icon: ToolIcon, desc: String, action: KeyAction) {
+        v.gravity = Gravity.CENTER
+        v.setOnClickListener { listener?.onTool(action) }
+        icons[v] = icon to desc
+    }
+
+    /** 同 [OptionBarsView.styleTool] 一樣：底色 + 圖案擺正中間 */
+    private fun styleTool(v: TextView, faceColor: Int) {
+        val spec = icons[v]
+        if (spec == null) { v.background = chipBg(faceColor); return }
+        v.text = ""
+        v.contentDescription = spec.second
+        v.background = iconChip(chipBg(faceColor), spec.first, dp(ICON_DP).roundToInt(), theme.text)
     }
 
     fun applyTheme(t: Theme) {
@@ -131,8 +141,10 @@ class SidePanelView(context: Context) : LinearLayout(context) {
         candScroll.setBackgroundColor(t.background)
         for (v in listOf(sizeBtn, closeBtn, pasteBtn, sttBtn, emojiBtn, aiBtn)) {
             v.setTextColor(t.text)
-            v.background = chipBg(t.keyFaceAlt)
+            // 圖案係畫死咗色嘅 drawable，setTextColor 影響唔到，要成個底重新砌
+            styleTool(v, t.keyFaceAlt)
         }
+        refreshAlignLabel()
         refreshAiLook()
         refreshSttLook()
         rebuildChips()
@@ -174,7 +186,7 @@ class SidePanelView(context: Context) : LinearLayout(context) {
     }
 
     private fun refreshSttLook() {
-        sttBtn.background = chipBg(if (sttActive) theme.keyAccent else theme.keyFaceAlt)
+        styleTool(sttBtn, if (sttActive) theme.keyAccent else theme.keyFaceAlt)
     }
 
     fun setCandidates(list: List<String>) {
@@ -204,12 +216,14 @@ class SidePanelView(context: Context) : LinearLayout(context) {
         setOnClickListener { listener?.onPickCandidate(index) }
     }
 
+    /** 同工具 bar 嗰粒一樣，圖案係「貼邊」嘅樣（一條牆 + 箭嘴指住埋去） */
     fun refreshAlignLabel() {
-        sizeBtn.text = when (Prefs.align(context)) {
-            PadAlign.STRETCH -> "↔"
-            PadAlign.LEFT_GAP -> "⬅"
-            PadAlign.RIGHT_GAP -> "➡"
+        icons[sizeBtn] = when (Prefs.align(context)) {
+            PadAlign.STRETCH -> ToolIcon.ALIGN_WIDE to "拉闊"
+            PadAlign.LEFT_GAP -> ToolIcon.ALIGN_RIGHT to "靠右"
+            PadAlign.RIGHT_GAP -> ToolIcon.ALIGN_LEFT to "靠左"
         }
+        styleTool(sizeBtn, theme.keyFaceAlt)
     }
 
     // ---- 大細：同工具 bar 嗰粒掣一樣，上下拖高低、左右拖闊窄 ------------------
@@ -242,5 +256,10 @@ class SidePanelView(context: Context) : LinearLayout(context) {
             MotionEvent.ACTION_UP -> if (dragging) { dragging = false; return true }
         }
         return false
+    }
+
+    private companion object {
+        /** 側邊欄啲掣 40×36dp，圖案細少少（同工具 bar 睇落一樣大） */
+        const val ICON_DP = 20f
     }
 }

@@ -50,7 +50,7 @@ adb shell ime set    hk.tq9/.ime.TQ9InputMethodService
 `7 8 9` 喺最上、`1 2 3` 喺最落，跟返 `Q9Form.cs` 嘅 `ResizeAllButton()`。
 底行係 `[0 佔兩格][取消]`；選字夠兩頁嗰陣兩格闊嗰粒 `0` 點變由設定話事
 （見下面「選字揭頁」）。改過嚟電話排法就同原版打法唔同曬。
-左下角淨返粒 `🌐`（成格闊）—— `🎤` 搬咗上工具 bar，喺 `📋` 隔籬，
+左下角淨返粒 `🌐`（成格闊）—— 錄音搬咗上工具 bar，喺「貼上」隔籬，
 亦都係左上角嗰粒鍵揀得嘅其中一個 `PadFunc`。
 
 ### 底行嘅規矩（英文／符號／純數字）
@@ -162,6 +162,8 @@ core/   Q9Db       sqlite 存取、assets 安裝、換 db、weight prefix 統計
         EmojiDict  assets/emoji.txt，分類 + 用英文／中文關鍵字搵
         ClipHistory clipboard 歷史（JSON 存喺 Prefs）
         AiRewrite  Gemini generateContent，改寫揀咗嗰段字
+        AiStt      VoiceRecorder 錄 PCM、VoiceActivity 判斷有冇人聲、
+                   SttAudio 壓縮（AAC-LC / ADTS，做唔到就跌返 WAV）
         UsageStats 另一個 sqlite（usage_stats.db，同 dataset.db 分開）：
                    連續兩個中文字嘅 bigram 次數、每隻字打咗幾多次
         Prefs      全部設定
@@ -271,6 +273,41 @@ gravity 跟 `PadAlign` 反過嚟擺）：上面一（兩）行功能掣，下面
 `effective == BarMode.OFF` 就升做 `CANDIDATES`。**唔會改到 `barMode` 本身** ——
 返到中文頁照樣跟返 user 設定嗰個開關。
 
+## 工具掣嘅圖案：自己畫，唔用 emoji
+
+工具 bar（`OptionBarsView`）同側邊欄（`SidePanelView`）嗰幾粒掣本來直接寫
+`📋` `🎤` `😀` `✨` 落 `TextView` 度，2026-08-25 全部換成 `ime/ToolIcons.kt`
+入面自己畫嘅**單色** `ToolIconDrawable`。三個唔用 emoji 嘅理由，改之前記住：
+
+1. emoji 一律由系統嘅彩色 emoji 字型畫 —— 鍵盤其餘全部單色，夾埋一齊好突兀；
+2. 每部機每個 Android 版本嘅 emoji 字型都唔同樣，畫出嚟嘅大細同顏色都唔受控；
+3. `setTextColor(Theme.text)` **套唔到落彩色 emoji 度**，深色主題一樣係嗰個彩色樣。
+
+畫法：一律喺一個 **24×24 嘅座標**度砌，`draw()` 先 `canvas.scale()` 去粒掣實際
+咁大，所以任何 dp 都唔會起格。**顏色喺 constructor 傳死**（跟 `Theme.text`），
+冇實作 `setTintList` —— 轉主題係 `styleTool()` 整粒新嘅出嚟。
+兩個 view 都有一個 `icons: LinkedHashMap<TextView, Pair<ToolIcon, String>>`
+記住邊粒掣用邊個圖案，`applyTheme()` 就係照住佢重畫一次。
+
+**唔可以用 compound drawable** —— `TextView` 個 `gravity` 淨係管啲字：左格嗰個
+drawable 永遠貼死 `paddingLeft`（淨係上下置中），上格嗰個就永遠貼死 `paddingTop`
+（淨係左右置中），兩樣都唔會真係擺正中間（實測過，啲圖案全部黐晒粒掣左邊）。
+所以 `iconChip()` 用 `LayerDrawable` 疊喺圓角底色上面，
+`setLayerSize()` + `setLayerGravity(CENTER)`，乜情況都啱。
+順帶：粒掣個底色同圖案而家係同一件 drawable，所以 `refreshSttLook()`
+（錄緊音著燈）唔可以再淨係 `background = chipBg(...)`，要行返 `styleTool()`。
+
+**顯示方式嗰粒（`refreshAlignLabel`）唔係一支淨嘅左／右箭咀** —— 淨箭咀睇落似
+「向左移／向右移」，但實際上係「貼實左邊／貼實右邊」，所以畫成
+**一條牆 + 一支箭嘴指住埋去**（`ALIGN_LEFT` / `ALIGN_RIGHT`）；
+「拉闊」（`STRETCH`）就兩邊都有牆、箭嘴向外撐開（`ALIGN_WIDE`）。
+留意 `PadAlign.LEFT_GAP` 係「**左**邊留白」＝ 內容貼**右**，所以佢配 `ALIGN_RIGHT`，
+兩個名係對調嘅，改嗰陣睇清楚。
+
+`✖`（關閉）、`⇄`（切換）、`▼`（拉大候選）三粒**冇換** —— 佢哋本身就係單色
+文字符號，唔係彩色 emoji。`PadFunc.EMOJI` 個鍵面亦都由 `😀` 改咗寫「表情」，
+而家成個 `PadFunc` 一個 icon 都冇，全部寫中文。
+
 ## `Spinner` 唔可以用「跳過第一下 callback」嗰招
 
 `SettingsActivity.FuncPicker`（左上角鍵嘅短撳／長撳）試過用一個 `ready` flag
@@ -301,6 +338,10 @@ fire 唔 fire）係睇 layout 時序，擋錯咗就會食咗 user 真正嗰下 �
 **level 1 一定要係舊嗰個力度**（12ms / 40）—— 嗰個係以前唯一嘅設定。
 部分機款（例如部分 Sony Xperia）冇 `hasAmplitudeControl()`，硬傳 amplitude
 會完全唔震，所以嗰啲機跌返 `DEFAULT_AMPLITUDE`，淨係靠時間長短分三級。
+
+2026-08-25 user 話 level 3 仲係唔夠明顯，**2／3 兩級由 18／26ms 拉長到 34／60ms**
+（震幅亦都由 110／200 加到 170／255）。要再調就繼續加時間 —— 好多機嘅震幅
+係封咗頂嘅，真正感覺到「大力咗」嘅係震耐咗。**0 同 1 唔准郁。**
 
 ## 設定頁嘅 `slider()` 有 step 同 format
 
@@ -352,9 +393,9 @@ app 入面所有 user 見到嘅字（設定頁、toast、鍵面、空狀態提�
   設定頁嗰套自訂 API 範本（URL／headers／body）表達唔到。所以
   `Prefs.aiSttOn()` 見到 `aiUseCustom` 就**一律回 false**（唔理個 pref 之前開過），
   設定頁嗰個開關亦都會鎖住。加新 provider 之前請先諗清楚點送段錄音。
-- **錄音**用 `WavRecorder`（`core/AiStt.kt`）：`AudioRecord` 收 16kHz mono PCM，
-  收工先包個 44 byte RIFF header。特登**唔用 `MediaRecorder`** —— 佢一定要寫落
-  檔案，而且各家機出嚟嘅 AAC 容器唔一定啱 Gemini 收。
+- **錄音**用 `VoiceRecorder`（`core/AiStt.kt`）：`AudioRecord` 收 16kHz mono PCM。
+  特登**唔用 `MediaRecorder`** —— 佢一定要寫落檔案，而且各家機出嚟嘅容器
+  唔一定啱 Gemini 收。段 PCM 點包由 `SttAudio` 話事（見下面）。
 - **兩種操作**：撳一下開始、再撳一下停（`hold = false`）；撳實一路錄、放手即停
   （`hold = true`）。後者要 `OptionBarsView.Listener.onSttHoldStart()` /
   `onSttHoldEnd()` 兩個 callback，同埋 `KeyboardBaseView.Host.onLongPressEnd()`
@@ -372,6 +413,34 @@ app 入面所有 user 見到嘅字（設定頁、toast、鍵面、空狀態提�
   呢啲同 `Prefs.sound`（按鍵聲）**冇關係**，唔跟嗰個開關。
 - **逾時／離開個欄要記得清**：`sttGeneration` 同 `aiGeneration` 一樣係用嚟
   當第遲到嘅 callback；`onFinishInputView` / `onDestroy` 行 `cancelAiStt()`。
+- **放手之後先篩一篩，唔好乜都掟上去**（2026-08-25 加）。`VoiceRecorder.stop()`
+  回一個 `VoiceClip`，三種：
+
+  | | 幾時 | 點處理 |
+  | --- | --- | --- |
+  | `TooShort` | 短過 `VoiceRecorder.MIN_CLIP_MS`（400ms） | 當撳錯，唔叫 API |
+  | `Silent` | 夠長但係 `VoiceActivity.hasSpeech()` 話冇人聲 | 當撳錯，唔叫 API |
+  | `Ready` | 其餘 | 送上去 |
+
+  `VoiceActivity` 係能量式 VAD：逐 20ms 一格計 RMS，最響嗰啲都細過 `ABS_PEAK`
+  就當死靜；再用「噪音底（第 20 百分位）× `SNR_RATIO`」做動態門檻，夠
+  `MIN_VOICED_FRAMES`（8 格 = 160ms）響過門檻先當有人講嘢。**寧鬆莫緊** ——
+  漏咗一次最多嘥個 API call，但係錯手擋咗人哋細聲講嗰句，user 就會覺得粒掣壞咗。
+  改門檻一定要跑 `VoiceActivityTest`（純 JVM，入面有「嘈但係冇人講嘢」同
+  「細聲講都唔可以擋」兩個對照 case）。
+- **壓縮唔可以喺 `stop()` 度做**：`stop()` 係喺 main thread 叫嘅（放手嗰下），
+  一分鐘錄音 encode 落 AAC 要成幾百毫秒，擺喺嗰度就會窒。所以 `VoiceClip.Ready`
+  入面淨係原始 PCM，`AiStt.transcribe` 喺自己條背景 thread 度先至叫 `SttAudio.encode`。
+  VAD 就相反 —— 行一次成段嘢係幾毫秒嘅事，而且要即刻知結果先決定叫唔叫 API，
+  所以照樣喺 `stop()` 度行。
+- **`SttAudio` 首選 AAC-LC，跌返落 WAV**：16kHz mono 24kbps，一分鐘 ~180KB
+  （WAV 要 ~1.9MB）。容器係自己逐 frame 加 7 byte **ADTS header** 出嚟嘅裸
+  AAC stream，**唔經 `MediaMuxer`** —— 當初唔敢用 `MediaRecorder` 就係因為
+  各家機出嚟嘅容器唔一定啱 Gemini 收，ADTS 自己砌就每個 byte 都揸得住。
+  `BUFFER_FLAG_CODEC_CONFIG` 嗰嚿（AudioSpecificConfig）**唔可以**寫落個 stream 度，
+  ADTS header 本身已經有齊同樣嘅資料。部機冇 AAC encoder、或者中途 fail
+  （包括 `ENCODE_DEADLINE_MS` 逾時）就跌返落 WAV —— **唔可以**因為 encode 唔到
+  就當今次語音輸入失敗。
 - prompt（`Prefs.DEFAULT_AI_STT_PROMPT`）逐條寫死唔准做乜 —— Gemini 好鍾意
   加句「以下是錄音的轉錄內容：」，又鍾意順手幫你執靚啲句子。改 prompt 嗰陣
   唔好刪咗「只輸出結果」同「逐字轉錄唔好潤飾」呢兩條。
@@ -595,6 +664,9 @@ per-key 判斷）連埋 `keyCenter` 拋畀 IME service，放手之後**由 IME s
   `Q9Engine.shortcutDigit(d)`：直接開嗰格嘅速選字表（`mapped_table` id
   `1000 + d`），唔使再「撳個碼再撳速選掣」。打緊碼（`currCode` 有嘢）就唔截，
   照行返連撳，`77x` 呢啲碼撳得返。
+  **呢一路預設熄咗**（`Prefs.longPressShortcut`，設定 →「其他」，2026-08-25 加）：
+  就算未打碼，佢一樣食咗「長撳 = 連撳」嘅頭一下，`77`／`88` 撳極都唔出，
+  所以要 user 自己開。
 - **選字模式**→ `Q9Engine.homoAt(slot)`：開嗰格嗰個字嘅同音字表，
   **唔使先撳「同音」掣**。就算查唔到同音字（多字詞、標點、`word_meta` 冇記錄）
   `onLongPress` 都要回 `true` 食咗佢 —— 跌返落連撳就會即刻揀咗個字，
@@ -718,8 +790,10 @@ URL／email／密碼／`TYPE_TEXT_FLAG_NO_SUGGESTIONS` 嘅欄再加多重保險�
 JAVA_HOME=/opt/android-studio/jbr ./gradlew :app:assembleDebug :app:testDebugUnitTest
 ```
 
-要保持**零 warning**。`GestureKeyTracker` 同 `EnDict` 有 unit test（純 JVM），
-改判定邏輯或者評分公式一定要跑。UI 就上模擬器影相睇。
+要保持**零 warning**。純 JVM unit test 有四份：`GestureKeyTracker`、`EnDict`、
+`VoiceActivity`（語音 VAD 門檻）、`SttAudio`（ADTS header 逐個 byte）——
+改判定邏輯、評分公式、VAD 門檻或者 header bit packing 一定要跑。
+UI 就上模擬器影相睇。
 
 ## 簽名：兩條 key，唔好撈亂
 

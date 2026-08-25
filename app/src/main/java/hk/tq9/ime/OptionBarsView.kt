@@ -94,6 +94,9 @@ class OptionBarsView(context: Context) : LinearLayout(context) {
     private val barRow = LinearLayout(context)
     private val swap = FrameLayout(context)
 
+    /** 邊粒掣用邊個圖案（＋TalkBack 讀嘅名），轉主題重新畫嗰陣要用 */
+    private val icons = LinkedHashMap<TextView, Pair<ToolIcon, String>>()
+
     private var candidates: List<String> = emptyList()
     private var expanded = false
     private var mode = BarMode.CANDIDATES
@@ -118,10 +121,10 @@ class OptionBarsView(context: Context) : LinearLayout(context) {
             // 所以 View 本身照計長撳；真係拉起上嚟就會過咗 touch slop，長撳自動取消
             setOnLongClickListener { listener?.onMaxWidth(); true }
         }
-        tool(pasteBtn, "📋", KeyAction.PASTE)
+        tool(pasteBtn, ToolIcon.PASTE, "貼上", KeyAction.PASTE)
         pasteBtn.setOnLongClickListener { listener?.onPasteHistory(); true }
         // 🎤 由九宮格搬咗上嚟，擺喺「貼上」隔籬（左上角嗰粒都揀得做錄音）
-        tool(sttBtn, "🎤", KeyAction.STT)
+        tool(sttBtn, ToolIcon.MIC, "語音輸入", KeyAction.STT)
         // 撳實 🎤 = 一路錄，放手就停（淨係 AI 語音輸入先做得到，所以由 host 話
         // 收唔收呢下長撳）。onTouch 回 false，粒掣本身嘅短撳／長撳照行；
         // ACTION_UP 一定喺 performClick 之前到，所以撳一下唔會誤當放手收工。
@@ -132,8 +135,8 @@ class OptionBarsView(context: Context) : LinearLayout(context) {
                 e.actionMasked == MotionEvent.ACTION_CANCEL) listener?.onSttHoldEnd()
             false
         }
-        tool(emojiBtn, "😀", KeyAction.TO_EMOJI)
-        tool(aiBtn, "✨", KeyAction.AI)
+        tool(emojiBtn, ToolIcon.EMOJI, "表情符號", KeyAction.TO_EMOJI)
+        tool(aiBtn, ToolIcon.AI, "AI 改寫", KeyAction.AI)
 
         expandBtn.apply {
             // 一開始都要有個字，唔係就要拉開再收埋一次先見到粒掣
@@ -203,13 +206,26 @@ class OptionBarsView(context: Context) : LinearLayout(context) {
         refreshAlignLabel()
     }
 
-    private fun tool(v: TextView, icon: String, action: KeyAction) {
-        v.apply {
-            text = icon
-            gravity = Gravity.CENTER
-            textSize = 17f
-            setOnClickListener { listener?.onTool(action) }
-        }
+    /**
+     * 一粒工具掣。個圖案係自己畫嘅單色 [ToolIconDrawable]（唔再係彩色 emoji），
+     * 顏色跟主題行，所以要記低邊粒係邊個圖案，轉主題嗰陣 [styleTool] 重新砌過。
+     */
+    private fun tool(v: TextView, icon: ToolIcon, desc: String, action: KeyAction) {
+        v.gravity = Gravity.CENTER
+        v.setOnClickListener { listener?.onTool(action) }
+        icons[v] = icon to desc
+    }
+
+    /**
+     * 粒掣個樣：底色 + 圖案（圖案擺正中間，見 [iconChip]）。
+     * 冇圖案嗰啲（`✖`／`⇄`／`▼`，佢哋本身就係單色文字符號）就淨係換底色。
+     */
+    private fun styleTool(v: TextView, faceColor: Int) {
+        val spec = icons[v]
+        if (spec == null) { v.background = chipBg(faceColor); return }
+        v.text = ""
+        v.contentDescription = spec.second
+        v.background = iconChip(chipBg(faceColor), spec.first, dp(ICON_DP).roundToInt(), theme.text)
     }
 
     fun applyTheme(t: Theme) {
@@ -218,8 +234,10 @@ class OptionBarsView(context: Context) : LinearLayout(context) {
         expandedScroll.setBackgroundColor(t.background)
         for (v in listOf(sizeBtn, expandBtn, closeBtn, switchBtn, pasteBtn, sttBtn, emojiBtn, aiBtn)) {
             v.setTextColor(t.text)
-            v.background = chipBg(t.keyFaceAlt)
+            // 圖案係畫死咗色嘅 drawable，setTextColor 影響唔到，要成個底重新砌
+            styleTool(v, t.keyFaceAlt)
         }
+        refreshAlignLabel()
         refreshAiLook()
         refreshSttLook()
         rebuildChips()
@@ -281,7 +299,7 @@ class OptionBarsView(context: Context) : LinearLayout(context) {
     }
 
     private fun refreshSttLook() {
-        sttBtn.background = chipBg(if (sttActive) theme.keyAccent else theme.keyFaceAlt)
+        styleTool(sttBtn, if (sttActive) theme.keyAccent else theme.keyFaceAlt)
     }
 
     fun setCandidates(list: List<String>) {
@@ -333,13 +351,19 @@ class OptionBarsView(context: Context) : LinearLayout(context) {
         }
     }
 
-    /** 顯示方式只關中文九宮格事，英文／符號模式就淨係剩返「拉高拉低」 */
+    /**
+     * 顯示方式只關中文九宮格事，英文／符號模式就淨係剩返「拉高拉低」。
+     *
+     * 圖案係**貼邊**嘅樣（一條牆 + 箭嘴指住埋去），唔係一支淨嘅左／右箭咀 ——
+     * 淨箭咀睇落似「向左移／向右移」，但實際上係「貼實左邊／貼實右邊」。
+     */
     fun refreshAlignLabel() {
-        sizeBtn.text = when (Prefs.align(context)) {
-            PadAlign.STRETCH -> "↔"
-            PadAlign.LEFT_GAP -> "⬅"
-            PadAlign.RIGHT_GAP -> "➡"
+        icons[sizeBtn] = when (Prefs.align(context)) {
+            PadAlign.STRETCH -> ToolIcon.ALIGN_WIDE to "拉闊"
+            PadAlign.LEFT_GAP -> ToolIcon.ALIGN_RIGHT to "靠右"
+            PadAlign.RIGHT_GAP -> ToolIcon.ALIGN_LEFT to "靠左"
         }
+        styleTool(sizeBtn, theme.keyFaceAlt)
     }
 
     // ---- 大細：直接喺粒掣度上下拖 -------------------------------------------
@@ -382,4 +406,9 @@ class OptionBarsView(context: Context) : LinearLayout(context) {
 
     /** 而家拖緊嘅方向（[handleSizeDrag] 一鎖就唔會中途轉） */
     private var horizontal = false
+
+    private companion object {
+        /** 工具掣個圖案畫幾大（粒掣本身 42dp 高，減埋上下 3dp padding） */
+        const val ICON_DP = 21f
+    }
 }

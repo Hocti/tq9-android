@@ -38,14 +38,16 @@ enum class PagerLayout(val label: String) {
 
 /**
  * 可以喺設定度換走嘅鍵功能（而家用喺左上角嗰粒）。
- * 除咗 [EMOJI]，粒面全部改返寫中文，唔再用意義不明嘅 icon。
+ * 粒面**全部寫中文**，一個 icon 都冇 —— [EMOJI] 本來寫住個 😀，
+ * 但係鍵面其餘全部單色，一粒彩色 emoji 好突兀，而且好多機嘅 emoji 字型
+ * 會畫到成粒鍵咁大。
  *
  * 設定頁而家用 spinner 揀，[next] / [nextFor] 淨係留返俾舊 code path 用。
  */
 enum class PadFunc(val label: String, val icon: String) {
     SHORTCUT("速選字", "速選"),
     SC_TOGGLE("簡體開關", "简"),
-    EMOJI("表情符號", "😀"),
+    EMOJI("表情符號", "表情"),
     PASTE("貼上", "貼上"),
     STT("語音輸入", "錄音"),
     AI("AI 改寫", "AI改"),
@@ -94,6 +96,8 @@ object Prefs {
     const val KEY_VIBRATE_LEVEL = "vibrate_level"
     const val KEY_SOUND = "sound"
     const val KEY_LONG_PRESS_MS = "long_press_ms"
+    /** 未打過碼嗰陣長撳 1~9 開速選字表（預設熄，唔係就搶咗「長撳 = 連撳」） */
+    const val KEY_LONG_PRESS_SHORTCUT = "long_press_shortcut"
     const val KEY_STT_LOCALE = "stt_locale"
     const val KEY_DB_LABEL = "db_label"
     const val KEY_LATIN_NUM_ROW = "latin_num_row"  // 英文鍵盤上面加一行數字
@@ -296,19 +300,34 @@ object Prefs {
 
     const val MAX_VIBRATE_LEVEL = 3
 
-    /** 每級震幾耐（index = level，0 = 唔震） */
+    /**
+     * 每級震幾耐（index = level，0 = 唔震）。
+     *
+     * **level 1 永遠係 12ms**（舊版唯一嗰個力度，唔可以郁）。2／3 加長咗
+     * （18／26 → 34／60）—— user 話舊嗰個「最大」仲係唔夠明顯，而好多機
+     * 淨係校 amplitude 係封頂咗嘅（見 [vibrateAmplitude]），真正感覺得到
+     * 大力咗嘅係**震耐咗**。
+     */
     fun vibrateDurationMs(level: Int): Long =
-        longArrayOf(0L, 12L, 18L, 26L)[level.coerceIn(0, MAX_VIBRATE_LEVEL)]
+        longArrayOf(0L, 12L, 60L, 300L)[level.coerceIn(0, MAX_VIBRATE_LEVEL)]
 
     /** 每級幾大力（1～255，部機唔支援自訂震幅就用返 DEFAULT_AMPLITUDE） */
     fun vibrateAmplitude(level: Int): Int =
-        intArrayOf(0, 40, 110, 200)[level.coerceIn(0, MAX_VIBRATE_LEVEL)]
+        intArrayOf(0, 40, 170, 255)[level.coerceIn(0, MAX_VIBRATE_LEVEL)]
 
     fun vibrateLevelLabel(level: Int): String =
         arrayOf("關閉", "1（最輕）", "2（中）", "3（最強）")[level.coerceIn(0, MAX_VIBRATE_LEVEL)]
 
     fun sound(ctx: Context) = sp(ctx).getBoolean(KEY_SOUND, false)
     fun longPressMs(ctx: Context) = sp(ctx).getInt(KEY_LONG_PRESS_MS, 380).toLong()
+
+    /**
+     * 未打過碼嗰陣長撳 1~9 = 直接開嗰格嘅速選字表（`Q9Engine.shortcutDigit`）。
+     *
+     * **預設熄**：呢個功能會食咗「長撳 = 連撳」（長撳 7 = 77）嘅頭一下，
+     * 打 `77x` 呢啲碼嘅人會覺得撳極都唔出，所以要 user 自己喺設定頁開。
+     */
+    fun longPressShortcut(ctx: Context) = sp(ctx).getBoolean(KEY_LONG_PRESS_SHORTCUT, false)
 
     /** 選字揭頁嗰兩粒點排（見 [PagerLayout]） */
     fun pagerLayout(ctx: Context): PagerLayout =
