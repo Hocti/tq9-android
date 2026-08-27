@@ -62,6 +62,31 @@ class Q9Db private constructor(private val db: SQLiteDatabase) {
         return out
     }
 
+    /**
+     * 打咗一兩個碼、仲未夠碼出候選字嗰陣，上面條 bar 出「呢個碼開頭最常用嗰幾隻字」。
+     *
+     * `word_meta.code` 入面每一個打法都以 `,` 開頭（例如「為」＝ `,470,480,970`），
+     * 所以「碼嘅頭幾個數字」＝ 搵 `,` 加住個 prefix 呢段字。打 `4`、`47`、`48`
+     * 三個 prefix 都要搵得返「為」，但係 `70` **唔可以**夾到 `,970`（嗰個 `70`
+     * 唔係由 `,` 開始），所以個 pattern 一定要連埋粒逗號一齊 LIKE。
+     *
+     * 同一隻字可能有幾個打法（幾行記錄），所以要 `GROUP BY` 收埋做一個。
+     */
+    fun topByCodePrefix(prefix: String, limit: Int = 9): List<String> {
+        if (prefix.isEmpty() || prefix.any { it !in '0'..'9' }) return emptyList()
+        val out = ArrayList<String>(limit)
+        runCatching {
+            db.rawQuery(
+                "SELECT char FROM word_meta WHERE code LIKE ? AND char <> '' " +
+                    "GROUP BY char ORDER BY MAX(freq) DESC LIMIT ?",
+                arrayOf("%,$prefix%", limit.toString())
+            ).use { c ->
+                while (c.moveToNext()) c.getString(0)?.let { if (it.isNotEmpty()) out.add(it) }
+            }
+        }.onFailure { Log.w(TAG, "topByCodePrefix 查唔到", it) }
+        return out
+    }
+
     /** 繁轉簡 */
     fun tcsc(input: String): String {
         if (tsMap == null) loadTsMap()
@@ -78,16 +103,47 @@ class Q9Db private constructor(private val db: SQLiteDatabase) {
         return sb.toString()
     }
 
+    /**
+     * 簡轉繁，**淨係攞嚟查表**（例如攞游標前面隻字去查關聯字）。
+     *
+     * 簡體字係多對一嘅，反查一定有機會揀錯字，所以出街嘅字一律行 [tcsc]，
+     * 呢個反向表唔可以攞去做輸出。開咗「輸出簡體」嗰陣輸入框入面係簡體，
+     * 但係 `related_candidates_table` 淨係有正體，唔轉返就成個關聯字功能廢咗。
+     */
+    fun sctc(input: String): String {
+        if (stMap == null) loadTsMap()
+        val m = stMap ?: return input
+        val sb = StringBuilder(input.length)
+        var i = 0
+        while (i < input.length) {
+            val cp = input.codePointAt(i)
+            val n = Character.charCount(cp)
+            val src = input.substring(i, i + n)
+            sb.append(m[src] ?: src)
+            i += n
+        }
+        return sb.toString()
+    }
+
     private var tsMap: HashMap<String, String>? = null
+    private var stMap: HashMap<String, String>? = null
 
     private fun loadTsMap() {
         val m = HashMap<String, String>(4500)
+        val r = HashMap<String, String>(4500)
         runCatching {
             db.rawQuery("SELECT traditional, simplified FROM ts_chinese_table", null).use { c ->
-                while (c.moveToNext()) m[c.getString(0)] = c.getString(1)
+                while (c.moveToNext()) {
+                    val t = c.getString(0)
+                    val sc = c.getString(1)
+                    m[t] = sc
+                    // 多對一：頭一個（表入面排先嗰個）當代表，後面嗰啲唔覆蓋
+                    if (sc !in r) r[sc] = t
+                }
             }
         }.onFailure { Log.w(TAG, "ts_chinese_table 讀唔到", it) }
         tsMap = m
+        stMap = r
     }
 
     // ---- weight：swipe 歧義時用嚟加減可能性 --------------------------------

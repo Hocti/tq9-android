@@ -317,8 +317,11 @@ class Q9Engine(val db: Q9Db) {
     }
 
     /**
-     * 頭九個（第一頁）：同上一個字組成夠 3 次嘅 bigram 推去前面，次數越大越前。
-     * 第九個之後：跟住打過幾多次（[Host.charFreq]）推前，唔郁第一頁。
+     * 頭九個（第一頁）：同上一個字組成過 [MIN_USAGE_COUNT] 次嘅 bigram 推去前面，
+     * 次數越大越前。第九個之後：跟住打過幾多次（[Host.charFreq]）推前，唔郁第一頁。
+     *
+     * **兩邊都要打夠 [MIN_USAGE_COUNT] 次先算數**：打過一次就當「常用」太急，
+     * 撳錯一下就會累住之後個次序都唔同咗，user 會覺得個字表自己識郁。
      */
     private fun reorderByUsage(words: List<String>): List<String> {
         val h = host ?: return words
@@ -327,13 +330,16 @@ class Q9Engine(val db: Q9Db) {
         val tail = words.drop(9)
         val prev = bigramPrev
         val newHead = if (prev.isEmpty()) head else head.sortedByDescending { w ->
-            if (isHanChar(w)) h.bigramCount(prev + w).let { if (it >= 3) it else -1 } else -1
+            if (isHanChar(w)) qualified(h.bigramCount(prev + w)) else -1
         }
         val newTail = if (tail.isEmpty()) tail else tail.sortedByDescending { w ->
-            if (isHanChar(w)) h.charFreq(w) else -1
+            if (isHanChar(w)) qualified(h.charFreq(w)) else -1
         }
         return newHead + newTail
     }
+
+    /** 未打夠 [MIN_USAGE_COUNT] 次就當冇打過（-1 = 排返原本個位，穩定排序唔會亂） */
+    private fun qualified(count: Int): Int = if (count >= MIN_USAGE_COUNT) count else -1
 
     private fun isHanChar(s: String): Boolean =
         s.isNotEmpty() && s != "*" && s.codePointCount(0, s.length) == 1 &&
@@ -472,4 +478,12 @@ class Q9Engine(val db: Q9Db) {
     }
 
     private fun changed() { host?.onStateChanged() }
+
+    companion object {
+        /**
+         * 「常用字排前」要打過幾多次先至肯郁個次序（bigram 同單字次數都用呢個）。
+         * 少過呢個數就當冇打過 —— 撳錯一次唔應該就影響到之後嘅選字次序。
+         */
+        const val MIN_USAGE_COUNT = 2
+    }
 }

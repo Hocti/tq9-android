@@ -74,6 +74,11 @@ abstract class KeyboardBaseView(context: Context) : View(context) {
     private var swiping = false
     private var longFired = false
     /**
+     * 呢粒鍵喺 ACTION_DOWN 就已經出咗（見 [instantKey]）。ACTION_UP 就唔好再出多次，
+     * 而長撳（「長撳 = 連撳」）補嗰下照計 —— 撳落一下 + 長撳一下 = 連撳兩下。
+     */
+    private var instantFired = false
+    /**
      * 長撳嗰下係俾 [Host.onLongPress] 收咗（唔係變體 popup、唔係郁 caret、
      * 唔係「長撳當連撳」）。放手嗰陣要通知返 host（見 [Host.onLongPressEnd]）。
      */
@@ -156,6 +161,17 @@ abstract class KeyboardBaseView(context: Context) : View(context) {
      * 純數字頁成頁 false —— 打號碼撳耐咗少少就彈嘢出嚟好煩（見 [NumberPadView]）。
      */
     protected open fun allowLongPress(k: Key): Boolean = true
+
+    /**
+     * 撳落去（ACTION_DOWN）就即刻出鍵，唔等放手 —— 打字反應快好多。
+     *
+     * **淨係「長撳 = 連撳」嗰啲鍵先安全**：粒鍵之後唯一會發生嘅事就係再出多次
+     * 佢自己（[Key.holdRepeat]），所以撳落即出唔會同任何嘢撞。粒鍵長撳有第二個
+     * 意思（變體 popup、[Host.onLongPress]、郁 caret…）就唔可以 ——
+     * 短撳嗰個動作已經做咗，跟住個長撳動作又做多次，一撳出兩樣嘢。
+     * 中文九宮格點揀見 [ChinesePadView.instantKey]。
+     */
+    protected open fun instantKey(k: Key): Boolean = false
 
     /** ⏎ 一定要跟返而家個欄要做乜，唔可以淨係睇 [Key.label] */
     protected fun labelOf(k: Key): String =
@@ -291,6 +307,8 @@ abstract class KeyboardBaseView(context: Context) : View(context) {
                 longKey = null
                 swipeAborted = false
                 cursorMode = false
+                val instant = instantKey(b.key)
+                instantFired = instant
                 host?.feedback(b.key)
                 if (allowLongPress(b.key)) {
                     handler.postDelayed(longPressRunnable, Prefs.longPressMs(context))
@@ -299,8 +317,12 @@ abstract class KeyboardBaseView(context: Context) : View(context) {
                 if (canSwipe(b.key)) {
                     tracker.attach(swipeDelegate)
                     tracker.minSegPx = min(b.w, b.h) * 0.3f
-                    tracker.start(x, y, t)
+                    // 起點已經出咗就話埋 tracker 知，唔係佢放手嗰下會再補多次
+                    tracker.start(x, y, t, startEmitted = instant)
                 }
+                // 一定要喺 tracker 起咗之後先出 —— [Host.onKey] 會改 engine 狀態，
+                // 隨時觸發 relayout（`boxes` 重砌），`b` 就會變咗舊嗰個 KeyBox
+                if (instant) host?.onKey(b.key)
                 // 一撳落去就即刻浮個大字出嚟，唔使等滑動先出（見 [hoverLabel]）；
                 // 長撳出變體 popup 嗰陣 [openVariantPopup] 自己會 [dismissHover]，換返嗰個
                 updateHoverPopup(x, y)
@@ -372,7 +394,8 @@ abstract class KeyboardBaseView(context: Context) : View(context) {
                 } else {
                     tracker.cancel()
                     val b = pressed
-                    if (b != null && !longFired) host?.onKey(b.key)
+                    // instantFired = ACTION_DOWN 嗰下已經出咗，放手唔可以再出多次
+                    if (b != null && !longFired && !instantFired) host?.onKey(b.key)
                 }
                 pressed = null
                 invalidate()
@@ -386,6 +409,7 @@ abstract class KeyboardBaseView(context: Context) : View(context) {
                 tracker.cancel()
                 swiping = false
                 cursorMode = false
+                instantFired = false
                 pressed = null
                 invalidate()
             }

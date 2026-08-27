@@ -102,6 +102,9 @@ class OptionBarsView(context: Context) : LinearLayout(context) {
     private var mode = BarMode.CANDIDATES
     private var aiReady = false
     private var sttActive = false
+    private var closeVisible = false
+    /** 見 [setSwitchVisible] */
+    private var switchAllowed = true
 
     private fun dp(v: Float) =
         TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, v, resources.displayMetrics)
@@ -266,8 +269,25 @@ class OptionBarsView(context: Context) : LinearLayout(context) {
 
     /** emoji 表／剪貼簿開住嗰陣先出 ✖，冇開就係切換掣（兩粒共用同一個位） */
     fun setCloseVisible(v: Boolean) {
-        closeBtn.visibility = if (v) View.VISIBLE else View.GONE
-        switchBtn.visibility = if (v) View.GONE else View.VISIBLE
+        closeVisible = v
+        refreshLeftBtn()
+    }
+
+    /**
+     * 條 bar 常駐（[Prefs.barPinned]）而家又見緊中文九宮格嗰陣：切換候選字／工具
+     * 已經由九宮格右上角嗰粒 `⇄` 負責，呢度就唔使再擺多粒做同一件事。
+     * 英文／符號頁冇嗰粒鍵，所以嗰陣一定要留返呢粒，唔係就入唔到工具列。
+     */
+    fun setSwitchVisible(v: Boolean) {
+        if (switchAllowed == v) return
+        switchAllowed = v
+        refreshLeftBtn()
+    }
+
+    private fun refreshLeftBtn() {
+        closeBtn.visibility = if (closeVisible) View.VISIBLE else View.GONE
+        // ✖ 永遠行先（emoji 表／剪貼簿唔可以冇得返去），冇 ✖ 先輪到 ⇄
+        switchBtn.visibility = if (!closeVisible && switchAllowed) View.VISIBLE else View.GONE
     }
 
     /** AI 要而家真係有字改先撳得（揀咗一段，或者成個欄有字） */

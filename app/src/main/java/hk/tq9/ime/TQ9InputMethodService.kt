@@ -127,9 +127,23 @@ class TQ9InputMethodService : android.inputmethodservice.InputMethodService(),
     private var emojiResults: List<String> = emptyList()
     private var emojiReturnMode = PadMode.CHINESE
 
-    // 候選欄冇嘢出嗰陣頂上嘅速選字（mapped_table id 1000）
-    private var quickPicks: List<String> = emptyList()
-    private var showingQuickPicks = false
+    /**
+     * 中文候選欄「未打碼、未選字」嗰陣頂上嘅字。**唔再係速選字表（id 1000）**——
+     * 而家跟返**游標前面嗰隻字**嘅關聯字（見 [contextPicks]），
+     * 前面吉住／唔係中文就用 [DEFAULT_PICK_ID]（`mapped_table` id 1010）。
+     */
+    private var defaultPicks: List<String> = emptyList()
+    /**
+     * 條 bar 而家出緊嘅唔係 engine 嘅選字表，而係 [contextPicks] 或者
+     * [codePreview] —— 撳落去要行 `Q9Engine.pickQuick()`（根本未入過選字模式）。
+     */
+    private var showingContextPicks = false
+    /** 上面兩者而家出緊嗰個 list（[onPickCandidate] 要攞返個字） */
+    private var contextBarPicks: List<String> = emptyList()
+
+    // 打咗 1~2 個碼嗰陣嘅「最常用嗰九隻字」預覽，同一個碼唔使查兩次
+    private var codePreviewFor = ""
+    private var codePreviewList: List<String> = emptyList()
 
     private var recognizer: SpeechRecognizer? = null
     private var listening = false
@@ -150,7 +164,13 @@ class TQ9InputMethodService : android.inputmethodservice.InputMethodService(),
         runCatching { ClipHistory.current(this) }
     }
 
-    override val optionOn: Boolean get() = barMode != BarMode.OFF
+    /**
+     * 九宮格右上角嗰粒要唔要著燈。平時 = 條 bar 開住；條 bar 常駐嗰陣粒鍵已經
+     * 唔再係開關，而係候選字 ⇄ 工具嘅切換掣，所以改為代表「而家喺工具嗰邊」——
+     * 一路著住藍燈冇資訊可言。
+     */
+    override val optionOn: Boolean
+        get() = if (Prefs.barPinned(this)) barMode == BarMode.TOOLS else barMode != BarMode.OFF
     override val aiReady: Boolean get() = aiUsable
 
     // ---- lifecycle --------------------------------------------------------
@@ -168,8 +188,14 @@ class TQ9InputMethodService : android.inputmethodservice.InputMethodService(),
         engine.scOutput = Prefs.scOutput(this)
         engine.usageReorder = Prefs.usageReorder(this)
         barMode = Prefs.barMode(this)
-        quickPicks = runCatching { db?.keyInput(1000).orEmpty() }.getOrDefault(emptyList())
-            .filter { it.isNotEmpty() && it != "*" }
+        // 舊版嘅 dataset.db 冇 id 1010（亦都冇 word_meta.freq / .code），
+        // 而 `ensureInstalled` 唔會覆蓋 user 手上嗰個 —— 攞唔到就跌返落速選字表
+        // （id 1000，即係以前嘅做法），總好過條 bar 一路吉住。
+        // 想攞返新功能就喺設定頁撳「還原內置字碼表」。
+        defaultPicks = runCatching {
+            db?.keyInput(DEFAULT_PICK_ID)?.takeIf { it.isNotEmpty() }
+                ?: db?.keyInput(LEGACY_PICK_ID).orEmpty()
+        }.getOrDefault(emptyList()).filter { it.isNotEmpty() && it != "*" }
         clipboard()?.addPrimaryClipChangedListener(clipListener)
         UsageStats.get(this) // 背景 thread 偷偷載返之前記低嘅 bigram / 每字次數
     }
@@ -306,6 +332,9 @@ class TQ9InputMethodService : android.inputmethodservice.InputMethodService(),
         // caret 唔喺最頭 = 前面實有字，慳返一次 IPC
         applyAiState(sel || newSelStart > 0 ||
             !currentInputConnection?.getTextAfterCursor(1, 0).isNullOrEmpty())
+        // 候選欄係跟住**游標前面嗰隻字**行（見 [contextPicks]），所以游標一郁就要重出。
+        // 打緊碼／揀緊字嗰陣個表同游標冇關，唔使嘥呢次 IPC。
+        if (mode == PadMode.CHINESE && !engine.busy && !emojiSearch) refreshBars()
     }
 
     /** 搜尋欄要出放大鏡（單色，見 [SEARCH_GLYPH]），唔係就照出 ⏎ */
@@ -466,6 +495,7 @@ class TQ9InputMethodService : android.inputmethodservice.InputMethodService(),
             KeyAction.AI -> runAi()
             KeyAction.SYM_PAGE -> symbolPad?.let { it.page = 1 - it.page }
             KeyAction.IME_SWITCH -> switchIme()
+            KeyAction.IME_PICKER -> showImePicker()
             KeyAction.STT -> toggleStt()
             KeyAction.OPTION -> toggleBar()
             KeyAction.BACKSPACE -> backspace()
@@ -508,11 +538,7 @@ class TQ9InputMethodService : android.inputmethodservice.InputMethodService(),
             }
             KeyAction.HOMO -> { engine.cmd(Q9Cmd.RELATE); return true }
             KeyAction.PASTE -> { onPasteHistory(); return true }
-            KeyAction.IME_SWITCH -> {
-                (getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager)
-                    .showInputMethodPicker()
-                return true
-            }
+            KeyAction.IME_SWITCH -> { showImePicker(); return true }
             KeyAction.SHIFT -> {
                 latinPad?.let { it.shift = ShiftState.LOCK; it.rebuild() }
                 return true
@@ -762,10 +788,13 @@ class TQ9InputMethodService : android.inputmethodservice.InputMethodService(),
             (getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager)
                 .switchToNextInputMethod(window?.window?.attributes?.token, false)
         }
-        if (!ok) {
-            (getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager)
-                .showInputMethodPicker()
-        }
+        if (!ok) showImePicker()
+    }
+
+    /** 彈系統嗰個輸入法選單（長撳 `Eng` 揀得，見 [hk.tq9.core.EngLongPress]） */
+    private fun showImePicker() {
+        (getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager)
+            .showInputMethodPicker()
     }
 
     // ---- 貼上 / clipboard 歷史 --------------------------------------------
@@ -864,8 +893,15 @@ class TQ9InputMethodService : android.inputmethodservice.InputMethodService(),
 
     // ---- 上面條 bar -------------------------------------------------------
 
-    /** 九宮格右上角 ☰：淨係開／關成條 bar，一開返永遠先入候選字 view */
+    /**
+     * 九宮格右上角嗰粒。平時 `☰` = 開／關成條 bar，一開返永遠先入候選字 view。
+     *
+     * **條 bar 常駐（[Prefs.barPinned]）嗰陣冇嘢好開關**，粒鍵改咗做 `⇄`：
+     * 喺候選字同工具之間切，同條 bar 最左本來嗰粒一模一樣（嗰粒亦都因此收埋咗，
+     * 見 [refreshBars] 嗰句 `setSwitchVisible`）。
+     */
     private fun toggleBar() {
+        if (Prefs.barPinned(this)) { onSwitchView(); chinesePad?.invalidate(); return }
         barMode = if (barMode == BarMode.OFF) BarMode.CANDIDATES else BarMode.OFF
         Prefs.setBarMode(this, barMode)
         refreshBars()
@@ -877,6 +913,7 @@ class TQ9InputMethodService : android.inputmethodservice.InputMethodService(),
         barMode = if (barMode == BarMode.TOOLS) BarMode.CANDIDATES else BarMode.TOOLS
         Prefs.setBarMode(this, barMode)
         refreshBars()
+        chinesePad?.invalidate() // 常駐模式：右上角嗰粒著燈與否跟住呢個狀態行
     }
 
     /** emoji 表／剪貼簿開住：一定要有條 bar 出返粒 ✖，唔係就返唔到去普通鍵盤 */
@@ -884,6 +921,13 @@ class TQ9InputMethodService : android.inputmethodservice.InputMethodService(),
 
     private fun refreshBars() {
         if (!::bars.isInitialized) return
+        val pinned = Prefs.barPinned(this)
+        // 常駐：關唔熄得。舊設定裡面存住 OFF 就當場升做候選字（設定頁開個掣嗰陣
+        // 唔會 restart 個 service，所以要喺呢度補）
+        if (pinned && barMode == BarMode.OFF) {
+            barMode = BarMode.CANDIDATES
+            Prefs.setBarMode(this, barMode)
+        }
         // 搵 emoji 嗰陣一定要見到啲結果，就算條 bar 本身係關住
         var effective = if (emojiSearch || (forceCandidates && latinSuggestions.isNotEmpty()))
             BarMode.CANDIDATES else barMode
@@ -896,20 +940,30 @@ class TQ9InputMethodService : android.inputmethodservice.InputMethodService(),
         // emoji 表／剪貼簿嗰陣冇候選字可以出，索性成行出工具，唔好淨係得粒 ✖ 吉住
         if (specialPad) effective = BarMode.TOOLS
 
-        showingQuickPicks = false
+        // 中文本體窄到夠位喺隔籬擺嘢 → 條 bar 收埋，功能掣同候選字全部搬去側邊欄。
+        // 一早計定：側邊欄兩樣（候選字＋工具）一次過見晒，所以佢出咗嚟就一定要有候選字
+        val geom = if (barMode == BarMode.OFF || overlay != null) null else sideGeom()
+        val wantCands = geom != null || effective == BarMode.CANDIDATES
+
+        showingContextPicks = false
+        contextBarPicks = emptyList()
         val cands = when {
             emojiSearch -> emojiResults
-            mode == PadMode.CHINESE -> {
-                val c = if (engine.selectMode) engine.selectWords else engine.relateHints
-                // 冇字碼又冇關聯字嗰陣，條欄唔好吉住 —— 出速選字頂住
-                if (c.isEmpty()) { showingQuickPicks = true; quickPicks } else c
+            mode == PadMode.CHINESE -> when {
+                engine.selectMode -> engine.selectWords
+                // 根本冇出緊候選字（條 bar 關咗／而家喺工具嗰邊）就唔使查
+                // ——[contextPicks] 要問個輸入框攞字（IPC），逐粒鍵行一次好唔抵
+                !wantCands -> emptyList()
+                // 打咗一兩個碼（未夠碼出字）：出「呢個碼開頭最常用嗰九隻字」
+                engine.currCode.isNotEmpty() -> contextBar(codePreview(engine.currCode))
+                // 乜都未打：跟游標前面嗰隻字（唔係「啱啱打完嗰隻」）
+                else -> contextBar(contextPicks())
             }
             mode == PadMode.LATIN || mode == PadMode.SYMBOL -> latinSuggestions
             else -> emptyList()
         }
 
-        // 中文本體窄到夠位喺隔籬擺嘢 → 條 bar 收埋，功能掣同候選字全部搬去側邊欄
-        if (refreshSidePanel(cands)) {
+        if (refreshSidePanel(geom, cands)) {
             bars.visibility = View.GONE
             return
         }
@@ -917,12 +971,66 @@ class TQ9InputMethodService : android.inputmethodservice.InputMethodService(),
         bars.setMode(effective)
         bars.setCandidates(if (effective == BarMode.CANDIDATES) cands else emptyList())
         bars.setCloseVisible(specialPad)
+        // 常駐 + 中文九宮格：切換掣已經搬咗去右上角嗰粒鍵，條 bar 唔使再擺多粒。
+        // 英文／符號頁冇嗰粒鍵，所以一定要留返，唔係就入唔到工具列
+        bars.setSwitchVisible(!(pinned && mode == PadMode.CHINESE))
         bars.setAiReady(aiUsable)
         bars.setAiVisible(aiKeySet)
         bars.refreshAlignLabel()
         // 條 bar 高度定死，唔會因為有冇候選字而跳高跳低
         bars.visibility = if (effective == BarMode.OFF) View.GONE else View.VISIBLE
     }
+
+    /** 記住而家出緊嗰個 list，[onPickCandidate] 就知撳咗邊隻字（未入過選字模式） */
+    private fun contextBar(list: List<String>): List<String> {
+        showingContextPicks = true
+        contextBarPicks = list
+        return list
+    }
+
+    /**
+     * 未打過碼嗰陣候選欄出乜：**讀游標前面嗰隻字**，出佢嘅關聯字。
+     *
+     * 特登唔用 `Q9Engine.relateHints`（＝「啱啱打完嗰隻字」）—— user 撳過個輸入框
+     * 郁咗游標、或者啱啱開個鍵盤，嗰個狀態就已經係舊嘅。前面吉住、或者唔係中文
+     * （英文、標點、數字…）就出 [DEFAULT_PICK_ID] 嗰行最常用字。
+     *
+     * 開咗「輸出簡體」嗰陣個欄入面係簡體，但 `related_candidates_table` 淨係有
+     * 正體，所以查唔到就轉返正體再查一次（[Q9Db.sctc] 淨係攞嚟查表，唔會輸出）。
+     */
+    private fun contextPicks(): List<String> {
+        val d = db ?: return defaultPicks
+        // 攞兩個 char：一個增補字符（surrogate pair）都要攞得齊
+        val before = runCatching { currentInputConnection?.getTextBeforeCursor(2, 0)?.toString() }
+            .getOrNull().orEmpty()
+        val ch = Q9Db.splitGraphemes(before).lastOrNull().orEmpty()
+        if (ch.isNotEmpty() && isHanChar(ch)) {
+            var r = d.getRelate(ch)
+            if (r.isEmpty() && engine.scOutput) r = d.getRelate(d.sctc(ch))
+            val f = r.filter { it.isNotEmpty() && it != "*" }
+            if (f.isNotEmpty()) return f
+        }
+        return defaultPicks
+    }
+
+    /**
+     * 打咗 1~2 個碼（未夠碼出候選字）嗰陣，條 bar 出「以呢個碼開頭最常用嗰九隻字」，
+     * 撳落去即刻出字，唔使打齊三個碼（見 [Q9Db.topByCodePrefix]）。
+     * 同一個碼查一次就夠 —— 每撳一下鍵 [refreshBars] 都會行到呢度。
+     */
+    private fun codePreview(code: String): List<String> {
+        if (code == codePreviewFor) return codePreviewList
+        codePreviewFor = code
+        // 舊版 dataset.db 冇 `word_meta.freq` / `.code`，查唔到就跌返落預設嗰行字
+        // （條 bar 吉住反而似壞咗）。`topByCodePrefix` 自己會食晒個 SQL exception。
+        codePreviewList = runCatching { db?.topByCodePrefix(code, BAR_PREVIEW_COUNT).orEmpty() }
+            .getOrDefault(emptyList()).ifEmpty { defaultPicks }
+        return codePreviewList
+    }
+
+    private fun isHanChar(s: String): Boolean =
+        s.isNotEmpty() && s.codePointCount(0, s.length) == 1 &&
+            Character.UnicodeScript.of(s.codePointAt(0)) == Character.UnicodeScript.HAN
 
     // ---- 側邊欄（中文拉窄嗰陣）----------------------------------------------
 
@@ -931,13 +1039,14 @@ class TQ9InputMethodService : android.inputmethodservice.InputMethodService(),
      * 空出嚟嗰四成幾位夠曬擺功能掣同一大版候選字，冇理由再喺上面霸多條 bar。
      *
      * 回傳 true = 而家用緊側邊欄（call 嗰邊要自己收埋 [bars]）。
+     * [geom] 由 [refreshBars] 計（null = 唔夠窄／條 bar 關咗／有 overlay 蓋住）——
+     * 佢自己都要用「而家出唔出側邊欄」呢個答案去決定使唔使查候選字，所以計一次就夠。
      *
      * 只限中文九宮格：英文／符號／純數字係一行行鋪滿成行嘅，冇位空出嚟；
      * 剪貼簿嗰個 overlay 又會蓋住成個 padHolder（連側邊欄都遮埋，就撳唔返粒 ✖）。
      */
-    private fun refreshSidePanel(cands: List<String>): Boolean {
-        val geom = sideGeom()
-        if (geom == null || barMode == BarMode.OFF || overlay != null) {
+    private fun refreshSidePanel(geom: SideGeom?, cands: List<String>): Boolean {
+        if (geom == null) {
             removeSidePanel()
             return false
         }
@@ -1028,8 +1137,10 @@ class TQ9InputMethodService : android.inputmethodservice.InputMethodService(),
     }
 
     override fun onPickCandidate(index: Int) {
-        if (showingQuickPicks && !emojiSearch) {
-            engine.pickQuick(quickPicks.getOrNull(index) ?: return)
+        if (showingContextPicks && !emojiSearch) {
+            // 呢個 list 唔係 engine 出嘅選字表（根本未入過選字模式），
+            // 所以要行 pickQuick —— 佢入面會補返簡繁／同音／關聯字嗰套
+            engine.pickQuick(contextBarPicks.getOrNull(index) ?: return)
             return
         }
         if (emojiSearch) {
@@ -1043,9 +1154,7 @@ class TQ9InputMethodService : android.inputmethodservice.InputMethodService(),
             return
         }
         when (mode) {
-            PadMode.CHINESE -> {
-                if (engine.selectMode) engine.pickCandidateAt(index) else engine.pickRelateAt(index)
-            }
+            PadMode.CHINESE -> engine.pickCandidateAt(index)
             else -> {
                 val w = latinSuggestions.getOrNull(index) ?: return
                 val ic = currentInputConnection ?: return
@@ -1672,5 +1781,14 @@ class TQ9InputMethodService : android.inputmethodservice.InputMethodService(),
         /** 送去 AI 做上下文嘅字數：caret 前面／後面各攞幾多 */
         private const val STT_CONTEXT_BEFORE = 400
         private const val STT_CONTEXT_AFTER = 100
+        /**
+         * 游標前面吉住／唔係中文嗰陣，候選欄出 `mapped_table` 呢個 id
+         * （最常用嗰行字）。**唔係速選字表 1000** —— 嗰行係符號同口語字。
+         */
+        private const val DEFAULT_PICK_ID = 1010
+        /** 舊版 dataset.db 冇 [DEFAULT_PICK_ID]，跌返落呢個（速選字表，以前嘅做法） */
+        private const val LEGACY_PICK_ID = 1000
+        /** 打咗一兩個碼嗰陣，條 bar 出幾多隻「呢個碼最常用」嘅字 */
+        private const val BAR_PREVIEW_COUNT = 9
     }
 }

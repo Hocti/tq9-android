@@ -79,7 +79,12 @@ class GestureKeyTracker(
     private val times = ArrayList<Long>(128)
     var active = false; private set
 
-    fun start(x: Float, y: Float, t: Long) {
+    /**
+     * @param startEmitted 起點嗰粒鍵**已經出咗**（撳落即出，見
+     *   `KeyboardBaseView` 嘅 ACTION_DOWN）。tracker 就唔好再出多次 ——
+     *   起點永遠都會 emit 一次，兩邊夾埋就會變咗打兩下。
+     */
+    fun start(x: Float, y: Float, t: Long, startEmitted: Boolean = false) {
         points.clear()
         times.clear()
         points.add(x); points.add(y); times.add(t)
@@ -90,7 +95,12 @@ class GestureKeyTracker(
         active = true
         val key = keyOrNull(x, y)
         cur = if (key != NO_KEY) Visit(key, x, y, t, 0f, 0f) else null
+        // 起點根本唔喺任何一粒可滑動嘅鍵度，就冇「已經出咗」呢回事
+        this.startEmitted = startEmitted && cur != null
     }
+
+    /** 起點嗰下已經由 caller 出咗（撳落即出），tracker 唔好再補多次 */
+    private var startEmitted = false
 
     private var delegate: Delegate? = null
     fun attach(d: Delegate) { delegate = d }
@@ -154,13 +164,18 @@ class GestureKeyTracker(
         return hypot(cx - points[i * 2], cy - points[i * 2 + 1]) / dt
     }
 
-    /** 放手：最尾嗰格一定計；喺度停夠耐就當連撳兩下 */
+    /**
+     * 放手：最尾嗰格一定計；喺度停夠耐就當連撳兩下。
+     *
+     * 由頭到尾都冇離開過起點嗰格、而起點又已經由 caller 出咗（[startEmitted]），
+     * 就淨係補「停夠耐」嗰下 —— 基本嗰下已經喺 ACTION_DOWN 出咗。
+     */
     fun finish(x: Float, y: Float, t: Long) {
         if (!active) return
         val v = cur
         if (v != null) {
             v.lastX = x; v.lastY = y; v.lastT = t
-            emit(v.key)
+            if (!(isFirst && startEmitted)) emit(v.key)
             if (holdRepeatMs > 0 && t - v.enterT >= holdRepeatMs) emit(v.key)
         }
         active = false
@@ -180,7 +195,8 @@ class GestureKeyTracker(
     // ---- 判定 -------------------------------------------------------------
 
     private fun decideAndEmit(v: Visit, exitX: Float, exitY: Float, exitT: Long) {
-        if (isFirst) { emit(v.key); return }
+        // 起點永遠計 —— 除非 caller 喺 ACTION_DOWN 已經出咗佢（[startEmitted]）
+        if (isFirst) { if (!startEmitted) emit(v.key); return }
 
         val dwell = max(0L, exitT - v.enterT)
         val elapsed = max(1L, exitT - startT)

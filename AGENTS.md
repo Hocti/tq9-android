@@ -50,6 +50,10 @@ adb shell ime set    hk.tq9/.ime.TQ9InputMethodService
 `7 8 9` 喺最上、`1 2 3` 喺最落，跟返 `Q9Form.cs` 嘅 `ResizeAllButton()`。
 底行係 `[0 佔兩格][取消]`；選字夠兩頁嗰陣兩格闊嗰粒 `0` 點變由設定話事
 （見下面「選字揭頁」）。改過嚟電話排法就同原版打法唔同曬。
+
+**右欄由上而下係 `☰／⇄`、`␣`、`⌫`、`⏎`**（2026-08-27 user 要求，`␣` 同 `⌫`
+對調咗）—— 咁樣中文都跟返下面嗰條「`⏎` 上面嗰粒一定係 `⌫`」嘅規矩，
+四款鍵盤一致。最上嗰粒平時係 `☰`，條 bar 常駐嗰陣變 `⇄`（見「工具列常駐」）。
 左下角淨返粒 `🌐`（成格闊）—— 錄音搬咗上工具 bar，喺「貼上」隔籬，
 亦都係左上角嗰粒鍵揀得嘅其中一個 `PadFunc`。
 
@@ -59,6 +63,10 @@ adb shell ime set    hk.tq9/.ime.TQ9InputMethodService
   中文九宮格自己就係中文，左下角淨係 `Eng`；**純數字頁**兩粒搬咗去**右上角**
   （user 要求，左下角讓咗俾 `0` `.` `-`）。
   英文嗰粒**寫 `Eng` 唔寫 `ABC`**（2026-08-25 user 要求，全部頁一致）。
+  中文嗰粒**長撳 = 換輸入法**，做乜由設定頁揀（`Prefs.EngLongPress`）：
+  `NEXT_IME` → `KeyAction.IME_SWITCH`（跳去下一個，跳唔到就跌落選單），
+  `PICKER` → `KeyAction.IME_PICKER`（直接彈系統選單）。🌐 收埋咗，
+  呢粒鍵係唯一入口，所以兩種做法都要有。
 - **`⏎` 上面嗰粒一定係 `⌫`**。所以符號頁嘅分頁掣（`€£¥`／`?123`）同 `⌫`
   都喺倒數第二行嘅最左同最右，純數字頁嘅 `⌫` 亦都由右上角搬咗去 `⏎` 上面。
   第一頁嗰粒分頁掣**寫三個銀紙符號 `€£¥`**（第二頁頭一行就係啲銀紙），
@@ -108,6 +116,24 @@ adb shell ime set    hk.tq9/.ime.TQ9InputMethodService
 封頂 360dp，中英切換嗰陣啲鍵會左右彈。所以 `onCycleAlign` / `onWidthDrag` /
 `onMaxWidth` 三處都要記得 `numberPad?.rebuild()`。
 
+### `dataset.db` 唔會自動更新，舊機仲用緊裝機嗰陣嗰份
+
+`Q9Db.ensureInstalled()` **淨係喺 `filesDir/dataset.db` 唔見咗嗰陣先由 assets 抄**——
+user 可以喺設定頁換走個字碼表，夾硬覆蓋就會刪咗人哋自己揀嗰份。代價：
+**由舊版升級上嚟嘅機，個 db 仲係當初裝機嗰份**。實測（2026-08-27，模擬器）
+2026-08-21 嗰份 1.7MB 舊 db：
+
+- `word_meta` **冇 `freq` / `code` 兩欄** → `topByCodePrefix` 查唔到（SQL 直接
+  throw，佢自己 `runCatching` 食咗）
+- `mapped_table` **冇 id `1010`** → 候選欄嘅預設字攞唔到
+
+所以兩處都要有 fallback（`TQ9InputMethodService`）：`defaultPicks` 攞唔到 1010
+就跌返落 1000（速選字表，即係以前嘅做法），`codePreview()` 空就跌返落
+`defaultPicks`。**條 bar 吉住睇落似壞咗，情願出舊嗰套。** 想攞返新功能就叫 user
+喺設定頁撳「還原內置字碼表」（會覆蓋佢自訂過嘅 db，所以唔可以靜靜雞自動做）。
+
+加任何要新 schema 嘅嘢之前，記住問返自己：舊 db 會點？
+
 ### mapped_table 嘅 id 有特別意思
 
 | id | 係乜 |
@@ -117,6 +143,7 @@ adb shell ime set    hk.tq9/.ime.TQ9InputMethodService
 | `10`, `20`, … `90` | 姓氏表（撳咗第一碼之後再撳 0） |
 | `10`~`999` | 正常字碼表，`weight` = 常用度 |
 | `1000`~`1009` | 速選字表（⭐；首頁 = 1000，撳咗 1~9 之後 = 1001~1009） |
+| `1010` | 候選欄嘅預設字（游標前面吉住／唔係中文嗰陣出，見「候選欄出乜」） |
 
 打碼邏輯（`Q9Engine.press`）：夠三碼、或者中途撳 0 收尾，就查表出候選字。
 
@@ -267,6 +294,27 @@ gravity 跟 `PadAlign` 反過嚟擺）：上面一（兩）行功能掣，下面
 唔係 user 熄咗條 bar 之後開 emoji 就返唔到去普通鍵盤。
 
 `showOverlay()` / `hideOverlay()` 兩邊都會叫 `refreshBars()`。
+
+### 工具列常駐（`Prefs.barPinned`，2026-08-27 加）
+
+開咗之後條 bar 關唔熄得，而**九宮格右上角嗰粒鍵換咗個意思**：
+
+| | 粒鍵 | 條 bar 最左 |
+| --- | --- | --- |
+| 平時（預設） | `☰`＝開／關成條 bar | `⇄`＝候選字 ⇄ 工具 |
+| 常駐 | `⇄`＝候選字 ⇄ 工具 | **冇咗**（`setSwitchVisible(false)`） |
+
+三處要一齊夾：
+
+- `TQ9InputMethodService.toggleBar()` 第一句就分流去 `onSwitchView()`。
+- `refreshBars()` 開頭見到 `pinned && barMode == OFF` 就當場升做 `CANDIDATES`
+  **兼且寫返落 pref**（設定頁㩒個掣唔會 restart 個 service）。
+- `ChinesePadView.optionKey()` 換鍵面；`optionOn`（著唔著燈）常駐嗰陣代表
+  「而家喺工具嗰邊」，唔係「條 bar 開住」—— 一路著住藍燈冇資訊可言。
+
+**`setSwitchVisible` 淨係喺中文九宮格先收埋粒 `⇄`**：英文／符號頁根本冇右上角
+嗰粒鍵，收埋咗就永遠入唔到工具列。`✖`（emoji 表／剪貼簿）永遠行先，
+兩粒共用同一個位（`refreshLeftBtn()`）。
 
 **英文／符號頁亦都夾硬開返條 bar**：呢兩頁靠佢出打字提示同滑出嚟嘅字，
 冇咗就等於打盲舖。`refreshBars()` 見到 `mode` 係 `LATIN`／`SYMBOL` 而
@@ -445,14 +493,34 @@ app 入面所有 user 見到嘅字（設定頁、toast、鍵面、空狀態提�
   加句「以下是錄音的轉錄內容：」，又鍾意順手幫你執靚啲句子。改 prompt 嗰陣
   唔好刪咗「只輸出結果」同「逐字轉錄唔好潤飾」呢兩條。
 
-## 候選欄吉住就出速選字
+## 候選欄出乜（中文，2026-08-27 重寫）
 
-`refreshBars()` 喺中文模式見到 `selectWords` 同 `relateHints` 都空，
-就會出 `quickPicks`（`mapped_table` id 1000，`onCreate` 讀一次）同時
-`showingQuickPicks = true`。撳落去要行 `Q9Engine.pickQuick()`，
-**唔係** `pickCandidateAt()` —— 嗰陣根本冇入過 selectMode。
-`pickQuick()` 內部係 `startSelectWord(listOf(word))` + `selectWord(1)`，
-所以簡繁輸出、同音、關聯字全部照行。
+`refreshBars()` 喺中文模式分三種情況，**兩種係「唔關 engine 事」嘅**
+（`showingContextPicks = true`，撳落去要行 `Q9Engine.pickQuick()`，
+**唔係** `pickCandidateAt()` —— 嗰陣根本冇入過 selectMode。`pickQuick()` 內部係
+`startSelectWord(listOf(word))` + `selectWord(1)`，所以簡繁輸出、同音、關聯字全部照行）：
+
+| 狀態 | 出乜 |
+| --- | --- |
+| `engine.selectMode` | `engine.selectWords`（照舊，撳 = `pickCandidateAt`） |
+| `currCode` 有 1~2 個碼 | `codePreview()` → `Q9Db.topByCodePrefix`，最常用嗰 9 隻字 |
+| 乜都未打 | `contextPicks()` → **游標前面嗰隻字**嘅關聯字，冇就 `mapped_table` id `1010` |
+
+- **速選字表（id 1000）唔再喺條 bar 出現**（以前吉住就出佢）。`quickPicks` 個 field
+  刪咗，換成 `defaultPicks`（id `1010`）。速選字表照樣由左上角粒鍵／長撳 1~9 開得到。
+- **`contextPicks()` 特登唔用 `engine.relateHints`**（＝「啱啱打完嗰隻字」）——
+  user 撳過個輸入框郁咗游標、或者啱啱開個鍵盤，`relateHints` 已經係舊嘢。
+  而家逐次 `getTextBeforeCursor(2, 0)` 攞返游標前面嗰個 grapheme 去查。
+  所以 `onUpdateSelection` 喺中文、`!engine.busy`、唔喺 emoji 搜尋嗰陣要 `refreshBars()`
+  —— 游標一郁，條 bar 就要換。（`Q9Engine.pickRelateAt` 冇人叫，但係冇刪。）
+- **開咗「輸出簡體」個欄入面係簡體**，但 `related_candidates_table` 淨係有正體，
+  所以查唔到就 `Q9Db.sctc()` 轉返正體再查一次。`sctc` 係由 `ts_chinese_table` 反轉出嚟嘅
+  （多對一，第一個當代表）—— **淨係可以攞嚟查表，唔可以攞嚟做輸出**，出街嘅字一律行 `tcsc`。
+- **`topByCodePrefix` 個 LIKE 一定要連埋粒逗號**：`word_meta.code` 每個打法都以 `,`
+  開頭（「為」＝ `,470,480,970`），所以 pattern 係 `%,<prefix>%`。打 `4`／`47`／`48`
+  都搵得返「為」，而 `70` **唔可以**夾到 `,970`。同一隻字有幾個打法（幾行記錄），
+  要 `GROUP BY char ORDER BY MAX(freq)`。同一個碼查一次就 cache 住（`codePreviewFor`），
+  唔係每撳一下鍵都查次 sqlite。
 
 ## 同音字就係一個 flag，唔好再加嘢
 
@@ -519,9 +587,11 @@ app 入面所有 user 見到嘅字（設定頁、toast、鍵面、空狀態提�
 每次都要重新讀一次。
 
 `Q9Engine.reorderByUsage()` 淨係喺 `processResult()`（打碼揀字嗰條主線）用：
-第一頁（頭 9 個）睇 bigram（夠 3 次先郁，次數越大越前），第九個之後睇單字
-次數；兩邊都用**穩定排序**（`sortedByDescending`），冇資格嘅嘢唔會亂咗原本
-次序。讀寫都喺 `UsageStats` 入面：讀係 in-memory cache（`ensureLoaded()`
+第一頁（頭 9 個）睇 bigram，第九個之後睇單字次數；**兩邊都要打過至少
+`Q9Engine.MIN_USAGE_COUNT`（＝ 2）次先至郁個次序**（2026-08-27 user 要求；
+bigram 以前係 3 次，單字係「打過就算」）—— 撳錯一下唔應該影響到之後嘅選字。
+兩邊都用**穩定排序**（`sortedByDescending`），冇資格嘅嘢（`qualified()` 回 -1）
+唔會亂咗原本次序。讀寫都喺 `UsageStats` 入面：讀係 in-memory cache（`ensureLoaded()`
 第一次先揸 sqlite），寫就即刻更新 cache、sqlite 嗰邊擺去背景 thread，
 唔會拖慢緊住打緊字嘅 UI。
 
@@ -656,6 +726,30 @@ per-key 判斷）連埋 `keyCenter` 拋畀 IME service，放手之後**由 IME s
   英文唔使呢樣，所以 `holdRepeatMs` 預設 0（熄），淨係 `ChinesePadView` 開。
 
 `0` 冇 `holdRepeat`，因為佢長撳係開關標點。
+
+### 撳落即出（`Prefs.instantKey`，2026-08-27 加，預設開）
+
+`KeyboardBaseView` ACTION_DOWN 見到 `instantKey(key)` 就即刻 `host.onKey()`，
+放手嗰下就唔再出（`instantFired`）。**淨係中文九宮格 `1`~`9` 先做**
+（`ChinesePadView.instantKey`），而且淨係喺「長撳 = 連撳」嗰個狀態：
+
+- 選字模式（長撳 = 同音字表）唔做
+- 開咗 `longPressShortcut` 而又未打過碼（長撳 = 速選字表）唔做
+- `0` 唔做（長撳 = 開關標點／上頁）
+
+三樣一齊夾住先啱：
+
+1. **DOWN 出鍵一定要喺 `tracker.start()` 之後**——`onKey()` 會改 engine 狀態，
+   隨時觸發 `relayout()`（`boxes` 重砌），嗰粒 `KeyBox` 就會變咗舊嘢。
+2. **`tracker.start(x, y, t, startEmitted = true)`**：`GestureKeyTracker` 起點
+   **永遠 emit**，唔話佢知就會變咗打兩下。佢兩處要跳過：`decideAndEmit` 嘅
+   `isFirst` 分支，同埋 `finish()` 嘅**基本**嗰下（「停夠耐再補一下」照出，
+   唔係喺起點格停住放手就攞唔返個連撳）。
+3. **長撳嗰下照計**：`longPressRunnable` 嘅 `holdRepeat` 分支唔設 `longFired`，
+   所以「撳落一下 + 長撳一下」＝ 連撳兩下，同以前一模一樣。
+
+改呢度一定要跑 `GestureKeyTrackerTest`，入面有四個 `startEmitted` 嘅 case
+（起點唔可以補、冇離開過起點放手都唔補、停夠耐照補、拉去第二格照計）。
 
 **「長撳 = 連撳」係最後一條路**：`longPressRunnable` 要 `Host.onLongPress()`
 回 `false` 先至行到佢。九宮格 `1`~`9` 有兩個情況會截走（2026-08-25 加）：

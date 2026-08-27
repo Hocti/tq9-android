@@ -31,7 +31,8 @@ class GestureKeyTrackerTest {
         weights: (Int) -> Float = { 0f },
         dwellMs: Long = 150,
         angleDeg: Float = 55f,
-        holdRepeatMs: Long = 0
+        holdRepeatMs: Long = 0,
+        startEmitted: Boolean = false
     ): List<Int> {
         val out = ArrayList<Int>()
         val t = GestureKeyTracker(dwellMs, angleDeg)
@@ -43,7 +44,7 @@ class GestureKeyTrackerTest {
             override fun onGestureKey(key: Int) { out.add(key) }
         })
         val (x0, y0, t0) = path.first()
-        t.start(x0, y0, t0)
+        t.start(x0, y0, t0, startEmitted)
         for (p in path.drop(1).dropLast(1)) t.move(p.first, p.second, p.third)
         val last = path.last()
         t.move(last.first, last.second, last.third)
@@ -151,5 +152,51 @@ class GestureKeyTrackerTest {
         val c = center(5)
         val path = listOf(Triple(c.first, c.second, 0L), Triple(c.first + 2f, c.second, 30L))
         assertEquals(listOf(5), run(path))
+    }
+
+    // ---- 撳落即出（`Prefs.instantKey`）：起點嗰下由 view 出咗，tracker 唔好補多次 ----
+
+    @Test
+    fun `撳落即出：起點唔可以再 emit 多次`() {
+        val path = ArrayList<Triple<Float, Float, Long>>()
+        path.add(Triple(center(7).first, center(7).second, 0L))
+        path.addAll(leg(center(7), center(9), 200, 0))
+        path.addAll(leg(center(9), center(3), 200, 200))
+        // 平時係 7,9,3；起點已經由 ACTION_DOWN 出咗，就淨返 9,3
+        assertEquals(listOf(9, 3), run(path, startEmitted = true))
+    }
+
+    @Test
+    fun `撳落即出：由頭到尾冇離開過起點，放手都唔補`() {
+        val a = center(8)
+        val path = listOf(
+            Triple(a.first, a.second, 0L),
+            Triple(a.first + 8f, a.second + 5f, 40L),
+            Triple(a.first + 4f, a.second + 9f, 90L)
+        )
+        assertEquals(emptyList<Int>(), run(path, startEmitted = true))
+    }
+
+    @Test
+    fun `撳落即出：喺起點停夠耐先放手，照補多一下（連撳兩下）`() {
+        val a = center(8)
+        val path = listOf(
+            Triple(a.first, a.second, 0L),
+            Triple(a.first + 6f, a.second + 3f, 200L),
+            Triple(a.first + 5f, a.second + 4f, 500L)
+        )
+        // 撳落嗰下（8）＋ 停夠 380ms 補嗰下（8）= 88，所以 tracker 呢邊淨係出一次
+        assertEquals(listOf(8), run(path, holdRepeatMs = 380, startEmitted = true))
+    }
+
+    @Test
+    fun `撳落即出：8 拉落 2 停一停 = 822`() {
+        val path = ArrayList<Triple<Float, Float, Long>>()
+        path.add(Triple(center(8).first, center(8).second, 0L))
+        path.addAll(leg(center(8), center(2), 150, 0))
+        // 喺 2 度停到 700ms 先放手
+        path.add(Triple(center(2).first, center(2).second, 700L))
+        // 起點 8 已經出咗，所以 tracker 出 2（放手）＋ 2（停夠耐）＝ 合埋一齊 822
+        assertEquals(listOf(2, 2), run(path, holdRepeatMs = 380, startEmitted = true))
     }
 }

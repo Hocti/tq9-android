@@ -14,7 +14,8 @@ enum class KeyAction {
     TO_EMOJI,     // 開 emoji 表
     PASTE,        // 貼上（長撳 = clipboard 歷史）
     AI,           // 用 AI 改寫揀咗嘅字
-    IME_SWITCH,   // 地球
+    IME_SWITCH,   // 地球：直接跳去下一個輸入法
+    IME_PICKER,   // 彈出系統嘅輸入法選單（長撳 Eng 揀得，見 [hk.tq9.core.EngLongPress]）
     STT,          // 語音輸入
     OPTION,       // 上面條 bar：關 → 候選字 → 工具
     BACKSPACE,

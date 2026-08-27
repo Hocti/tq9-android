@@ -4,6 +4,7 @@ import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Rect
 import android.graphics.RectF
+import hk.tq9.core.EngLongPress
 import hk.tq9.core.PadFunc
 import hk.tq9.core.PagerLayout
 import hk.tq9.core.Prefs
@@ -16,10 +17,13 @@ import kotlin.math.roundToInt
  * 九万中文輸入本體。
  *
  * 5 欄 × 4 行：
- *   [速選/簡]  1 2 3  [option]
- *   [同音]     4 5 6  [⌫]
- *   [?123]     7 8 9  [␣]
+ *   [速選/簡]  1 2 3  [☰/⇄]
+ *   [同音]     4 5 6  [␣]
+ *   [?123]     7 8 9  [⌫]
  *   [Eng]      0 0 取消 [⏎]
+ *
+ * `␣` 同 `⌫` 喺 2026-08-27 對調咗（user 要求）—— 順帶令中文都跟返
+ * 英文／符號／純數字嗰條「`⏎` 上面嗰粒一定係 `⌫`」嘅規矩。
  *
  * 選字夠兩頁嗰陣底行兩格闊嗰粒 `0` 點變，由設定頁嗰個 [PagerLayout] 話事
  * （以前係撳住「下頁」向左掃先返到上一頁，太難撳，收咗）：拆做「下頁」＋「上頁」
@@ -97,8 +101,9 @@ class ChinesePadView(context: Context, private val engine: Q9Engine) : KeyboardB
         add(Key(KeyAction.HOMO, label = "同音"), 0f, 1)
         // 長撳 ?123 唔使經符號頁，直接跳去純數字 keypad（英文鍵盤嗰粒一樣）
         add(Key(KeyAction.TO_SYMBOL, label = "?123", longAction = KeyAction.TO_NUMBER), 0f, 2)
-        // 🌐 收埋咗，但長撳「Eng」照樣叫得出輸入法揀選（KeyAction.IME_SWITCH 個 code 冇刪）
-        add(Key(KeyAction.TO_LATIN, label = "Eng", longAction = KeyAction.IME_SWITCH), 0f, 3)
+        // 🌐 收埋咗，換輸入法就淨係靠長撳「Eng」。跳去下一個定係彈個選單出嚟，
+        // 由設定頁話事（見 [EngLongPress]）——「地球」個 code 一路都冇刪
+        add(Key(KeyAction.TO_LATIN, label = "Eng", longAction = engLongAction()), 0f, 3)
 
         // 九宮格 1~9：跟足 numpad 排法，7 8 9 喺最上面
         for (i in 1..9) {
@@ -125,11 +130,26 @@ class ChinesePadView(context: Context, private val engine: Q9Engine) : KeyboardB
         add(Key(KeyAction.CANCEL, label = "取消"), 3f, 3)
 
         // 右欄。☰ 代表「揭開上面條 bar」，⚙ 太似「設定」，人哋撳落去唔知做乜
-        add(Key(KeyAction.OPTION, label = "☰"), 4f, 0)
-        add(Key(KeyAction.BACKSPACE, label = "⌫", repeatable = true), 4f, 1)
-        add(Key(KeyAction.SPACE, label = "␣"), 4f, 2)
+        add(optionKey(), 4f, 0)
+        // ␣ 同 ⌫ 對調咗：⌫ 落咗去 ⏎ 上面（同英文／符號／純數字一致）
+        add(Key(KeyAction.SPACE, label = "␣"), 4f, 1)
+        add(Key(KeyAction.BACKSPACE, label = "⌫", repeatable = true), 4f, 2)
         add(Key(KeyAction.ENTER, label = "⏎", accent = true), 4f, 3)
     }
+
+    /** 長撳 `Eng`：跳去下一個輸入法，定係彈個系統選單出嚟（設定頁揀） */
+    private fun engLongAction(): KeyAction = when (Prefs.engLongPress(context)) {
+        EngLongPress.NEXT_IME -> KeyAction.IME_SWITCH
+        EngLongPress.PICKER -> KeyAction.IME_PICKER
+    }
+
+    /**
+     * 右上角嗰粒。平時係 `☰`＝開／關成條 bar；**條 bar 常駐**
+     * （[Prefs.barPinned]）就冇嘢好開關，改咗做 `⇄`＝候選字 ⇄ 工具，
+     * 而條 bar 自己最左嗰粒 `⇄` 就收埋（見 `OptionBarsView.setSwitchVisible`）。
+     */
+    private fun optionKey(): Key =
+        Key(KeyAction.OPTION, label = if (Prefs.barPinned(context)) "⇄" else "☰")
 
     /**
      * 左上角嗰粒。預設短撳 = 速選字、長撳 = 簡體開關，
@@ -185,6 +205,22 @@ class ChinesePadView(context: Context, private val engine: Q9Engine) : KeyboardB
      */
     override fun canSwipe(key: Key) =
         key.action == KeyAction.DIGIT && Prefs.swipeEnabled(context) && !engine.selectMode
+
+    /**
+     * **撳落即出碼**（唔等放手）。淨係 `1`~`9`，而且淨係喺「長撳 = 連撳」嗰個
+     * 狀態先做得 —— 嗰陣粒鍵之後唯一會發生嘅事就係再出多次佢自己，
+     * 撳落一下 + 長撳一下 = 連撳兩下，同以前一模一樣。
+     *
+     * 兩種情況照舊等放手，因為粒鍵長撳有第二個意思，一撳落就出咗碼會兩樣一齊做：
+     *  - **選字模式**：長撳一格 = 開嗰個字嘅同音字表（`Q9Engine.homoAt`）
+     *  - **未打過碼 + 開咗 [Prefs.longPressShortcut]**：長撳 = 開速選字表
+     *
+     * `0` 亦都唔做（長撳 = 開關標點／上頁）。
+     */
+    override fun instantKey(k: Key): Boolean =
+        k.action == KeyAction.DIGIT && k.digit in 1..9 && Prefs.instantKey(context) &&
+            !engine.selectMode &&
+            !(Prefs.longPressShortcut(context) && engine.currCode.isEmpty())
 
     override fun swipeKeyAt(x: Float, y: Float): Int {
         for (d in 0..9) {

@@ -37,6 +37,17 @@ enum class PagerLayout(val label: String) {
 }
 
 /**
+ * 中文九宮格長撳 `Eng` 做乜（設定頁揀，預設 [NEXT_IME]）。
+ *
+ * 🌐 收埋咗之後，換輸入法就淨係靠呢粒鍵，所以兩種做法都要畀得 user 揀：
+ * 有兩個輸入法輪流用嘅人想一撳就跳，成堆輸入法嘅人就想見到個選單。
+ */
+enum class EngLongPress(val label: String) {
+    NEXT_IME("直接切換至下一個輸入法"),
+    PICKER("彈出輸入法選單");
+}
+
+/**
  * 可以喺設定度換走嘅鍵功能（而家用喺左上角嗰粒）。
  * 粒面**全部寫中文**，一個 icon 都冇 —— [EMOJI] 本來寫住個 😀，
  * 但係鍵面其餘全部單色，一粒彩色 emoji 好突兀，而且好多機嘅 emoji 字型
@@ -103,6 +114,9 @@ object Prefs {
     const val KEY_LATIN_NUM_ROW = "latin_num_row"  // 英文鍵盤上面加一行數字
     const val KEY_USAGE_REORDER = "usage_reorder"  // 打得多嘅字推前（usage_stats.db）
     const val KEY_PAGER_LAYOUT = "pager_layout"    // PagerLayout.name（選字揭頁嗰兩粒點排）
+    const val KEY_BAR_PINNED = "bar_pinned"        // 上面條 bar 常駐（右上角嗰粒改做 ⇄）
+    const val KEY_ENG_LONG = "eng_long"            // EngLongPress.name（長撳 Eng 做乜）
+    const val KEY_INSTANT_KEY = "instant_key"      // 九宮格 1~9 撳落即出，唔等放手
 
     // 左上角嗰粒鍵
     const val KEY_TL_TAP = "topleft_tap"
@@ -336,6 +350,32 @@ object Prefs {
 
     fun setPagerLayout(ctx: Context, p: PagerLayout) =
         sp(ctx).edit().putString(KEY_PAGER_LAYOUT, p.name).apply()
+
+    /**
+     * 上面條 bar 常駐：關唔熄得。中文九宮格右上角嗰粒本來係「開／關成條 bar」，
+     * 常駐之後冇嘢好開關，改咗做**候選字 ⇄ 工具**嘅切換掣，而條 bar 自己最左
+     * 嗰粒 `⇄` 就收埋（兩粒做同一件事冇意思）。見
+     * `TQ9InputMethodService.toggleBar` 同 `ChinesePadView.optionKey`。
+     */
+    fun barPinned(ctx: Context) = sp(ctx).getBoolean(KEY_BAR_PINNED, false)
+
+    /** 長撳中文九宮格粒 `Eng`（🌐 收埋咗之後唯一嘅換輸入法入口） */
+    fun engLongPress(ctx: Context): EngLongPress =
+        runCatching { EngLongPress.valueOf(sp(ctx).getString(KEY_ENG_LONG, EngLongPress.NEXT_IME.name)!!) }
+            .getOrDefault(EngLongPress.NEXT_IME)
+
+    fun setEngLongPress(ctx: Context, e: EngLongPress) =
+        sp(ctx).edit().putString(KEY_ENG_LONG, e.name).apply()
+
+    /**
+     * 九宮格 1~9 **撳落去就即刻出碼**，唔等放手（預設開）。
+     *
+     * 淨係喺「長撳 = 連撳」嗰個狀態先生效 —— 選字模式（長撳 = 同音字表）同埋
+     * 開咗 [longPressShortcut] 而又未打過碼（長撳 = 速選字表）嗰兩種情況，
+     * 粒鍵長撳有第二個意思，撳落即出就會兩樣一齊發生，所以嗰陣照舊等放手。
+     * 見 `ChinesePadView.instantKey` 同 `KeyboardBaseView` 嘅 ACTION_DOWN。
+     */
+    fun instantKey(ctx: Context) = sp(ctx).getBoolean(KEY_INSTANT_KEY, true)
     fun sttLocale(ctx: Context): String = sp(ctx).getString(KEY_STT_LOCALE, "yue-Hant-HK")!!
 
     fun aiApiKey(ctx: Context): String = sp(ctx).getString(KEY_AI_KEY, "")!!

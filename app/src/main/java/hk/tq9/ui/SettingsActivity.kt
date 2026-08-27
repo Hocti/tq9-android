@@ -43,6 +43,7 @@ import androidx.core.view.WindowCompat
 import com.google.android.material.tabs.TabLayout
 import hk.tq9.core.AiStt
 import hk.tq9.core.BarMode
+import hk.tq9.core.EngLongPress
 import hk.tq9.core.PadFunc
 import hk.tq9.core.PagerLayout
 import hk.tq9.core.Prefs
@@ -237,6 +238,10 @@ class SettingsActivity : AppCompatActivity() {
         note("選取一個 sqlite 檔案後會立即覆蓋現有資料庫（舊版不會保留）。" +
             "檔案須包含 mapped_table、related_candidates_table、ts_chinese_table、" +
             "word_meta 四張表。")
+        note("由舊版升級上來的話，資料庫仍然是當初安裝的那一份，不會自動更新。" +
+            "候選字欄的兩項新功能（輸入一兩個字碼即顯示最常用的九個字、" +
+            "游標前無中文時顯示的預設字）需要較新的資料庫，" +
+            "按「還原內置字碼表」即可取得（自訂過資料庫的話會被覆蓋）。")
         row(
             button("選取 sqlite 檔案…") {
                 pickDb.launch(arrayOf("*/*"))
@@ -357,6 +362,23 @@ class SettingsActivity : AppCompatActivity() {
             rebuildPreview()
         }
 
+        val engOptions = EngLongPress.entries.toList()
+        enumPicker("長按中文鍵盤的「Eng」", engOptions.map { it.label },
+            engOptions.indexOf(Prefs.engLongPress(this))) { i ->
+            Prefs.setEngLongPress(this, engOptions[i])
+            rebuildPreview()
+        }
+        note("地球圖示已收起，切換輸入法一律靠長按中文鍵盤左下角的「Eng」。" +
+            "選「直接切換」會跳至系統排在下一個的輸入法；輸入法多於兩個時，" +
+            "選「彈出選單」較易找到想要的那個。")
+
+        switch("按下即輸入（不等放開手指）", Prefs.KEY_INSTANT_KEY, true)
+        note("開啟後，九宮格 1~9 一按下去就立刻出碼，不必等放開手指，反應快得多。" +
+            "長按仍然等於連按兩下（按下一次 + 長按一次），滑動輸入亦完全不受影響。" +
+            "選字狀態下的 1~9（長按 = 同音字表），以及開啟了「長按 1~9 開速選字表」" +
+            "而尚未輸入字碼時，仍然是放開手指才生效——那兩種情況長按另有意思，" +
+            "一按下去就出字會兩件事同時發生。")
+
         if (SHOW_HIDDEN_OPTIONS) {
             switch("英文鍵盤上方加一行數字", Prefs.KEY_LATIN_NUM_ROW, false)
         }
@@ -365,6 +387,8 @@ class SettingsActivity : AppCompatActivity() {
             "長按 , . / 三鍵可選其餘標點（左上角小字為長按時的預設項）。")
         note("長按 ␣ 後不要放手，上下左右拖動即可移動游標（切換輸入法改為長按中文鍵盤的 Eng 鍵）。" +
             "長按 ?123 可直接跳至純數字鍵盤。")
+        note("中文鍵盤右欄的 ␣ 與 ⌫ 已對調：由上而下是「工具列鍵、␣、⌫、⏎」，" +
+            "⌫ 就在 ⏎ 上面，與英文、符號、純數字鍵盤的排法一致。")
 
         buildPagerSection()
     }
@@ -664,9 +688,10 @@ class SettingsActivity : AppCompatActivity() {
         note("每隻字打過多少次、以及連續兩個字的組合都會記錄在 usage_stats.db，" +
             "與字碼資料庫分開存放（更換字碼資料庫不會影響這些記錄）。")
         switch("常用字排前", Prefs.KEY_USAGE_REORDER, true)
-        note("開啟後，候選字第一頁會依「與前一個字的組合」打過的次數推前（至少三次才會調動），" +
-            "第九個之後則依該字本身打過的次數推前。關閉則完全依字碼表原本的次序，" +
-            "但仍然會繼續記錄次數。")
+        note("開啟後，候選字第一頁會依「與前一個字的組合」打過的次數推前，" +
+            "第九個之後則依該字本身打過的次數推前；兩者都要打過至少 " +
+            "${Q9Engine.MIN_USAGE_COUNT} 次才會調動次序（按錯一下不應該影響往後的選字）。" +
+            "關閉則完全依字碼表原本的次序，但仍然會繼續記錄次數。")
         row(
             button("匯出…") { saveUsage.launch("usage_stats.db") },
             button("匯入…") { pickUsage.launch(arrayOf("*/*")) },
@@ -717,9 +742,13 @@ class SettingsActivity : AppCompatActivity() {
     private fun buildBehaviourSection() {
         header("其他")
         switch("輸出簡體字", Prefs.KEY_SC_OUTPUT, false)
-        note("九宮格右上角的 ☰ 只負責開關整條工具列，開啟後會先進入候選字。" +
-            "開啟後可按工具列最左的 ⇄ 在候選字與工具（大小位置、貼上、語音、" +
-            "表情符號、AI）之間切換。英文與符號頁一律強制顯示工具列。")
+        switch("工具列常駐", Prefs.KEY_BAR_PINNED, false)
+        note("關閉（預設）：九宮格右上角的 ☰ 負責開關整條工具列，開啟後會先進入候選字，" +
+            "再按工具列最左的 ⇄ 可在候選字與工具（大小位置、貼上、語音、表情符號、AI）" +
+            "之間切換。")
+        note("開啟：工具列固定顯示、不能關閉。右上角那顆鍵改為 ⇄，直接負責候選字與工具" +
+            "的切換（該鍵在工具狀態下會亮起），工具列最左那顆 ⇄ 則會消失，" +
+            "不會兩顆鍵做同一件事。英文與符號頁沒有那顆鍵，工具列最左的 ⇄ 仍然保留。")
         slider("按鍵震動", 0, Prefs.MAX_VIBRATE_LEVEL, Prefs.vibrateLevel(this), "",
             format = { Prefs.vibrateLevelLabel(it) }) { v ->
             Prefs.setVibrateLevel(this, v)
