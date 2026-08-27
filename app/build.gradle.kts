@@ -33,8 +33,8 @@ android {
         applicationId = "hk.tq9"
         minSdk = 26
         targetSdk = 36
-        versionCode = 21
-        versionName = "1.1.4"
+        versionCode = 22
+        versionName = "1.1.5"
     }
 
     signingConfigs {
