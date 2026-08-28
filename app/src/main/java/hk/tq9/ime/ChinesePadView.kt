@@ -2,7 +2,6 @@ package hk.tq9.ime
 
 import android.content.Context
 import android.graphics.Canvas
-import android.graphics.Rect
 import android.graphics.RectF
 import hk.tq9.core.EngLongPress
 import hk.tq9.core.PadFunc
@@ -30,7 +29,8 @@ import kotlin.math.roundToInt
  * 兩粒正常闊（左右次序兩個選擇），或者唔拆、成兩格闊嗰粒做「下頁」＋長撳做「上頁」。
  *
  * 🎤 搬咗上面條工具 bar（貼上隔籬），左上角嗰粒都揀得。
- * 🌐（轉輸入法）收埋咗，長撳「Eng」照樣叫得出嚟（見 [KeyAction.IME_SWITCH]）。
+ * 🌐（轉輸入法）粒獨立掣收埋咗，長撳「Eng」照樣叫得出嚟（見 [KeyAction.IME_SWITCH]）——
+ * 所以粒「Eng」左上角畫住個地球，同其餘啲鍵一樣「左上角 = 長撳做乜」。
  */
 class ChinesePadView(context: Context, private val engine: Q9Engine) : KeyboardBaseView(context) {
 
@@ -48,7 +48,6 @@ class ChinesePadView(context: Context, private val engine: Q9Engine) : KeyboardB
 
     private val digitBoxes = arrayOfNulls<KeyBox>(10)
     private var metrics: PadMetrics? = null
-    private val imgRect = Rect()
     private val dstRect = RectF()
 
     /**
@@ -97,10 +96,14 @@ class ChinesePadView(context: Context, private val engine: Q9Engine) : KeyboardB
 
         // 左欄（最上嗰粒短撳／長撳做乜，設定頁揀得）
         add(topLeftKey(), 0f, 0)
-        // 左上角嗰段細字係 engine 出嘅字碼提示，喺 drawFunction 度即時攞
-        add(Key(KeyAction.HOMO, label = "同音"), 0f, 1)
-        // 長撳 ?123 唔使經符號頁，直接跳去純數字 keypad（英文鍵盤嗰粒一樣）
-        add(Key(KeyAction.TO_SYMBOL, label = "?123", longAction = KeyAction.TO_NUMBER), 0f, 2)
+        // 短撳永遠都係開關同音，長撳做乜就設定頁揀（預設「候選字」）——
+        // 左上角細字＝長撳做乜，左下角嗰段即時提示（搵緊邊隻字嘅同音／個字正路
+        // 點打）喺 drawFunction 度問 engine 攞
+        add(funcLongKey(Key(KeyAction.HOMO, label = "同音"), Prefs.homoLong(context)), 0f, 1)
+        // 長撳 ?123 唔使經符號頁，直接跳去純數字 keypad（英文鍵盤嗰粒一樣）。
+        // 左上角寫住「123」＝長撳做乜，同其餘啲鍵一致
+        add(Key(KeyAction.TO_SYMBOL, label = "?123", hint = "123",
+            longAction = KeyAction.TO_NUMBER), 0f, 2)
         // 🌐 收埋咗，換輸入法就淨係靠長撳「Eng」。跳去下一個定係彈個選單出嚟，
         // 由設定頁話事（見 [EngLongPress]）——「地球」個 code 一路都冇刪
         add(Key(KeyAction.TO_LATIN, label = "Eng", longAction = engLongAction()), 0f, 3)
@@ -130,7 +133,7 @@ class ChinesePadView(context: Context, private val engine: Q9Engine) : KeyboardB
         add(Key(KeyAction.CANCEL, label = "取消"), 3f, 3)
 
         // 右欄。☰ 代表「揭開上面條 bar」，⚙ 太似「設定」，人哋撳落去唔知做乜
-        add(optionKey(), 4f, 0)
+        add(funcLongKey(optionKey(), Prefs.topRightLong(context)), 4f, 0)
         // ␣ 同 ⌫ 對調咗：⌫ 落咗去 ⏎ 上面（同英文／符號／純數字一致）
         add(Key(KeyAction.SPACE, label = "␣"), 4f, 1)
         add(Key(KeyAction.BACKSPACE, label = "⌫", repeatable = true), 4f, 2)
@@ -167,9 +170,17 @@ class ChinesePadView(context: Context, private val engine: Q9Engine) : KeyboardB
         )
     }
 
+    /**
+     * 粒鍵**短撳做乜換唔到**（同音、右上角嗰粒），但長撳一樣揀得
+     * （見 [Prefs.FUNC_SLOTS]）。冇揀（[PadFunc.NONE]）就連左上角細字都冇。
+     */
+    private fun funcLongKey(k: Key, f: PadFunc): Key =
+        if (f == PadFunc.NONE) k else k.copy(hint = f.icon, longAction = actionOf(f))
+
     private fun actionOf(f: PadFunc): KeyAction = when (f) {
         PadFunc.SHORTCUT -> KeyAction.SHORTCUT
         PadFunc.SC_TOGGLE -> KeyAction.SC_TOGGLE
+        PadFunc.RELATE -> KeyAction.RELATE
         PadFunc.EMOJI -> KeyAction.TO_EMOJI
         PadFunc.PASTE -> KeyAction.PASTE
         PadFunc.STT -> KeyAction.STT
@@ -278,13 +289,9 @@ class ChinesePadView(context: Context, private val engine: Q9Engine) : KeyboardB
         drawFace(canvas, box, faceColor(box, isDown, pk.enabled))
         val img = pk.img
         if (img != null) {
-            val bm = StrokeImages.get(context, img)
-            if (bm != null) {
-                val side = min(box.w, box.h) * 0.74f
-                dstRect.set(box.cx - side / 2f, box.cy - side / 2f, box.cx + side / 2f, box.cy + side / 2f)
-                imgRect.set(0, 0, bm.width, bm.height)
-                canvas.drawBitmap(bm, imgRect, dstRect, if (pk.dim) StrokeImages.dimPaint else StrokeImages.paint)
-            }
+            val side = min(box.w, box.h) * 0.74f
+            dstRect.set(box.cx - side / 2f, box.cy - side / 2f, box.cx + side / 2f, box.cy + side / 2f)
+            StrokeImages.draw(canvas, context, img, dstRect, pk.dim)
         }
         if (pk.text.isNotEmpty()) drawLabel(canvas, box, pk.text, sizeRatio = 0.46f)
         if (pk.hint.isNotEmpty()) drawCornerHint(canvas, box, pk.hint)
@@ -314,18 +321,22 @@ class ChinesePadView(context: Context, private val engine: Q9Engine) : KeyboardB
             sizeRatio = if (k.action == KeyAction.CANCEL) 0.36f else 0.40f,
             color = if (usable) theme.text else theme.textDim
         )
-        // 同音鍵左上角：攤開緊同音字表就寫住而家搵緊邊隻字嘅同音（成頁都係同音字，
-        // 冇個字擺喺度就唔知搵緊邊隻）；揀完就換做嗰個字正路應該點打嘅字碼
-        val hint = when {
-            k.action != KeyAction.HOMO -> k.hint
-            engine.homoWord.isNotEmpty() -> engine.homoWord
-            else -> engine.homoCodeHint
+        // `on` 淨係同音／簡體／工具 bar 三粒先會 true，嗰陣粒鍵係 accent 色底
+        val hintColor = if (on) theme.onAccentText else theme.textDim
+        // 左上角跟返成個 app 嘅規矩：**一律寫「長撳做乜」**
+        if (k.hint.isNotEmpty()) drawCornerHint(canvas, box, k.hint, hintColor)
+        if (k.action == KeyAction.HOMO) {
+            // 同音鍵嘅即時提示喺**左下角**（左上角個位讓咗俾長撳）：攤開緊同音字表
+            // 就寫住而家搵緊邊隻字嘅同音（成頁都係同音字，冇個字擺喺度就唔知搵緊
+            // 邊隻）；揀完就換做嗰個字正路點打嘅字碼
+            val tip = engine.homoWord.ifEmpty { engine.homoCodeHint }
+            if (tip.isNotEmpty()) drawCornerHintBottom(canvas, box, tip, hintColor)
         }
-        if (hint.isNotEmpty()) {
-            drawCornerHint(
-                canvas, box, hint,
-                if (on && (scKey || k.action == KeyAction.HOMO)) theme.onAccentText else theme.textDim
-            )
+        // `Eng` 長撳 = 轉輸入法，所以左上角擺個地球（獨立嗰粒 🌐 收埋咗，
+        // 冇呢個 icon 就冇人知撳得長撳，見 [engLongAction]）
+        if (k.action == KeyAction.TO_LATIN &&
+            (k.longAction == KeyAction.IME_SWITCH || k.longAction == KeyAction.IME_PICKER)) {
+            drawCornerIcon(canvas, box, ToolIcon.GLOBE, hintColor)
         }
     }
 }

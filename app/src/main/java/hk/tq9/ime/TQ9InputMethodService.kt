@@ -603,6 +603,7 @@ class TQ9InputMethodService : android.inputmethodservice.InputMethodService(),
             KeyAction.SHORTCUT -> engine.cmd(Q9Cmd.SHORTCUT)
             KeyAction.SC_TOGGLE -> toggleSc()
             KeyAction.HOMO -> engine.cmd(Q9Cmd.HOMO)
+            KeyAction.RELATE -> engine.cmd(Q9Cmd.RELATE)
             KeyAction.PREV_PAGE -> engine.cmd(Q9Cmd.PREV)
             KeyAction.TO_CHINESE -> switchMode(PadMode.CHINESE)
             KeyAction.TO_LATIN -> switchMode(PadMode.LATIN)
@@ -654,7 +655,6 @@ class TQ9InputMethodService : android.inputmethodservice.InputMethodService(),
                 // 覺得撳極都唔出，所以要 user 自己喺設定頁開（[Prefs.longPressShortcut]）
                 if (Prefs.longPressShortcut(this) && engine.shortcutDigit(key.digit)) return true
             }
-            KeyAction.HOMO -> { engine.cmd(Q9Cmd.RELATE); return true }
             KeyAction.PASTE -> { onPasteHistory(); return true }
             KeyAction.IME_SWITCH -> { showImePicker(); return true }
             KeyAction.SHIFT -> {

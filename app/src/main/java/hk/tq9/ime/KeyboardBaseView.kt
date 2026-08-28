@@ -19,6 +19,7 @@ import hk.tq9.swipe.GestureKeyTracker
 import kotlin.math.abs
 import kotlin.math.hypot
 import kotlin.math.min
+import kotlin.math.roundToInt
 
 /**
  * 所有鍵盤 view 嘅共同部份：排版、畫鍵、掂觸（撳／長撳／連撳／滑動畫線）。
@@ -613,6 +614,46 @@ abstract class KeyboardBaseView(context: Context) : View(context) {
         canvas.drawText(s, box.left + gapPx + dp(3f), box.top + gapPx + textPaint.textSize, textPaint)
         textPaint.textAlign = Paint.Align.CENTER
     }
+
+    /**
+     * 左下角細字。
+     *
+     * 左上角個位有規矩 —— 一律係「長撳做乜」（見 [drawCornerHint] 啲 caller），
+     * 所以要多寫一段**即時狀態**（例如同音鍵而家搵緊邊隻字）就落呢度。
+     */
+    protected fun drawCornerHintBottom(canvas: Canvas, box: KeyBox, s: String, color: Int = theme.textDim) {
+        if (s.isEmpty()) return
+        textPaint.isFakeBoldText = false
+        textPaint.color = color
+        textPaint.textAlign = Paint.Align.LEFT
+        textPaint.textSize = min(box.w, box.h) * 0.2f * fontScale
+        val avail = box.w - gapPx * 2 - dp(4f)
+        val need = textPaint.measureText(s)
+        if (need > avail) textPaint.textSize *= avail / need
+        // 同左上角對稱：嗰邊個字框頂啱啱好貼 `top + gapPx`，呢邊個字框底就貼
+        // `bottom - gapPx`（所以要減返 descent），中間讓到最多位俾粒鍵正中個 label
+        canvas.drawText(s, box.left + gapPx + dp(3f),
+            box.bottom - gapPx - textPaint.fontMetrics.descent, textPaint)
+        textPaint.textAlign = Paint.Align.CENTER
+    }
+
+    /**
+     * 左上角一個細 icon，當左上角細字用（`Eng` 粒鍵嘅 🌐）。
+     *
+     * 唔寫 emoji —— 鍵面其餘全部單色，一粒彩色 emoji 好突兀（同
+     * [ToolIcons] 個講法一樣）。Drawable cache 住，唔好每 frame 起過。
+     */
+    protected fun drawCornerIcon(canvas: Canvas, box: KeyBox, icon: ToolIcon, color: Int = theme.textDim) {
+        val d = cornerIcons.getOrPut(icon to color) { ToolIconDrawable(icon, color) }
+        // 比左上角細字大少少：呢個 icon 冇字咁多線索，太細就乜都睇唔到
+        val size = (min(box.w, box.h) * 0.26f * fontScale).roundToInt().coerceAtLeast(1)
+        val l = (box.left + gapPx + dp(2f)).roundToInt()
+        val t = (box.top + gapPx + dp(1f)).roundToInt()
+        d.setBounds(l, t, l + size, t + size)
+        d.draw(canvas)
+    }
+
+    private val cornerIcons = HashMap<Pair<ToolIcon, Int>, ToolIconDrawable>()
 
     /** 右上角細字（長撳彈得出嘅符號） */
     protected fun drawCornerHintRight(canvas: Canvas, box: KeyBox, s: String, color: Int = theme.textDim) {

@@ -121,6 +121,9 @@ adb shell run-as hk.tq9 cat shared_prefs/tq9_settings.xml
   情願粒粒細啲都好過有幾個推咗出螢幕外面永遠揀唔到 —— `/` 有八個，
   用返 `max(鍵闊 × 1.1, 50dp)` 就一定爆。字太大 `KeyPopup` 自己會縮返。
 - `?123` 長撳 = 直接跳純數字頁（`longAction = TO_NUMBER`），中文九宮格嗰粒一樣。
+  **英文嗰粒冇左上角提示字**（2026-08-29 user 要求）：鍵面本身已經四個字符，
+  底行粒粒都窄，再迫個 `123` 落左上角就撞埋一舊。中文九宮格嗰粒地方鬆啲，
+  個 `hint` 照留 —— 兩處唔一致係特登嘅。
 
 ### 純數字頁：成頁唔准長撳
 
@@ -180,9 +183,35 @@ ACTION_DOWN 用 `boxNear()`（搵唔到就攞 14dp 內最近嗰粒），
 
 ### 圖檔
 
-`assets/img/` 直接照抄 Windows 版 `files/img/`，`0_1`~`0_9` 係首頁筆形，
+90 格筆形提示圖**唔再係 90 個 png**，係一幅 sprite sheet：`assets/default90.png`，
+橫切 9 份、直切 10 份 —— **第一個數字 = 第幾行（0 起）、第二個 = 第幾列（1 起）**，
+所以左上角 `0_1`、右上 `0_9`、左下 `9_1`、右下 `9_9`。`0_1`~`0_9` 係首頁筆形，
 `1_1`~`9_9` 係第二碼提示。**Android 版冇 `10_x`** —— 關聯字改咗喺上面條 bar 揀，
-唔會再迫落九宮格。App icon 直接用 `TQ9/logo.png`。
+唔會再迫落九宮格。
+
+`StrokeImages` 得一個 `Bitmap` cache 住成幅 sheet，`draw()` 每次計個 source rect
+出嚟 `drawBitmap` —— **唔好**改返做逐格 crop 出 90 個 Bitmap（多一份 memory，
+IME process 個 heap 好細）。個 source rect 用「乘完先除」（`c * w / COLS`）計邊界，
+user 換咗幅唔係 9 嘅倍數闊嘅圖都唔會漏 pixel。
+
+換圖：揀嗰幅抄落 `filesDir/strokes.png`，**檔案喺唔喺度就係「有冇自訂」**
+（冇另開 pref，唔會出現「pref 話自訂但個檔唔見咗」）。所以升級換咗新嘅內置圖
+即刻生效，唔使似 `dataset.db` 咁記 versionCode。換完要叫 `StrokeImages.reload()`，
+但係**唔好 recycle 舊嗰幅** —— 鍵盤可能同一時間畫緊佢。
+
+**「檢視目前 sqlite／圖片」＝ save as，唔係喺 app 入面開**（2026-08-29 加）：
+設定頁兩節各加咗一粒掣，行 `ActivityResultContracts.CreateDocument` 抄一份出去，
+user 想用邊個 sqlite viewer／睇圖 app 都得。App 自己唔識開呢兩種檔，
+猜佢裝咗乜、又或者為咗 `ACTION_VIEW` 開多個 `FileProvider` 出嚟都係多餘。
+兩點要記住：
+
+- **一定要抄 `filesDir` 嗰份**（`Q9Db.file` / `StrokeImages.file`），唔好貪方便
+  由 assets 攞 —— 唔係就變咗「檢視內置」，睇唔到 user 自己換咗入去嗰份。
+- 筆形圖**冇自訂過就 `filesDir` 度根本冇個檔**（見上面「檔案喺唔喺度就係
+  有冇自訂」），所以 `exportImg()` 嗰陣先要 `isCustom()` 分流，
+  冇自訂就真係由 assets 抄。字碼庫冇呢個問題（`ensureInstalled` 保證有）。
+
+App icon 直接用 `TQ9/logo.png`。
 
 ### 系統輸入法揀選視窗只可以有一個「九万」
 
@@ -321,11 +350,27 @@ gravity 跟 `PadAlign` 反過嚟擺）：上面一（兩）行功能掣，下面
 全部收埋咗（`SettingsActivity.SHOW_HIDDEN_OPTIONS = false`，一行 code 都冇刪），
 剩返「字體大細」（中文一條、英文一條）同「邊框粗幼」—— 長闊而家一律喺鍵盤度直接拖。
 
+`SHOW_HIDDEN_OPTIONS` 之下仲有**滑動輸入嘅「停留」同「轉角」**兩條
+（2026-08-29 收埋，user：一般人唔需要調到咁細）—— 兩個 pref
+（`KEY_SWIPE_DWELL` / `KEY_SWIPE_ANGLE`）同 `GestureKeyTracker` 照讀，
+淨係設定頁見唔到。
+
+**「顯示方式」嗰粒掣 2026-08-29 由設定頁移走咗**（user 要求）：條工具列最左粒掣
+撳一下就轉下一個，設定頁再擺多個入口做同一件事係多舊雲。`Prefs.align` /
+`setAlign` / `nextAlign` 一個字都冇刪，`TQ9InputMethodService.onCycleAlign` 仲用緊。
+
 ### 字體大細都係分兩組（2026-08-28 user 要求）
 
-`Prefs.fontScale(ctx, group)`：`CJK` 行 `KEY_FONT_SCALE`、`LATIN` 行
+`Prefs.fontScalePref(ctx, group)`：`CJK` 行 `KEY_FONT_SCALE`、`LATIN` 行
 `KEY_FONT_SCALE_LATIN`（未校過就跟返 `CJK` 嗰個值，升級之後個樣唔會變）。
 中文字要夠大先睇得清，英文字母同數字用同一個倍數就會逼爆粒鍵。
+
+**畫嗰陣要叫 `Prefs.fontScale`，唔係 `fontScalePref`**（2026-08-29 分開咗）：
+英文嗰組實際倍數 = pref × `Prefs.LATIN_FONT_BOOST`（1.2），而且條 slider
+拉得到 `MAX_FONT_SCALE_LATIN_PCT`（200%，中文嗰條照舊 140%）—— user 話英文
+140% 都唔算大。**唔好貪方便將個 boost 寫死落 pref 度**（例如揀 100 就存 120）：
+存住嗰個數字就係設定頁見到嗰個百分比，反推返嚟一定有 rounding 誤差，
+拖幾次就會走位。設定頁讀 `fontScalePref`，鍵盤讀 `fontScale`。
 
 分組跟返 `PadGroup`（**唔係**「中文 pad vs 其餘」）：純數字 keypad 排位同大細
 本來就跟九宮格，所以字體都跟 `CJK`。`KeyboardBaseView.padGroup` 就係攞邊套嘅入口
@@ -563,6 +608,17 @@ app 入面所有 user 見到嘅字（設定頁、toast、鍵面、空狀態提�
 **正體中文書面語**，唔用廣東話口語（「冇」→「沒有」、「撳」→「按」、
 「而家」→「目前」…）。**注釋同 commit message 唔使跟**，照舊用口語。
 
+### 而且要短（2026-08-29 user 踩到「描述過長，很多廢話」）
+
+設定頁每個 `note()` **最多兩句**，講「開咗會點／要注意乜」就夠。唔好寫：
+
+- 設計理由（「否則等於浪費一格」、「按錯一下不應該影響往後的選字」）——
+  嗰啲寫落 code 注釋同呢份 AGENTS.md，唔係寫俾 user 睇。
+- 內部細節（震動幾多毫秒、`?123` 個 hint 點嚟、邊個版本改過乜）。
+- 鍵面上撳一下就見到嘅嘢（「⌫ 就在 ⏎ 上面」）。
+
+一般 user 唔會逐段睇，寫長咗等於冇寫。
+
 個名一律叫「**九万輸入法**」，簡稱「**九万**」。「TQ9」係 project 個英文名，
 **淨係可以喺 code／檔名／package 度出現**，唔可以出現喺畀人睇嘅字入面
 （`strings.xml` 個 `subtype_en` 就係因為咁刪咗）。
@@ -727,7 +783,47 @@ app 入面所有 user 見到嘅字（設定頁、toast、鍵面、空狀態提�
 （有 `lastWord` 就開佢嘅同音字，冇就開速選字表），user 話打斷咗打字流程，**收返咗**。
 撳一下淨係著／熄粒掣（會變藍），唔可以換走而家個字表。
 
-同音鍵左上角一個位、兩樣嘢，**攤開緊個表嗰陣行 `homoWord`，揀完先至行
+### 左上角 = 長撳做乜，唔好擺即時狀態落去
+
+成個 app 一條規矩：**粒鍵左上角細字一律講「長撳會發生咩事」**（`drawCornerHint`）。
+同音鍵以前破咗呢條規矩（左上角擺住即時提示），2026-08-28 改返：
+
+| 位 | 擺乜 | 邊句 code |
+|---|---|---|
+| 左上 | `Key.hint` ＝長撳嗰個 `PadFunc.icon`（預設「候選字」）| `ChinesePadView.funcLongKey` |
+| 左下 | 即時提示（`homoWord` / `homoCodeHint`）| `drawCornerHintBottom` |
+
+同一條規矩之下順手補返：`?123` 左上角寫 `123`（長撳直入 numpad；2026-08-29 起
+**淨係中文九宮格嗰粒有**，英文嗰粒太窄，見「英文鍵盤排位」），
+`Eng` 左上角畫個地球 `ToolIcon.GLOBE`（長撳轉輸入法 ——
+粒獨立 🌐 掣收埋咗之後，冇呢個 icon 就冇人知撳得長撳）。個地球係
+`drawCornerIcon` 畫嘅**單色** vector，唔好改返寫 emoji 🌐（鍵面其餘全單色）。
+
+### 四個位揀功能，唔准重複
+
+`Prefs.FUNC_SLOTS` = 左上短撳 → 左上長撳 → 同音長撳 → 右上長撳，**排住嗰個
+次序就係優先次序**。四個位唔准做同一件事（`PadFunc.NONE` 例外，可以齊齊停用），
+左上短撳仲唔准 `NONE`。
+
+- 讀：一律行 `Prefs.funcSlot(ctx, key)`（`topLeftTap` / `topLeftLong` /
+  `homoLong` / `topRightLong` 都係佢嘅 wrapper）。撞到**排喺前面**嗰個位就回
+  `NONE`。呢段係防住舊 pref，正常情況下唔會行到。
+- 揀：**唔准重複唔係揀完先話你唔得**，而係 `SettingsActivity.availableFuncs()`
+  一開始就唔會將已經有人用嗰啲放入個 spinner。試過「揀撞咗就 toast 彈返轉頭」
+  同埋「揀撞咗就靜靜雞熄咗第二個位」，兩樣都差 —— 前者要撞完釘先知，
+  後者郁咗 user 冇叫你郁嘅設定。所以 `FuncPicker` 個 options 係個 lambda，
+  每次 `sync()` 都重新問過。
+- 換 adapter 嗰陣 `Spinner` 會 select 返第 0 個兼有機會即場 `onItemSelected`，
+  所以 `FuncPicker.fill()` **一定要**拆走個 listener 先，擺返真正 selection 之後
+  先駁返，唔係就會當咗 user 揀咗第 0 個。
+
+同音鍵同右上角嗰粒**短撳換唔到**（開關同音／開關上面條 bar），淨係長撳揀得；
+兩粒都係 `ChinesePadView.funcLongKey()` 幫粒鍵補返 `hint` ＋ `longAction`。
+長撳實際點行完全靠 `TQ9InputMethodService.onLongPress` 開頭嗰句
+「`key.longAction != NOOP` 就照 `onKey` 行一次」—— **唔好**再喺下面個 `when`
+度為某粒鍵寫死長撳做乜（同音鍵以前寫死 `Q9Cmd.RELATE`，設定揀「停用」都照行）。
+
+同音鍵**左下角**一個位、兩樣嘢，**攤開緊個表嗰陣行 `homoWord`，揀完先至行
 `homoCodeHint`**：
 
 - `Q9Engine.homoWord` = 而家搵緊邊隻字嘅同音（兩條入口都會 set）。成頁都係
@@ -742,7 +838,7 @@ app 入面所有 user 見到嘅字（設定頁、toast、鍵面、空狀態提�
 
 除咗個 flag，仲有第二條路入同音字表：**選字模式長撳嗰格**
 （`Q9Engine.homoAt()`，2026-08-25 加）。兩條路出嚟嘅表一模一樣（同一句
-`db.getHomo()`），亦都一樣會 set `afterHomo`，所以揀完照樣喺同音鍵左上角
+`db.getHomo()`），亦都一樣會 set `afterHomo`，所以揀完照樣喺同音鍵左下角
 寫返個字正路點打。`homoAt()` 唔會掂 `homo` 個 flag 以外嘅嘢，
 開關標點模式（`openclose`）就直接唔做 —— 嗰陣個表係「」呢啲一對對嘅標點。
 

@@ -182,7 +182,10 @@ class LatinPadView(context: Context) : RowsPadView(context) {
             return if (numRow) listOf(digits, r0, r1, r2, r3) else listOf(r0, r1, r2, r3)
         }
         r3.add(Key(KeyAction.TO_CHINESE, label = "中", weight = 1.3f, bigLabel = true))
-        // 長撳 ?123 唔使經符號頁，直接跳去純數字 keypad
+        // 長撳 ?123 唔使經符號頁，直接跳去純數字 keypad。
+        // **冇左上角提示字**（2026-08-29 user 要求）—— 呢粒鍵面本身已經四個字符，
+        // 英文底行粒粒都窄，再喺左上角迫多個「123」就撞埋一舊。
+        // 中文九宮格嗰粒地方鬆啲，個 hint 照留。
         r3.add(Key(KeyAction.TO_SYMBOL, label = "?123", weight = 1.3f,
             longAction = KeyAction.TO_NUMBER))
         if (emailMode) {

@@ -48,6 +48,13 @@ enum class ToolIcon {
 
     /** 顯示方式「左右拆開」：兩邊都有牆，兩橛鍵盤各自貼實，中間裂開 */
     ALIGN_SPLIT,
+
+    /**
+     * 地球：轉輸入法。畫喺 `Eng` 粒鍵左上角（＝長撳做乜），
+     * 所以特登畫得簡單 —— 一個圓、一條赤道、一個經線橢圓，
+     * 縮到得十零 dp 都仲認得出，唔會糊成一嚿。
+     */
+    GLOBE,
 }
 
 /**
@@ -88,6 +95,7 @@ class ToolIconDrawable(private val icon: ToolIcon, color: Int) : Drawable() {
             ToolIcon.ALIGN_RIGHT -> drawAlign(canvas, left = false, both = false)
             ToolIcon.ALIGN_WIDE -> drawAlign(canvas, left = true, both = true)
             ToolIcon.ALIGN_SPLIT -> drawSplit(canvas)
+            ToolIcon.GLOBE -> drawGlobe(canvas)
         }
         canvas.restoreToCount(save)
     }
@@ -196,6 +204,14 @@ class ToolIconDrawable(private val icon: ToolIcon, color: Int) : Drawable() {
         canvas.drawRoundRect(rect, 1.5f, 1.5f, fill)
         rect.set(13.4f, 7.4f, 19.1f, 16.6f)
         canvas.drawRoundRect(rect, 1.5f, 1.5f, fill)
+    }
+
+    /** 地球：圓框 + 赤道 + 一個窄橢圓做經線 */
+    private fun drawGlobe(canvas: Canvas) {
+        canvas.drawCircle(12f, 12f, 9f, stroke)
+        canvas.drawLine(3.2f, 12f, 20.8f, 12f, stroke)
+        rect.set(6.9f, 3f, 17.1f, 21f)
+        canvas.drawOval(rect, stroke)
     }
 
     /** 箭嘴頭：尖喺 ([tipX], 12)，[dir] = -1 指左、+1 指右，[back] 長、[half] 半高 */

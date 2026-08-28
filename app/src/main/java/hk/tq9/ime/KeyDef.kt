@@ -5,7 +5,8 @@ enum class KeyAction {
     CANCEL,       // 取消
     SHORTCUT,     // 速選字
     SC_TOGGLE,    // 簡體輸出開關
-    HOMO,         // 同音 toggle（長撳 = 關聯字）
+    HOMO,         // 同音 toggle（長撳做乜由設定頁話事，預設 [RELATE]）
+    RELATE,       // 游標前面嗰隻字嘅候選字（Q9Cmd.RELATE）
     PREV_PAGE,    // 選字上一頁（淨係選字模式、夠兩頁先出現喺 0 隔籬）
     TO_CHINESE,
     TO_LATIN,

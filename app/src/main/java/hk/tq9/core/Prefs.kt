@@ -71,37 +71,23 @@ enum class EngLongPress(val label: String) {
 }
 
 /**
- * 可以喺設定度換走嘅鍵功能（而家用喺左上角嗰粒）。
+ * 可以喺設定度換走嘅鍵功能（左上角短撳／長撳、同音鍵長撳、右上角長撳）。
  * 粒面**全部寫中文**，一個 icon 都冇 —— [EMOJI] 本來寫住個 😀，
  * 但係鍵面其餘全部單色，一粒彩色 emoji 好突兀，而且好多機嘅 emoji 字型
  * 會畫到成粒鍵咁大。
  *
- * 設定頁而家用 spinner 揀，[next] / [nextFor] 淨係留返俾舊 code path 用。
+ * 設定頁用 spinner 揀 —— 四個位（[Prefs.FUNC_SLOTS]）唔准做同一件事。
  */
 enum class PadFunc(val label: String, val icon: String) {
     SHORTCUT("速選字", "速選"),
     SC_TOGGLE("簡體開關", "简"),
+    /** 游標前面嗰隻字嘅候選字（`Q9Cmd.RELATE`）—— 同音鍵長撳預設就係佢 */
+    RELATE("候選字", "候選字"),
     EMOJI("表情符號", "表情"),
     PASTE("貼上", "貼上"),
     STT("語音輸入", "錄音"),
     AI("AI 改寫", "AI改"),
     NONE("停用", "");
-
-    fun next(): PadFunc = entries[(ordinal + 1) % entries.size]
-
-    companion object {
-        /**
-         * 揀下一個功能，但係跳過唔准揀嗰啲。
-         * 短撳唔可以係「無效」（粒掣撳落去乜都唔做冇道理），
-         * 而且短撳同長撳唔可以做同一件事（咁樣就嘥咗一格）。
-         */
-        fun nextFor(cur: PadFunc, other: PadFunc, allowNone: Boolean): PadFunc {
-            var f = cur.next()
-            var guard = entries.size
-            while (guard-- > 0 && (f == other || (!allowNone && f == NONE))) f = f.next()
-            return f
-        }
-    }
 }
 
 object Prefs {
@@ -138,15 +124,21 @@ object Prefs {
     const val KEY_DB_LABEL = "db_label"
     const val KEY_DB_CUSTOM = "db_custom"
     const val KEY_DB_ASSET_VER = "db_asset_ver"
+    /** User 自己換嘅筆形圖叫乜名（幅圖本身喺 `filesDir/strokes.png`） */
+    const val KEY_IMG_LABEL = "img_label"
     const val KEY_LATIN_NUM_ROW = "latin_num_row"  // 英文鍵盤上面加一行數字
     const val KEY_USAGE_REORDER = "usage_reorder"  // 打得多嘅字推前（usage_stats.db）
     const val KEY_PAGER_LAYOUT = "pager_layout"    // PagerLayout.name（選字揭頁嗰兩粒點排）
     const val KEY_BAR_PINNED = "bar_pinned"        // 上面條 bar 常駐（右上角嗰粒改做 ⇄）
     const val KEY_ENG_LONG = "eng_long"            // EngLongPress.name（長撳 Eng 做乜）
 
-    // 左上角嗰粒鍵
+    // 揀得功能嗰四個位（見 [FUNC_SLOTS]）
     const val KEY_TL_TAP = "topleft_tap"
     const val KEY_TL_LONG = "topleft_long"
+    /** 同音鍵長撳（預設 [PadFunc.RELATE]） */
+    const val KEY_HOMO_LONG = "homo_long"
+    /** 右上角嗰粒（☰／⇄）長撳（預設 [PadFunc.NONE]） */
+    const val KEY_TR_LONG = "topright_long"
 
     // AI
     const val KEY_AI_KEY = "ai_api_key"
@@ -281,16 +273,33 @@ object Prefs {
     fun keyHeightRatio(ctx: Context) = sp(ctx).getFloat(KEY_H_RATIO, 0.8f)
     fun gapDp(ctx: Context) = sp(ctx).getInt(KEY_GAP_DP, 2)
     /**
-     * 鍵面字體大細。**兩組各有各一個**（2026-08-28 user 要求）：中文九宮格＋純數字
-     * keypad 一套（[KEY_FONT_SCALE]），英文＋符號另一套（[KEY_FONT_SCALE_LATIN]）——
-     * 中文字要夠大先睇得清，英文字母同數字用同一個倍數就會逼爆粒鍵。
+     * 設定頁見到嗰個百分比（**未**乘 [LATIN_FONT_BOOST]）。**兩組各有各一個**
+     * （2026-08-28 user 要求）：中文九宮格＋純數字 keypad 一套（[KEY_FONT_SCALE]），
+     * 英文＋符號另一套（[KEY_FONT_SCALE_LATIN]）—— 中文字要夠大先睇得清，
+     * 英文字母同數字用同一個倍數就會逼爆粒鍵。
      *
      * 英文嗰個未校過就跟返中文嗰個，升級之後個樣唔會即刻變。
      */
-    fun fontScale(ctx: Context, g: PadGroup = PadGroup.CJK): Float {
+    fun fontScalePref(ctx: Context, g: PadGroup = PadGroup.CJK): Float {
         val cjk = sp(ctx).getFloat(KEY_FONT_SCALE, 1.0f)
         return if (g == PadGroup.LATIN) sp(ctx).getFloat(KEY_FONT_SCALE_LATIN, cjk) else cjk
     }
+
+    /**
+     * 英文／符號鍵盤額外乘呢個倍數（2026-08-29 user 要求：「140% 都唔算大」）。
+     *
+     * **唔可以直接改個 pref 嘅意思**（例如將 100 當 120 寫落去）—— 存住嗰個數字
+     * 就係設定頁見到嗰個百分比，反推返嚟一定有 rounding 誤差，拖幾次就會走位。
+     * 所以個倍數淨係喺 [fontScale]（真正畫嗰陣）先乘。
+     */
+    const val LATIN_FONT_BOOST = 1.2f
+
+    /** 英文嗰條 slider 拉得幾盡（中文嗰條照舊 140%） */
+    const val MAX_FONT_SCALE_LATIN_PCT = 200
+
+    /** 真正畫鍵面用嘅倍數（[fontScalePref] × 英文嗰個 [LATIN_FONT_BOOST]） */
+    fun fontScale(ctx: Context, g: PadGroup = PadGroup.CJK): Float =
+        fontScalePref(ctx, g) * if (g == PadGroup.LATIN) LATIN_FONT_BOOST else 1f
 
     /** 拉高／拉低成個鍵盤（每個螢幕尺寸 × [PadGroup] 各有各套，見 [profKey]） */
     fun heightScale(ctx: Context, g: PadGroup = PadGroup.CJK) =
@@ -361,17 +370,49 @@ object Prefs {
     fun latinNumberRow(ctx: Context) =
         if (FORCE_LATIN_NUM_ROW) true else sp(ctx).getBoolean(KEY_LATIN_NUM_ROW, false)
 
-    /** 短撳唔准係「無效」，舊設定入面有就當返預設 */
-    fun topLeftTap(ctx: Context): PadFunc {
-        val f = func(ctx, KEY_TL_TAP, PadFunc.SHORTCUT)
-        return if (f == PadFunc.NONE) PadFunc.SHORTCUT else f
+    /**
+     * 中文九宮格上面**四個揀得功能嘅位**，排住嘅次序就係優先次序：
+     * 左上短撳 → 左上長撳 → 同音長撳 → 右上長撳。
+     *
+     * 四個位唔准做同一件事（做同一件事等於嘥咗一格），[PadFunc.NONE] 例外 ——
+     * 四個位全部停用都得。設定頁本身已經唔會俾你揀走已經有人用嗰啲
+     * （見 `SettingsActivity.availableFuncs`），所以正常情況下唔會撞；
+     * [funcSlot] 嗰段讓位嘅 code 係防住舊版留低嘅 pref。
+     */
+    val FUNC_SLOTS = listOf(KEY_TL_TAP, KEY_TL_LONG, KEY_HOMO_LONG, KEY_TR_LONG)
+
+    private fun funcDefault(key: String): PadFunc = when (key) {
+        KEY_TL_TAP -> PadFunc.SHORTCUT
+        KEY_TL_LONG -> PadFunc.SC_TOGGLE
+        KEY_HOMO_LONG -> PadFunc.RELATE
+        else -> PadFunc.NONE
     }
 
-    /** 長撳唔准同短撳撞 */
-    fun topLeftLong(ctx: Context): PadFunc {
-        val f = func(ctx, KEY_TL_LONG, PadFunc.SC_TOGGLE)
-        return if (f == topLeftTap(ctx)) PadFunc.NONE else f
+    /**
+     * [FUNC_SLOTS] 其中一個位而家做緊乜。
+     *
+     * 撞咗**排喺前面**嗰個位就讓出嚟（回 [PadFunc.NONE]），所以排最尾嗰個
+     * （右上長撳）最易被讓。左上短撳係唯一唔准 [PadFunc.NONE] 嗰個 ——
+     * 粒掣撳落去乜都唔做冇道理。
+     */
+    fun funcSlot(ctx: Context, key: String): PadFunc {
+        var f = func(ctx, key, funcDefault(key))
+        if (key == KEY_TL_TAP && f == PadFunc.NONE) f = PadFunc.SHORTCUT
+        if (f == PadFunc.NONE) return f
+        for (k in FUNC_SLOTS) {
+            if (k == key) break
+            if (funcSlot(ctx, k) == f) return PadFunc.NONE
+        }
+        return f
     }
+
+    fun topLeftTap(ctx: Context): PadFunc = funcSlot(ctx, KEY_TL_TAP)
+    fun topLeftLong(ctx: Context): PadFunc = funcSlot(ctx, KEY_TL_LONG)
+    /** 同音鍵長撳（短撳永遠都係開關同音，換唔到） */
+    fun homoLong(ctx: Context): PadFunc = funcSlot(ctx, KEY_HOMO_LONG)
+    /** 右上角嗰粒長撳（短撳永遠都係開關上面條 bar，換唔到） */
+    fun topRightLong(ctx: Context): PadFunc = funcSlot(ctx, KEY_TR_LONG)
+
     fun setFunc(ctx: Context, key: String, f: PadFunc) =
         sp(ctx).edit().putString(key, f.name).apply()
 
@@ -516,6 +557,19 @@ object Prefs {
     fun dbAssetVersion(ctx: Context): Long = sp(ctx).getLong(KEY_DB_ASSET_VER, 0L)
     fun setDbAssetVersion(ctx: Context, v: Long) =
         sp(ctx).edit().putLong(KEY_DB_ASSET_VER, v).apply()
+
+    /** 冇自己換過筆形圖嗰陣個 label */
+    const val BUILTIN_IMG_LABEL = "內置 default90.png"
+
+    /**
+     * 而家用緊嘅筆形圖叫乜名。
+     *
+     * 「係咪自訂」**唔喺呢度記** —— 由 `StrokeImages.isCustom`（即係
+     * `filesDir/strokes.png` 喺唔喺度）話事，個 label 純粹係設定頁攞嚟顯示。
+     * 咁樣就唔會出現「pref 話自訂但個檔唔見咗」呢種對唔上嘅狀態。
+     */
+    fun imgLabel(ctx: Context): String = sp(ctx).getString(KEY_IMG_LABEL, BUILTIN_IMG_LABEL)!!
+    fun setImgLabel(ctx: Context, v: String) = sp(ctx).edit().putString(KEY_IMG_LABEL, v).apply()
 
     // ---- AI profiles：save/load/delete 成套 AI 設定 -----------------------
 
