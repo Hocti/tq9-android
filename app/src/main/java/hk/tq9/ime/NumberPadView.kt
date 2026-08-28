@@ -1,6 +1,7 @@
 package hk.tq9.ime
 
 import android.content.Context
+import hk.tq9.core.PadGroup
 
 /**
  * 純數字鍵盤。兩種用法：
@@ -58,12 +59,9 @@ class NumberPadView(context: Context) : RowsPadView(context) {
     }
 
     /**
-     * 闊度／貼邊完全跟中文九宮格（同一個 [PadMetrics]）：
+     * 高度／闊度／貼邊完全跟中文九宮格（同一套 [PadGroup.CJK] 設定）：
      * 「拉闊」就鋪滿成行，「靠左」／「靠右」就同九宮格喺同一邊、同一個闊度，
-     * 連工具 bar 左右拖出嚟嗰個 [hk.tq9.core.Prefs.KEY_WIDTH_SCALE] 都一齊跟。
+     * 連工具 bar 左右拖出嚟嗰個闊度倍數都一齊跟。
      */
-    override fun contentBounds(w: Int): Pair<Float, Float> {
-        val m = PadMetrics(context, w)
-        return m.offsetX to m.contentW
-    }
+    override val padGroup get() = PadGroup.CJK
 }

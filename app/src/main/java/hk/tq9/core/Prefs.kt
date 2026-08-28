@@ -3,14 +3,37 @@ package hk.tq9.core
 import android.content.Context
 import android.content.SharedPreferences
 import org.json.JSONObject
+import kotlin.math.roundToInt
 
-/** 顯示方式：中文輸入本體超過 max size 之後可以 toggle 的狀態 */
+/**
+ * 鍵盤大細（高度／闊度／顯示方式）分開兩套嚟存：
+ *
+ *  - [CJK]：中文九宮格同純數字 keypad（兩者本來就係同一個 5 欄排位）
+ *  - [LATIN]：英文、符號、數字符號頁
+ *
+ * 兩組嘅排位差好遠（一個係九宮格、一個係 qwerty），啱用嘅高度同闊度亦都唔同，
+ * 所以拉大細嗰陣淨係郁到而家見緊嗰組。再加埋 [Prefs.profKey] 嗰個螢幕尺寸，
+ * 摺機開合／打直打橫／兩組鍵盤加埋一共存 8 套。
+ */
+enum class PadGroup { CJK, LATIN }
+
+/**
+ * 顯示方式：鍵盤本體超過 max size 之後可以 toggle 的狀態。
+ *
+ * **唔係每個都成日揀得**，見 [Prefs.alignOptions] —— [SPLIT] 淨係英數鍵盤
+ * 兼且螢幕夠闊先出現，而嗰陣就輪到 [LEFT_GAP] / [RIGHT_GAP] 收起。
+ */
 enum class PadAlign(val label: String) {
     STRETCH("拉闊"),
     LEFT_GAP("靠右（左邊留白）"),
-    RIGHT_GAP("靠左（右邊留白）");
+    RIGHT_GAP("靠左（右邊留白）"),
 
-    fun next(): PadAlign = entries[(ordinal + 1) % entries.size]
+    /**
+     * 左右拆開：一行鍵拆做兩橛，一橛貼實左邊、一橛貼實右邊，中間裂開條罅
+     * （闊 screen 打橫捧住部機，兩隻姆指各顧一邊）。
+     * 兩橛都係 `contentW / 2` 咁闊，所以拉闊拉窄一樣係拖粒大細掣。
+     */
+    SPLIT("左右拆開")
 }
 
 /** 上面條 bar 嘅三段：關 → 候選字 → 工具 */
@@ -116,7 +139,6 @@ object Prefs {
     const val KEY_PAGER_LAYOUT = "pager_layout"    // PagerLayout.name（選字揭頁嗰兩粒點排）
     const val KEY_BAR_PINNED = "bar_pinned"        // 上面條 bar 常駐（右上角嗰粒改做 ⇄）
     const val KEY_ENG_LONG = "eng_long"            // EngLongPress.name（長撳 Eng 做乜）
-    const val KEY_INSTANT_KEY = "instant_key"      // 九宮格 1~9 撳落即出，唔等放手
 
     // 左上角嗰粒鍵
     const val KEY_TL_TAP = "topleft_tap"
@@ -207,6 +229,45 @@ object Prefs {
     fun sp(ctx: Context): SharedPreferences =
         ctx.applicationContext.getSharedPreferences(FILE, Context.MODE_PRIVATE)
 
+    /**
+     * 大細設定（[KEY_HEIGHT_SCALE]／[KEY_WIDTH_SCALE]／[KEY_ALIGN]）唔係得一套 ——
+     * 每個「螢幕尺寸 × [PadGroup]」各有各存。
+     *
+     * 用 dp 嘅螢幕闊高做名，一次過分開晒摺機嘅外／內屏（尺寸唔同）同打直打橫
+     * （闊高調轉）。舊版嗰個冇螢幕名嘅 key 照留返做預設值，升級之後大細唔會走位。
+     */
+    private fun profKey(ctx: Context, base: String, g: PadGroup): String {
+        val dm = ctx.resources.displayMetrics
+        val h = (dm.heightPixels / dm.density).roundToInt()
+        return "${base}_${screenWidthDp(ctx)}x${h}_${g.name}"
+    }
+
+    fun screenWidthDp(ctx: Context): Int {
+        val dm = ctx.resources.displayMetrics
+        return (dm.widthPixels / dm.density).roundToInt()
+    }
+
+    /** 螢幕闊過呢個數（dp）先至有 [PadAlign.SPLIT] 揀 —— 再窄拆開兩橛就細到撳唔到 */
+    const val SPLIT_MIN_WIDTH_DP = 600
+
+    /**
+     * 呢組鍵盤而家揀得邊幾個顯示方式。
+     *
+     * 闊 screen（`> [SPLIT_MIN_WIDTH_DP]`）嘅**英數鍵盤**淨係得「拉闊」同
+     * 「左右拆開」兩個：咁闊嘅螢幕再靠實一邊，另一邊嗰大橛位就係嘥咗，
+     * 拆開兩橛兩隻姆指啱用好多。其餘情況（中文那組、或者窄螢幕）就係原本三個。
+     */
+    fun alignOptions(ctx: Context, g: PadGroup): List<PadAlign> =
+        if (g == PadGroup.LATIN && screenWidthDp(ctx) > SPLIT_MIN_WIDTH_DP)
+            listOf(PadAlign.STRETCH, PadAlign.SPLIT)
+        else listOf(PadAlign.STRETCH, PadAlign.LEFT_GAP, PadAlign.RIGHT_GAP)
+
+    /** 撳一下粒大細掣：喺 [alignOptions] 入面轉去下一個 */
+    fun nextAlign(ctx: Context, g: PadGroup): PadAlign {
+        val opts = alignOptions(ctx, g)
+        return opts[(opts.indexOf(align(ctx, g)) + 1) % opts.size]
+    }
+
     // ---- typed accessors -------------------------------------------------
 
     fun keyScale(ctx: Context) = sp(ctx).getFloat(KEY_SCALE, 1.0f)
@@ -217,21 +278,29 @@ object Prefs {
     fun gapDp(ctx: Context) = sp(ctx).getInt(KEY_GAP_DP, 2)
     fun fontScale(ctx: Context) = sp(ctx).getFloat(KEY_FONT_SCALE, 1.0f)
 
-    /** 拉高／拉低成個鍵盤 */
-    fun heightScale(ctx: Context) = sp(ctx).getFloat(KEY_HEIGHT_SCALE, 1.0f)
-    fun setHeightScale(ctx: Context, v: Float) =
-        sp(ctx).edit().putFloat(KEY_HEIGHT_SCALE, v.coerceIn(MIN_HEIGHT_SCALE, MAX_HEIGHT_SCALE)).apply()
+    /** 拉高／拉低成個鍵盤（每個螢幕尺寸 × [PadGroup] 各有各套，見 [profKey]） */
+    fun heightScale(ctx: Context, g: PadGroup = PadGroup.CJK) =
+        sp(ctx).getFloat(profKey(ctx, KEY_HEIGHT_SCALE, g), sp(ctx).getFloat(KEY_HEIGHT_SCALE, 1.0f))
+
+    fun setHeightScale(ctx: Context, v: Float, g: PadGroup = PadGroup.CJK) =
+        sp(ctx).edit()
+            .putFloat(profKey(ctx, KEY_HEIGHT_SCALE, g), v.coerceIn(MIN_HEIGHT_SCALE, MAX_HEIGHT_SCALE))
+            .apply()
 
     const val MIN_HEIGHT_SCALE = 0.6f
     const val MAX_HEIGHT_SCALE = 1.8f
 
     /**
-     * 中文本體闊度倍數。淨係 [PadAlign.LEFT_GAP] / [PadAlign.RIGHT_GAP] 有用
+     * 鍵盤本體闊度倍數。淨係 [PadAlign.LEFT_GAP] / [PadAlign.RIGHT_GAP] 有用
      * （[PadAlign.STRETCH] 本來就用盡成行），喺工具 bar 最左嗰粒掣左右拖就改到。
      */
-    fun widthScale(ctx: Context) = sp(ctx).getFloat(KEY_WIDTH_SCALE, 1.0f)
-    fun setWidthScale(ctx: Context, v: Float) =
-        sp(ctx).edit().putFloat(KEY_WIDTH_SCALE, v.coerceIn(MIN_WIDTH_SCALE, MAX_WIDTH_SCALE)).apply()
+    fun widthScale(ctx: Context, g: PadGroup = PadGroup.CJK) =
+        sp(ctx).getFloat(profKey(ctx, KEY_WIDTH_SCALE, g), sp(ctx).getFloat(KEY_WIDTH_SCALE, 1.0f))
+
+    fun setWidthScale(ctx: Context, v: Float, g: PadGroup = PadGroup.CJK) =
+        sp(ctx).edit()
+            .putFloat(profKey(ctx, KEY_WIDTH_SCALE, g), v.coerceIn(MIN_WIDTH_SCALE, MAX_WIDTH_SCALE))
+            .apply()
 
     const val MIN_WIDTH_SCALE = 0.45f
     const val MAX_WIDTH_SCALE = 1.6f
@@ -242,12 +311,21 @@ object Prefs {
      */
     const val SIDE_PANEL_MAX_RATIO = 0.60f
 
-    fun align(ctx: Context): PadAlign =
-        runCatching { PadAlign.valueOf(sp(ctx).getString(KEY_ALIGN, PadAlign.STRETCH.name)!!) }
-            .getOrDefault(PadAlign.STRETCH)
+    /**
+     * 存住嗰個顯示方式，但係**唔喺 [alignOptions] 入面就當「拉闊」** ——
+     * 摺機打開／打橫嗰陣可揀嘅嘢會變（見 [alignOptions]），
+     * 舊 profile 或者舊版留低嘅值唔可以夾硬繼續用。
+     */
+    fun align(ctx: Context, g: PadGroup = PadGroup.CJK): PadAlign {
+        val fallback = sp(ctx).getString(KEY_ALIGN, PadAlign.STRETCH.name)!!
+        val stored = runCatching {
+            PadAlign.valueOf(sp(ctx).getString(profKey(ctx, KEY_ALIGN, g), fallback)!!)
+        }.getOrDefault(PadAlign.STRETCH)
+        return if (stored in alignOptions(ctx, g)) stored else PadAlign.STRETCH
+    }
 
-    fun setAlign(ctx: Context, a: PadAlign) =
-        sp(ctx).edit().putString(KEY_ALIGN, a.name).apply()
+    fun setAlign(ctx: Context, a: PadAlign, g: PadGroup = PadGroup.CJK) =
+        sp(ctx).edit().putString(profKey(ctx, KEY_ALIGN, g), a.name).apply()
 
     fun scOutput(ctx: Context) = sp(ctx).getBoolean(KEY_SC_OUTPUT, false)
     fun setScOutput(ctx: Context, v: Boolean) = sp(ctx).edit().putBoolean(KEY_SC_OUTPUT, v).apply()
@@ -357,7 +435,7 @@ object Prefs {
      * 嗰粒 `⇄` 就收埋（兩粒做同一件事冇意思）。見
      * `TQ9InputMethodService.toggleBar` 同 `ChinesePadView.optionKey`。
      */
-    fun barPinned(ctx: Context) = sp(ctx).getBoolean(KEY_BAR_PINNED, false)
+    fun barPinned(ctx: Context) = sp(ctx).getBoolean(KEY_BAR_PINNED, true)
 
     /** 長撳中文九宮格粒 `Eng`（🌐 收埋咗之後唯一嘅換輸入法入口） */
     fun engLongPress(ctx: Context): EngLongPress =
@@ -367,15 +445,6 @@ object Prefs {
     fun setEngLongPress(ctx: Context, e: EngLongPress) =
         sp(ctx).edit().putString(KEY_ENG_LONG, e.name).apply()
 
-    /**
-     * 九宮格 1~9 **撳落去就即刻出碼**，唔等放手（預設開）。
-     *
-     * 淨係喺「長撳 = 連撳」嗰個狀態先生效 —— 選字模式（長撳 = 同音字表）同埋
-     * 開咗 [longPressShortcut] 而又未打過碼（長撳 = 速選字表）嗰兩種情況，
-     * 粒鍵長撳有第二個意思，撳落即出就會兩樣一齊發生，所以嗰陣照舊等放手。
-     * 見 `ChinesePadView.instantKey` 同 `KeyboardBaseView` 嘅 ACTION_DOWN。
-     */
-    fun instantKey(ctx: Context) = sp(ctx).getBoolean(KEY_INSTANT_KEY, true)
     fun sttLocale(ctx: Context): String = sp(ctx).getString(KEY_STT_LOCALE, "yue-Hant-HK")!!
 
     fun aiApiKey(ctx: Context): String = sp(ctx).getString(KEY_AI_KEY, "")!!

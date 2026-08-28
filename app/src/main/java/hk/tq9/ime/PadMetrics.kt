@@ -3,23 +3,36 @@ package hk.tq9.ime
 import android.content.Context
 import android.util.TypedValue
 import hk.tq9.core.PadAlign
+import hk.tq9.core.PadGroup
 import hk.tq9.core.Prefs
 import kotlin.math.max
 import kotlin.math.min
 
 /**
- * 中文九宮格嘅尺寸計算。
+ * 鍵盤本體嘅尺寸計算。
  *
- * 重點：闊 screen（摺機／平板／打橫）唔可以任由九宮格拉到變長方形，
+ * 重點：闊 screen（摺機／平板／打橫）唔可以任由鍵盤拉到變長方形，
  * 所以超過 setting 入面嘅 max width / max height 之後就定形，
  * 剩低嘅空間交返俾 user 用 [PadAlign] 決定點擺。
  *
  * 高度就永遠用盡：鍵盤唔會浮起留空喺下面，想高啲矮啲就改 [Prefs.heightScale]
  * （工具 bar 嗰粒掣上下拖，或者設定頁嗰條 slider）。
+ *
+ * [group] 話畀佢知攞邊套大細設定：中文九宮格＋純數字係一套，英文＋符號另一套，
+ * 兩套仲要再按螢幕尺寸分開存（見 `Prefs.profKey`）。英文／符號嗰邊係一行行排，
+ * 唔使 [cellW]，但係一樣攞呢度嘅 [totalHeight]／[offsetX]／[contentW] ——
+ * **闊度嗰條式兩組唔同**（見 `init` 入面 `contentW`）：九宮格要保持格仔嘅高闊比，
+ * 英數就由最窄到成個螢幕線性拉。
  */
-class PadMetrics(ctx: Context, availW: Int, val cols: Int = 5, val rows: Int = 4) {
+class PadMetrics(
+    ctx: Context,
+    availW: Int,
+    val cols: Int = 5,
+    val rows: Int = 4,
+    val group: PadGroup = PadGroup.CJK
+) {
 
-    val align: PadAlign = Prefs.align(ctx)
+    val align: PadAlign = Prefs.align(ctx, group)
 
     val cellW: Float
     val cellH: Float
@@ -42,28 +55,44 @@ class PadMetrics(ctx: Context, availW: Int, val cols: Int = 5, val rows: Int = 4
         val hRatio = Prefs.keyHeightRatio(ctx)
         // 高度**唔跟**闊度倍數行：左右拉淨係應該改到闊度，唔可以順手拉埋高度
         // （上下拉係另一件事，行 Prefs.heightScale）
-        cellH = unit * hRatio * Prefs.heightScale(ctx)
-        val wanted = if (align == PadAlign.STRETCH) availW.toFloat() / cols
-                     else min(unit * Prefs.widthScale(ctx), availW.toFloat() / cols)
-        // 中文本體再窄都要有 [MIN_CONTENT_DP] 咁闊（螢幕本身窄過呢個數就用盡螢幕）——
-        // 拉到得幾格咁窄嘅九宮格，每粒鍵細過隻手指，根本撳唔中
-        val minCellW = min(dp(MIN_CONTENT_DP), availW.toFloat()) / cols
-        cellW = max(wanted, minCellW)
-        contentW = cellW * cols
+        cellH = unit * hRatio * Prefs.heightScale(ctx, group)
+        // 本體再窄都要有 [MIN_CONTENT_DP] 咁闊（螢幕本身窄過呢個數就用盡螢幕）——
+        // 拉到得幾格咁窄嘅鍵盤，每粒鍵細過隻手指，根本撳唔中
+        val minContent = min(dp(MIN_CONTENT_DP), availW.toFloat())
+        val ws = Prefs.widthScale(ctx, group)
+        contentW = when {
+            align == PadAlign.STRETCH -> availW.toFloat()
+            // 英數鍵盤：一行行排，格仔闊度同高度冇關係，所以闊度**直接由倍數線性拉**
+            // ——最窄 [MIN_CONTENT_DP]、最闊用盡成個螢幕，成段都拉得到。
+            // （跟九宮格嗰條「`unit` × 倍數」就會俾 `unit` 封住頂，闊 screen 拉極
+            // 都去唔到盡頭，窄 screen 就成段都撞住個最窄值，變成點拉都一個闊度。）
+            group == PadGroup.LATIN -> {
+                val t = ((ws - Prefs.MIN_WIDTH_SCALE) /
+                    (Prefs.MAX_WIDTH_SCALE - Prefs.MIN_WIDTH_SCALE)).coerceIn(0f, 1f)
+                minContent + (availW - minContent) * t
+            }
+            // 九宮格：格仔要保持返個高闊比，所以由 `unit`（高度嗰個 unit）出闊度
+            else -> max(min(unit * ws * cols, availW.toFloat()), minContent)
+        }
+        cellW = contentW / cols
 
         val slack = max(0f, availW - contentW)
         offsetX = when (align) {
             PadAlign.STRETCH -> 0f
             PadAlign.RIGHT_GAP -> 0f                                   // 右邊留白 → 內容貼左
             PadAlign.LEFT_GAP -> slack                                 // 左邊留白 → 內容貼右
+            PadAlign.SPLIT -> 0f                                       // 兩橛各自貼邊，見 RowsPadView
         }
     }
+
+    /** [PadAlign.SPLIT] 之下每橛幾闊（兩橛夾埋 = [contentW]） */
+    val halfW: Float get() = contentW / 2f
 
     val totalHeight: Float get() = cellH * rows
 
     companion object {
         /**
-         * 中文本體最少要咁闊。螢幕本身窄過呢個數就用盡螢幕闊度
+         * 鍵盤本體最少要咁闊。螢幕本身窄過呢個數就用盡螢幕闊度
          * （細機唔會被迫到橫向 scroll），闊過就一定夠 320dp。
          *
          * 拉窄（工具 bar 最左嗰粒左右拖）同 [Prefs.KEY_WIDTH_SCALE] 都收唔過呢條線。
@@ -71,12 +100,14 @@ class PadMetrics(ctx: Context, availW: Int, val cols: Int = 5, val rows: Int = 4
         const val MIN_CONTENT_DP = 320f
 
         /**
-         * 所有鍵盤（中文九宮格、英文、符號、純數字、emoji）**成塊嘅高度**都係呢個。
+         * 一組鍵盤（[PadGroup]）**成塊嘅高度**。
          *
-         * 英文開咗數字行就有 5 行、符號頁有 5 行、中文永遠 4 行 —— 行數唔同，
-         * 但總高度一樣，即係英文每行會矮少少。咁樣中英文切換先唔會成個窗跳高跳低。
+         * 同一組入面行數唔同都係一樣高：英文開咗數字行有 5 行、符號頁有 5 行、
+         * 中文永遠 4 行，行數多嗰啲每行矮少少，咁切換嗰陣個窗先唔會跳高跳低。
+         * 兩組之間就各有各高度（各自喺鍵盤度拖出嚟）。
          */
-        fun padHeightPx(ctx: Context, availW: Int): Float = PadMetrics(ctx, availW).totalHeight
+        fun padHeightPx(ctx: Context, availW: Int, group: PadGroup = PadGroup.CJK): Float =
+            PadMetrics(ctx, availW, group = group).totalHeight
 
         /** 一行行嗰啲鍵盤（英文／符號／emoji）用嘅行高 */
         fun rowHeightPx(ctx: Context, rowHeightDp: Float, rowCount: Int): Float {

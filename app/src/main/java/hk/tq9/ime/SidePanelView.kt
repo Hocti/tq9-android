@@ -216,12 +216,17 @@ class SidePanelView(context: Context) : LinearLayout(context) {
         setOnClickListener { listener?.onPickCandidate(index) }
     }
 
-    /** 同工具 bar 嗰粒一樣，圖案係「貼邊」嘅樣（一條牆 + 箭嘴指住埋去） */
+    /**
+     * 同工具 bar 嗰粒一樣，圖案係「貼邊」嘅樣（一條牆 + 箭嘴指住埋去）。
+     * 側邊欄淨係中文九宮格先出（[PadGroup.CJK]），所以永遠唔會撞到
+     * [PadAlign.SPLIT]（嗰個係英數鍵盤專用），但個 `when` 都要寫齊。
+     */
     fun refreshAlignLabel() {
         icons[sizeBtn] = when (Prefs.align(context)) {
             PadAlign.STRETCH -> ToolIcon.ALIGN_WIDE to "拉闊"
             PadAlign.LEFT_GAP -> ToolIcon.ALIGN_RIGHT to "靠右"
             PadAlign.RIGHT_GAP -> ToolIcon.ALIGN_LEFT to "靠左"
+            PadAlign.SPLIT -> ToolIcon.ALIGN_SPLIT to "左右拆開"
         }
         styleTool(sizeBtn, theme.keyFaceAlt)
     }

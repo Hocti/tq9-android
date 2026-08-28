@@ -154,7 +154,7 @@ class GestureKeyTrackerTest {
         assertEquals(listOf(5), run(path))
     }
 
-    // ---- 撳落即出（`Prefs.instantKey`）：起點嗰下由 view 出咗，tracker 唔好補多次 ----
+    // ---- 撳落即出：起點嗰下由 view 出咗，tracker 唔好補多次 ----
 
     @Test
     fun `撳落即出：起點唔可以再 emit 多次`() {

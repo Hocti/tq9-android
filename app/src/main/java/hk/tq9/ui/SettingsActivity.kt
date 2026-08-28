@@ -45,6 +45,7 @@ import hk.tq9.core.AiStt
 import hk.tq9.core.BarMode
 import hk.tq9.core.EngLongPress
 import hk.tq9.core.PadFunc
+import hk.tq9.core.PadGroup
 import hk.tq9.core.PagerLayout
 import hk.tq9.core.Prefs
 import hk.tq9.core.Q9Db
@@ -288,6 +289,9 @@ class SettingsActivity : AppCompatActivity() {
         header("鍵盤大細")
         note("鍵盤的高度與闊度請直接在鍵盤上調整：工具列最左的按鍵，" +
             "上下拖動改高度，左右拖動改闊度（限「靠左」或「靠右」顯示方式）。")
+        note("大小會分開記住：中文與純數字鍵盤一套、英文與符號鍵盤另一套，" +
+            "而且再按當時的螢幕尺寸分開（摺疊機的內外屏、直向與橫向各自一套），" +
+            "所以在哪一個畫面調整，就只影響該畫面的那組鍵盤。")
         slider("字體大細", 70, 140, (Prefs.fontScale(this) * 100).toInt(), "%") { v ->
             Prefs.sp(this).edit().putFloat(Prefs.KEY_FONT_SCALE, v / 100f).apply(); rebuildPreview()
         }
@@ -313,10 +317,15 @@ class SettingsActivity : AppCompatActivity() {
                 Prefs.setHeightScale(this, v / 100f); rebuildPreview()
             }
         }
-        note("螢幕較闊（摺疊機、平板、橫向）時，九宮格不會無限拉長，" +
-            "餘下的空位由下面這個選項決定如何擺放。")
+        note("螢幕較闊（摺疊機、平板、橫向）時，鍵盤不會無限拉長，" +
+            "餘下的空位由下面這個選項決定如何擺放。這裡改的是中文與純數字鍵盤那一套；" +
+            "英文與符號鍵盤請按工具列最左的按鍵切換。")
+        note("英文與符號鍵盤在螢幕闊過 ${Prefs.SPLIT_MIN_WIDTH_DP}dp 時，" +
+            "改為只有「拉闊」與「左右拆開」兩個選擇：拆開後每行鍵分成左右兩半，" +
+            "分別貼住左右兩邊，中間留空（橫向雙手持機時兩隻拇指各顧一邊）。" +
+            "左右拖動一樣可以調整兩半的闊度。")
         alignBtn = button(alignLabel()) {
-            Prefs.setAlign(this, Prefs.align(this).next())
+            Prefs.setAlign(this, Prefs.nextAlign(this, PadGroup.CJK))
             alignBtn?.text = alignLabel()
             rebuildPreview()
         }
@@ -372,8 +381,7 @@ class SettingsActivity : AppCompatActivity() {
             "選「直接切換」會跳至系統排在下一個的輸入法；輸入法多於兩個時，" +
             "選「彈出選單」較易找到想要的那個。")
 
-        switch("按下即輸入（不等放開手指）", Prefs.KEY_INSTANT_KEY, true)
-        note("開啟後，九宮格 1~9 一按下去就立刻出碼，不必等放開手指，反應快得多。" +
+        note("九宮格 1~9 一按下去就立刻出碼，不必等放開手指（固定如此，沒有開關）。" +
             "長按仍然等於連按兩下（按下一次 + 長按一次），滑動輸入亦完全不受影響。" +
             "選字狀態下的 1~9（長按 = 同音字表），以及開啟了「長按 1~9 開速選字表」" +
             "而尚未輸入字碼時，仍然是放開手指才生效——那兩種情況長按另有意思，" +
@@ -689,8 +697,8 @@ class SettingsActivity : AppCompatActivity() {
             "與字碼資料庫分開存放（更換字碼資料庫不會影響這些記錄）。")
         switch("常用字排前", Prefs.KEY_USAGE_REORDER, true)
         note("開啟後，候選字第一頁會依「與前一個字的組合」打過的次數推前，" +
-            "第九個之後則依該字本身打過的次數推前；兩者都要打過至少 " +
-            "${Q9Engine.MIN_USAGE_COUNT} 次才會調動次序（按錯一下不應該影響往後的選字）。" +
+            "要打過至少 ${Q9Engine.MIN_USAGE_COUNT} 次才會調動次序" +
+            "（按錯一下不應該影響往後的選字）。第二頁起的字一律不動，保留字碼表原本的位置。" +
             "關閉則完全依字碼表原本的次序，但仍然會繼續記錄次數。")
         row(
             button("匯出…") { saveUsage.launch("usage_stats.db") },
@@ -742,7 +750,7 @@ class SettingsActivity : AppCompatActivity() {
     private fun buildBehaviourSection() {
         header("其他")
         switch("輸出簡體字", Prefs.KEY_SC_OUTPUT, false)
-        switch("工具列常駐", Prefs.KEY_BAR_PINNED, false)
+        switch("工具列常駐", Prefs.KEY_BAR_PINNED, true)
         note("關閉（預設）：九宮格右上角的 ☰ 負責開關整條工具列，開啟後會先進入候選字，" +
             "再按工具列最左的 ⇄ 可在候選字與工具（大小位置、貼上、語音、表情符號、AI）" +
             "之間切換。")

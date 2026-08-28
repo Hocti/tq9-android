@@ -110,11 +110,10 @@ adb shell ime set    hk.tq9/.ime.TQ9InputMethodService
 打電話號碼／金額撳耐咗少少就彈個符號 popup 出嚟好煩，所以數字鍵**用 `num()`
 唔用 `digitKey()`**（後者會帶 `variants`）。
 
-闊度同貼邊**唔可以再自己計**：`contentBounds()` 直接開一個 `PadMetrics`
-（一樣 5 欄 4 行）攞 `offsetX` / `contentW`，即係同中文九宮格完全一樣 ——
-連工具 bar 左右拖出嚟嗰個 `Prefs.KEY_WIDTH_SCALE` 都跟。以前呢頁自己置中兼且
-封頂 360dp，中英切換嗰陣啲鍵會左右彈。所以 `onCycleAlign` / `onWidthDrag` /
-`onMaxWidth` 三處都要記得 `numberPad?.rebuild()`。
+闊度同貼邊**唔可以再自己計**：`RowsPadView.contentBounds()` 已經直接開一個
+`PadMetrics`（一樣 5 欄 4 行）攞 `offsetX` / `contentW`，呢頁淨係要 override
+`padGroup = PadGroup.CJK`，即係大細完全跟中文九宮格 —— 連工具 bar 左右拖出嚟
+嗰個闊度倍數都跟。以前呢頁自己置中兼且封頂 360dp，中英切換嗰陣啲鍵會左右彈。
 
 ### `dataset.db` 唔會自動更新，舊機仲用緊裝機嗰陣嗰份
 
@@ -216,12 +215,15 @@ ui/     SettingsActivity / MicPermissionActivity
 
 ## UI 高度：唔可以無啦啦跳
 
-### 所有鍵盤一樣咁高
+### 同一組鍵盤一樣咁高
 
-`RowsPadView.onMeasure` **唔係**逐行乘行高，係直接攞 `PadMetrics.padHeightPx()`
-（＝中文九宮格四行嘅總高）。英文開咗數字行有 5 行、符號頁有 5 行、中文永遠 4 行，
-總高度一樣，行數多嗰啲每行自然矮啲。加行減行**唔會**令個窗跳高跳低，
-所以唔好喺子類度加返 `rowHeightDp` 呢類逐行計嘅嘢。
+`RowsPadView.onMeasure` **唔係**逐行乘行高，係直接攞
+`PadMetrics.padHeightPx(ctx, w, padGroup)`（＝嗰組 4 行嘅總高）。英文開咗數字行有
+5 行、符號頁有 5 行、中文永遠 4 行，同一組入面總高度一樣，行數多嗰啲每行自然矮啲。
+加行減行**唔會**令個窗跳高跳低，所以唔好喺子類度加返 `rowHeightDp` 呢類逐行計嘅嘢。
+
+`padGroup`（`PadGroup.CJK` / `LATIN`）話畀佢知攞邊套大細 —— 見「大細設定分組存」。
+`RowsPadView` 預設 `LATIN`，`NumberPadView` override 返做 `CJK`（跟中文九宮格）。
 
 ### 上面條 bar 三段都係一行
 
@@ -229,6 +231,17 @@ ui/     SettingsActivity / MicPermissionActivity
 （字碼、`[同音]`、頁數）擺喺最上面，一出現就成個鍵盤高咗一截，已經**拆咗**——
 `Q9Engine.status` 仲計緊，但係冇人畫。要出 message 就用 `toast()`，
 唔好再喺條 bar 上面加行。
+
+### 粒 `▼`（拉大候選字）淨係喺真係捲得到嗰陣先出
+
+`OptionBarsView.wantExpandBtn()`：**比 `strip.width`（啲字實際幾闊）同 `swap.width`
+（成行嘅闊度）**，唔夠位擺先至 `VISIBLE`，否則 `GONE`（唔係 `INVISIBLE` ——
+以前係 `INVISIBLE`，粒掣冇咗個 `▼` 但個位仲霸住，睇落似壞咗）。
+**唔可以攞 `scroller` 嘅闊度嚟比**：粒掣一出現就食咗 38dp，跟住又變返「要捲」，
+出出入入。攤開咗（`expanded`）就一定要出，唔係收唔返。
+
+判斷要等排完版先做得，所以喺 `onLayout()` 度做，而且**改 visibility 要 `post`**
+（排緊版嗰陣改就會即刻再 `requestLayout` 多次）。
 
 ### 中文拉窄就唔要上面條 bar，改用側邊欄
 
@@ -262,6 +275,7 @@ gravity 跟 `PadAlign` 反過嚟擺）：上面一（兩）行功能掣，下面
 
 - **上下** = `Prefs.heightScale`（0.6~1.8）。`PadMetrics.cellH` 同
   `PadMetrics.rowHeightPx()` 兩邊都要乘返佢，唔係英文鍵盤就唔會跟住變。
+  拉邊組要睇 `TQ9InputMethodService.padGroup`（見「大細設定分組存」）。
 - **左右** = `Prefs.widthScale`（0.45~1.6），淨係 `LEFT_GAP` / `RIGHT_GAP` 有用。
   **淨係入 `cellW`，唔可以入 `cellH`** —— 兩者本來都由同一個 `unit` 出，
   一唔小心就會變成「左右拉埋高度都跟住變」。
@@ -280,9 +294,78 @@ gravity 跟 `PadAlign` 反過嚟擺）：上面一（兩）行功能掣，下面
 全部收埋咗（`SettingsActivity.SHOW_HIDDEN_OPTIONS = false`，一行 code 都冇刪），
 剩返「字體大細」同「邊框粗幼」—— 長闊而家一律喺鍵盤度直接拖。
 
+### 大細設定分組存（2026-08-28 user 要求）
+
+`heightScale` / `widthScale` / `align` 三樣**唔係得一套**，而係
+「螢幕尺寸 × `PadGroup`」各有各存（`Prefs.profKey()` 砌個
+`<base>_<闊dp>x<高dp>_<組>` 嘅 key）：
+
+- **`PadGroup.CJK`** = 中文九宮格 + 純數字 keypad（本來就係同一個 5 欄排位）
+- **`PadGroup.LATIN`** = 英文 + 符號（`RowsPadView` 預設）
+
+螢幕尺寸用 dp 闊高做名，一次過分開晒摺機嘅外／內屏（尺寸唔同）同打直打橫
+（闊高調轉）—— 摺機正路會有 2 屏 × 2 方向 × 2 組 ＝ 8 套。**舊嗰個冇螢幕名嘅
+key 照留返做預設值**（`sp.getFloat(profKey(...), sp.getFloat(舊 key, 1f))`），
+升級之後大細唔會走位，兩組都由舊嗰個值起步。
+
+`TQ9InputMethodService.padGroup` 睇住 `mode` 答而家郁緊邊組（`LATIN`／`SYMBOL`
+係 `LATIN`，其餘全部 `CJK`），`onSizeDrag` / `onWidthDrag` / `onMaxWidth` /
+`onCycleAlign` 四個都要攞佢，跟住一律 `relayoutPads()`（所有已經砌咗嘅 pad 一齊重排，
+唔使逐個 `?.rebuild()` 撩漏）。`OptionBarsView.padGroup` 亦都要喺 `refreshBars()`
+度跟住 set，唔係粒「靠左／靠右」掣個圖案會畫返另一組嗰個狀態。
+
+英文／符號頁本來永遠鋪滿成行，而家 `RowsPadView.buildLayout()` 一律開返個
+`PadMetrics(w, group = padGroup)` 攞 `offsetX` / `contentW`，所以佢哋一樣拉得闊窄、
+貼得左右。`STRETCH` 嗰陣 `contentW == availW`，同以前一模一樣。
+側邊欄（`sideGeom()`）就照舊淨係中文先出，用 `CJK` 嗰套。
+
+### 兩組嘅闊度**計法唔同**（2026-08-28 執過）
+
+`PadMetrics` 入面 `contentW` 分兩條路：
+
+| 組 | 點計 | 點解 |
+| --- | --- | --- |
+| `CJK` | `unit × widthScale × cols`（封頂 `availW`、封底 `MIN_CONTENT_DP`） | 九宮格要保持格仔嘅高闊比，闊度同 `unit`（＝高度嗰個 unit）綁埋 |
+| `LATIN` | `MIN_CONTENT_DP` → `availW` **線性**（`widthScale` 由 `MIN_` 到 `MAX_WIDTH_SCALE` 對應 0→1） | 一行行排，格仔闊度同高度冇關係 |
+
+英數嗰邊**唔可以**跟九宮格條式：`unit` 俾 `maxHeightDp / rows`（預設 300/4 = 75dp）
+封住頂，闊 screen 拉極都去唔到成個螢幕闊；窄 screen 又成段撞住 `MIN_CONTENT_DP`，
+拉大拉細都係同一個闊度（user 2026-08-28 踩到）。而家最窄一定係
+`min(320dp, 螢幕闊)`、最闊一定係**成個螢幕**，中間平均拉。
+
+### `PadAlign.SPLIT`：英數鍵盤喺闊 screen 拆做兩橛
+
+`Prefs.alignOptions(ctx, group)` 話你知**而家揀得邊幾個**顯示方式：
+
+- `LATIN` + 螢幕闊過 `Prefs.SPLIT_MIN_WIDTH_DP`（600dp）→ 得 `STRETCH` 同 `SPLIT`
+  （靠左／靠右嗰陣收起 —— 咁闊嘅螢幕靠實一邊，另一邊嗰橛位就係嘥咗）
+- 其餘（`CJK`、或者窄螢幕）→ 原本三個，冇 `SPLIT`
+
+三樣嘢跟住呢個表行，加新 mode 記得三樣一齊改：
+
+1. **`Prefs.align()` 會過濾**：存住嘅值唔喺 `alignOptions` 入面就當 `STRETCH`
+   （摺機開合／打橫之後可揀嘅嘢會變，舊 profile 唔可以夾硬用落去）。
+2. **`Prefs.nextAlign()`** 先至係「撳一下轉下一個」，`PadAlign.next()` 已經刪咗 ——
+   自己 `ordinal + 1` 就會轉到唔准揀嗰個。
+3. `OptionBarsView` / `SidePanelView` 兩個 `refreshAlignLabel()` 個 `when` 都要寫齊
+   （側邊欄係中文專用，撞唔到 `SPLIT`，但一樣要有嗰個 branch）。
+
+排位喺 `RowsPadView.buildLayout()`：每行用 `splitRow()` 由左邊夾夠一半 weight
+斬開（`asdfg` | `hjkl`、`⇧zxcv` | `bnm⌫`），兩橛各 `PadMetrics.halfW` 咁闊，
+一橛貼 `0`、一橛貼 `w - halfW`。**斬到一半嗰粒啱啱係 `␣` 就拆佢做兩粒**
+（`k.copy(weight = k.weight / 2f)`），唔係得左邊有 space，右手姆指撳唔到。
+
 `EmojiPadView` 同 `ClipboardListView` 唔係 `KeyboardBaseView`，
 高度靠 `forcedHeightPx`（開之前喺 `rememberPadHeight()` 記低上一個 pad 幾高），
 所以**一定要喺 `padHolder.removeAllViews()` 之前記**，唔係就攞到 0。
+
+### 底下閃開導覽列嗰條要有底色
+
+targetSdk 35+ 之後 IME window 一路去到螢幕最底，`outer` 個
+`setOnApplyWindowInsetsListener` 加 bottom padding 閃開導覽列（系統嘅
+「收起鍵盤／轉鍵盤」就喺嗰度）。**嗰忽 padding 係 `outer` 自己嘅底色**——
+唔 set 就透見住下面個 app，一忽色唔同好突兀，所以 `outer.setBackgroundColor(theme.background)`
+（`root` 嗰個 background 蓋唔到 padding 區）。
 
 ---
 
@@ -295,14 +378,14 @@ gravity 跟 `PadAlign` 反過嚟擺）：上面一（兩）行功能掣，下面
 
 `showOverlay()` / `hideOverlay()` 兩邊都會叫 `refreshBars()`。
 
-### 工具列常駐（`Prefs.barPinned`，2026-08-27 加）
+### 工具列常駐（`Prefs.barPinned`，2026-08-27 加，2026-08-28 起**預設開**）
 
 開咗之後條 bar 關唔熄得，而**九宮格右上角嗰粒鍵換咗個意思**：
 
 | | 粒鍵 | 條 bar 最左 |
 | --- | --- | --- |
-| 平時（預設） | `☰`＝開／關成條 bar | `⇄`＝候選字 ⇄ 工具 |
-| 常駐 | `⇄`＝候選字 ⇄ 工具 | **冇咗**（`setSwitchVisible(false)`） |
+| 熄咗 | `☰`＝開／關成條 bar | `⇄`＝候選字 ⇄ 工具 |
+| 常駐（預設） | `⇄`＝候選字 ⇄ 工具 | **冇咗**（`setSwitchVisible(false)`） |
 
 三處要一齊夾：
 
@@ -522,6 +605,25 @@ app 入面所有 user 見到嘅字（設定頁、toast、鍵面、空狀態提�
   要 `GROUP BY char ORDER BY MAX(freq)`。同一個碼查一次就 cache 住（`codePreviewFor`），
   唔係每撳一下鍵都查次 sqlite。
 
+## 選字擺入九宮格：中間格行先（2026-08-28 user 要求）
+
+一頁九隻字**唔係**由 `1` 排到 `9`，係跟 `Q9Engine.SLOT_ORDER`
+（`5 4 6 2 8 1 3 7 9`）擺：排第一嗰個字坐正中間嗰格 `5`，跟住四邊（`4 6 2 8`），
+四角（`1 3 7 9`）排最後。九宮格係 numpad 排位，`5` 喺正中最易撳，
+所以「常用字排前」推上嚟嗰個字要坐嗰度，唔係坐左下角粒 `1`。
+一頁得三隻字就淨係佔 `5 4 6`，四角吉住。
+
+`slotOfRank()` / `rankOfSlot()` 兩個 helper 一定要**成對咁用**，
+凡係「格號 ↔ `selectWords` 入面第幾個」嘅換算全部要行佢哋，四處：
+
+- `showPage()`：`rank` → `slotOfRank(rank)` 擺落 `keys[]`
+- `selectWord(slot)` / `homoAt(slot)`：`slot` → `rankOfSlot(slot)` 攞返 index
+- `plausibility(digit)`（滑動評估，選字模式嗰段）：一樣要換
+- `pickCandidateAt(index)`（條 bar 撳落嚟嘅絕對位置）：`selectWord(slotOfRank(index % 9))`
+
+漏咗其中一處就會「見到嘅字」同「撳落去出嘅字」對唔上，而且測唔到——
+`ChinesePadView` 淨係照 `engine.keys[d]` 畫，佢自己唔知個次序。
+
 ## 同音字就係一個 flag，唔好再加嘢
 
 `Q9Engine.pressHomo()` **淨係** `homo = !homo`，跟返原版（`Q9Form.cs:316`）：
@@ -586,12 +688,15 @@ app 入面所有 user 見到嘅字（設定頁、toast、鍵面、空狀態提�
 **照樣繼續記數**。設定頁改完唔會 restart 個 service，所以 `onStartInputView`
 每次都要重新讀一次。
 
-`Q9Engine.reorderByUsage()` 淨係喺 `processResult()`（打碼揀字嗰條主線）用：
-第一頁（頭 9 個）睇 bigram，第九個之後睇單字次數；**兩邊都要打過至少
-`Q9Engine.MIN_USAGE_COUNT`（＝ 2）次先至郁個次序**（2026-08-27 user 要求；
-bigram 以前係 3 次，單字係「打過就算」）—— 撳錯一下唔應該影響到之後嘅選字。
-兩邊都用**穩定排序**（`sortedByDescending`），冇資格嘅嘢（`qualified()` 回 -1）
-唔會亂咗原本次序。讀寫都喺 `UsageStats` 入面：讀係 in-memory cache（`ensureLoaded()`
+`Q9Engine.reorderByUsage()` 淨係喺 `processResult()`（打碼揀字嗰條主線）用，
+而且**淨係郁第一頁**（頭 9 個，睇 bigram）：**第二頁開始一律唔郁**，
+保留返字碼表原本嘅位置（2026-08-28 user 要求 —— 打得多咗就由第三頁彈上第二頁，
+揭頁揀字就冇得靠記憶；順帶 `Host.charFreq` 冇人用，一齊刪咗，
+但 `UsageStats` 照樣繼續記單字次數）。**要打過至少 `Q9Engine.MIN_USAGE_COUNT`
+（＝ 2）次先至郁個次序**（2026-08-27 user 要求，以前 bigram 係 3 次）——
+撳錯一下唔應該影響到之後嘅選字。用**穩定排序**（`sortedByDescending`），
+冇資格嘅嘢（`qualified()` 回 -1）唔會亂咗原本次序。
+讀寫都喺 `UsageStats` 入面：讀係 in-memory cache（`ensureLoaded()`
 第一次先揸 sqlite），寫就即刻更新 cache、sqlite 嗰邊擺去背景 thread，
 唔會拖慢緊住打緊字嘅 UI。
 
@@ -727,9 +832,10 @@ per-key 判斷）連埋 `keyCenter` 拋畀 IME service，放手之後**由 IME s
 
 `0` 冇 `holdRepeat`，因為佢長撳係開關標點。
 
-### 撳落即出（`Prefs.instantKey`，2026-08-27 加，預設開）
+### 撳落即出（2026-08-27 加，2026-08-28 起冇得熄）
 
-`KeyboardBaseView` ACTION_DOWN 見到 `instantKey(key)` 就即刻 `host.onKey()`，
+user 要求永遠開住，所以 `Prefs.KEY_INSTANT_KEY` 同設定頁嗰個開關都刪咗，
+淨返段說明。`KeyboardBaseView` ACTION_DOWN 見到 `instantKey(key)` 就即刻 `host.onKey()`，
 放手嗰下就唔再出（`instantFired`）。**淨係中文九宮格 `1`~`9` 先做**
 （`ChinesePadView.instantKey`），而且淨係喺「長撳 = 連撳」嗰個狀態：
 

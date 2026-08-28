@@ -16,6 +16,7 @@ import android.widget.ScrollView
 import android.widget.TextView
 import hk.tq9.core.BarMode
 import hk.tq9.core.PadAlign
+import hk.tq9.core.PadGroup
 import hk.tq9.core.Prefs
 import kotlin.math.abs
 import kotlin.math.roundToInt
@@ -75,6 +76,13 @@ class OptionBarsView(context: Context) : LinearLayout(context) {
 
     var listener: Listener? = null
     var theme: Theme = Theme.of(context)
+
+    /**
+     * 而家見緊嘅係邊組鍵盤（中文＋數字／英文＋符號）。大細同貼邊兩組各有各存，
+     * 所以「靠左／靠右／拉闊」個圖案要跟返而家嗰組（見 [refreshAlignLabel]）。
+     */
+    var padGroup: PadGroup = PadGroup.CJK
+        set(v) { if (field != v) { field = v; refreshAlignLabel() } }
 
     private val sizeBtn = TextView(context)
     private val pasteBtn = TextView(context)
@@ -265,6 +273,7 @@ class OptionBarsView(context: Context) : LinearLayout(context) {
         if (m != BarMode.CANDIDATES && expanded) setExpanded(false)
         candRow.visibility = if (m == BarMode.CANDIDATES) View.VISIBLE else View.GONE
         toolRow.visibility = if (m == BarMode.TOOLS) View.VISIBLE else View.GONE
+        updateExpandVisibility()
     }
 
     /** emoji 表／剪貼簿開住嗰陣先出 ✖，冇開就係切換掣（兩粒共用同一個位） */
@@ -326,8 +335,35 @@ class OptionBarsView(context: Context) : LinearLayout(context) {
         candidates = list
         rebuildChips()
         if (list.isEmpty() && expanded) setExpanded(false)
-        expandBtn.visibility = if (list.size > 12) View.VISIBLE else View.INVISIBLE
         scroller.scrollTo(0, 0)
+    }
+
+    /**
+     * 粒 `▼` 淨係喺**啲候選字真係一行擺唔晒**（要左右捲）嗰陣先出現，
+     * 否則成粒消失（`GONE`，唔會剩返個空底色霸住個位，其餘候選字順手攤開多一格位）。
+     *
+     * 比嘅係 `strip`（啲字實際闊度）同 [swap]（成行嘅闊度，即係**冇**粒 `▼` 嗰陣
+     * 用得晒嘅位）—— 唔可以攞 `scroller` 嘅闊度嚟比，因為粒掣一出現就會食咗
+     * 38dp，跟住又變返「要捲」，出出入入。
+     */
+    private fun wantExpandBtn(): Int? = when {
+        expanded -> View.VISIBLE                  // 攤開咗一定要有得撳返埋
+        mode != BarMode.CANDIDATES || candidates.isEmpty() -> View.GONE
+        swap.width <= 0 -> null                   // 未排過版，判斷唔到，唔好亂郁
+        strip.width > swap.width -> View.VISIBLE
+        else -> View.GONE
+    }
+
+    private fun updateExpandVisibility() {
+        val want = wantExpandBtn() ?: return
+        if (expandBtn.visibility != want) expandBtn.visibility = want
+    }
+
+    override fun onLayout(changed: Boolean, l: Int, t: Int, r: Int, b: Int) {
+        super.onLayout(changed, l, t, r, b)
+        val want = wantExpandBtn() ?: return
+        // 排緊版嗰陣改 visibility 會即刻再 requestLayout 一次，讓返下一個 frame 先改
+        if (expandBtn.visibility != want) post { expandBtn.visibility = want }
     }
 
     private fun setExpanded(v: Boolean) {
@@ -372,16 +408,15 @@ class OptionBarsView(context: Context) : LinearLayout(context) {
     }
 
     /**
-     * 顯示方式只關中文九宮格事，英文／符號模式就淨係剩返「拉高拉低」。
-     *
      * 圖案係**貼邊**嘅樣（一條牆 + 箭嘴指住埋去），唔係一支淨嘅左／右箭咀 ——
      * 淨箭咀睇落似「向左移／向右移」，但實際上係「貼實左邊／貼實右邊」。
      */
     fun refreshAlignLabel() {
-        icons[sizeBtn] = when (Prefs.align(context)) {
+        icons[sizeBtn] = when (Prefs.align(context, padGroup)) {
             PadAlign.STRETCH -> ToolIcon.ALIGN_WIDE to "拉闊"
             PadAlign.LEFT_GAP -> ToolIcon.ALIGN_RIGHT to "靠右"
             PadAlign.RIGHT_GAP -> ToolIcon.ALIGN_LEFT to "靠左"
+            PadAlign.SPLIT -> ToolIcon.ALIGN_SPLIT to "左右拆開"
         }
         styleTool(sizeBtn, theme.keyFaceAlt)
     }

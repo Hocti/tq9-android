@@ -43,6 +43,7 @@ import hk.tq9.core.EmojiDict
 import hk.tq9.core.EnDict
 import hk.tq9.core.NextWordModel
 import hk.tq9.core.PadAlign
+import hk.tq9.core.PadGroup
 import hk.tq9.core.PagerLayout
 import hk.tq9.core.Prefs
 import hk.tq9.core.Q9Db
@@ -234,6 +235,9 @@ class TQ9InputMethodService : android.inputmethodservice.InputMethodService(),
         // 包多層 FrameLayout：AI 處理緊嗰陣要喺呢層加返個 disable overlay 蓋晒成個鍵盤，
         // root 本身係 LinearLayout（bars 疊 padHolder），冇得喺度再疊多層
         outer = FrameLayout(this)
+        // 底下俾導覽列（「收起鍵盤／轉鍵盤」嗰條）閃開嘅位係呢層嘅 padding，
+        // 冇底色就會透見住下面個 app，一忽色唔同好突兀 —— 補返鍵盤自己個底色
+        outer.setBackgroundColor(theme.background)
         outer.addView(root, FrameLayout.LayoutParams(
             FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT))
 
@@ -404,6 +408,13 @@ class TQ9InputMethodService : android.inputmethodservice.InputMethodService(),
         refreshBars()
     }
 
+    /**
+     * 而家見緊嗰個 pad 攞邊套大細設定。英文同符號自成一組，其餘（中文九宮格、
+     * 純數字、emoji 表）都跟返中文嗰組 —— 拉大細嗰陣淨係應該郁到眼前嗰組。
+     */
+    private val padGroup: PadGroup
+        get() = if (mode == PadMode.LATIN || mode == PadMode.SYMBOL) PadGroup.LATIN else PadGroup.CJK
+
     /** 拉高拉低之後，所有已經砌咗嘅 pad 都要重新排位 */
     private fun relayoutPads() {
         chinesePad?.onSettingsChanged()
@@ -425,7 +436,6 @@ class TQ9InputMethodService : android.inputmethodservice.InputMethodService(),
 
     override fun bumpChar(ch: String) = UsageStats.get(this).bumpChar(ch)
     override fun bumpBigram(pair: String) = UsageStats.get(this).bumpBigram(pair)
-    override fun charFreq(ch: String): Int = UsageStats.get(this).charFreq(ch)
     override fun bigramCount(pair: String): Int = UsageStats.get(this).bigramCount(pair)
 
     /**
@@ -976,6 +986,9 @@ class TQ9InputMethodService : android.inputmethodservice.InputMethodService(),
         bars.setSwitchVisible(!(pinned && mode == PadMode.CHINESE))
         bars.setAiReady(aiUsable)
         bars.setAiVisible(aiKeySet)
+        // 大細／貼邊分咗兩組存，粒「靠左／靠右」掣要拉、要著返邊個樣，
+        // 都係跟而家見緊嗰組（見 [padGroup]）
+        bars.padGroup = padGroup
         bars.refreshAlignLabel()
         // 條 bar 高度定死，唔會因為有冇候選字而跳高跳低
         bars.visibility = if (effective == BarMode.OFF) View.GONE else View.VISIBLE
@@ -1182,54 +1195,61 @@ class TQ9InputMethodService : android.inputmethodservice.InputMethodService(),
     }
 
     override fun onCycleAlign() {
-        val next = Prefs.align(this).next()
-        Prefs.setAlign(this, next)
-        chinesePad?.onSettingsChanged()
-        numberPad?.rebuild()   // 純數字頁而家一齊跟住靠左／靠右
+        val g = padGroup
+        // 揀得邊幾個要問 [Prefs.alignOptions]：闊 screen 嘅英數鍵盤淨係得
+        // 「拉闊」同「左右拆開」，靠左／靠右嗰兩個嗰陣會收起
+        Prefs.setAlign(this, Prefs.nextAlign(this, g), g)
+        relayoutPads()
         bars.refreshAlignLabel()
         // 轉咗顯示方式可能就啱啱夠窄／唔再夠窄，側邊欄要跟住出現或者消失
         refreshBars()
     }
 
     /**
-     * 左右拖 = 拉闊拉窄中文本體。方向要跟返顯示方式：內容貼右（左邊留白）嗰陣
-     * 向左拖先係拉闊，貼左就啱啱相反 —— 永遠都係「拖向留白嗰邊 = 拉闊」。
+     * 左右拖 = 拉闊拉窄鍵盤本體（淨係郁到而家見緊嗰組，見 [padGroup]）。方向要跟返
+     * 顯示方式：內容貼右（左邊留白）嗰陣向左拖先係拉闊，貼左就啱啱相反 ——
+     * 永遠都係「拖向留白嗰邊 = 拉闊」。[PadAlign.SPLIT] 條罅喺中間，
+     * 所以向右（＝向住條罅）拖就係兩橛一齊拉闊。
      */
     override fun onWidthDrag(dxDp: Int) {
         if (dxDp == 0) return
-        val align = Prefs.align(this)
+        val g = padGroup
+        val align = Prefs.align(this, g)
         if (align == PadAlign.STRETCH) return // 本來就用盡成行，冇位可以拉
         val sign = if (align == PadAlign.LEFT_GAP) -1 else 1
-        val cur = Prefs.widthScale(this)
+        val cur = Prefs.widthScale(this, g)
         val next = (cur + sign * dxDp / 250f)
             .coerceIn(Prefs.MIN_WIDTH_SCALE, Prefs.MAX_WIDTH_SCALE)
         if (next == cur) return
-        Prefs.setWidthScale(this, next)
-        chinesePad?.onSettingsChanged()
-        numberPad?.rebuild()   // 純數字頁而家跟返中文本體嘅闊度（見 [NumberPadView.contentBounds]）
+        Prefs.setWidthScale(this, next, g)
+        relayoutPads()
         refreshBars()
     }
 
     /**
-     * 長撳「靠左／靠右」嗰粒（撳實唔拉）：中文本體一下子拉到最闊 ——
+     * 長撳「靠左／靠右」嗰粒（撳實唔拉）：鍵盤本體一下子拉到最闊 ——
      * [Prefs.MAX_WIDTH_SCALE] 之下 `PadMetrics` 個 `cellW` 一定會頂到 `availW / cols`，
      * 即係成個螢幕咁闊，同「拉闊」睇落一樣。拉窄咗之後想還原唔使一路拖返出去。
      */
     override fun onMaxWidth() {
-        if (Prefs.widthScale(this) >= Prefs.MAX_WIDTH_SCALE) { toast("鍵盤闊度已是最大"); return }
-        Prefs.setWidthScale(this, Prefs.MAX_WIDTH_SCALE)
-        chinesePad?.onSettingsChanged()
-        numberPad?.rebuild()   // 純數字頁而家跟返中文本體嘅闊度
+        val g = padGroup
+        if (Prefs.widthScale(this, g) >= Prefs.MAX_WIDTH_SCALE) { toast("鍵盤闊度已是最大"); return }
+        Prefs.setWidthScale(this, Prefs.MAX_WIDTH_SCALE, g)
+        relayoutPads()
         refreshBars()
         toast("鍵盤闊度已設為最大")
     }
 
-    /** 上下拖 = 拉高／拉低成個鍵盤（鍵盤永遠貼實底，唔會提起留個窿）。自由移動已經冇咗。 */
+    /**
+     * 上下拖 = 拉高／拉低而家見緊嗰組鍵盤（鍵盤永遠貼實底，唔會提起留個窿）。
+     * 中文＋純數字一組、英文＋符號另一組，兩組各拉各（見 [padGroup]）。
+     */
     override fun onSizeDrag(dyDp: Int) {
         if (dyDp == 0) return
-        val cur = Prefs.heightScale(this)
+        val g = padGroup
+        val cur = Prefs.heightScale(this, g)
         val next = (cur + dyDp / 250f).coerceIn(Prefs.MIN_HEIGHT_SCALE, Prefs.MAX_HEIGHT_SCALE)
-        if (next != cur) { Prefs.setHeightScale(this, next); relayoutPads(); refreshBars() }
+        if (next != cur) { Prefs.setHeightScale(this, next, g); relayoutPads(); refreshBars() }
     }
 
     /**

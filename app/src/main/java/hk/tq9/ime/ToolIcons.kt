@@ -45,6 +45,9 @@ enum class ToolIcon {
 
     /** 顯示方式「拉闊」：兩邊都有牆，箭嘴向外撐開 */
     ALIGN_WIDE,
+
+    /** 顯示方式「左右拆開」：兩邊都有牆，兩橛鍵盤各自貼實，中間裂開 */
+    ALIGN_SPLIT,
 }
 
 /**
@@ -84,6 +87,7 @@ class ToolIconDrawable(private val icon: ToolIcon, color: Int) : Drawable() {
             ToolIcon.ALIGN_LEFT -> drawAlign(canvas, left = true, both = false)
             ToolIcon.ALIGN_RIGHT -> drawAlign(canvas, left = false, both = false)
             ToolIcon.ALIGN_WIDE -> drawAlign(canvas, left = true, both = true)
+            ToolIcon.ALIGN_SPLIT -> drawSplit(canvas)
         }
         canvas.restoreToCount(save)
     }
@@ -176,6 +180,22 @@ class ToolIconDrawable(private val icon: ToolIcon, color: Int) : Drawable() {
             arrowHead(path, 16.8f, 1f)
         }
         canvas.drawPath(path, stroke)
+    }
+
+    /**
+     * 「左右拆開」：跟返其餘幾個顯示方式圖案嗰套**牆**嘅講法 ——
+     * 兩邊都有牆，兩橛鍵盤各自貼實一邊牆，中間裂開條罅。
+     */
+    private fun drawSplit(canvas: Canvas) {
+        val wall = stroke.strokeWidth
+        stroke.strokeWidth = wall * 1.35f
+        canvas.drawLine(2.6f, 3.6f, 2.6f, 20.4f, stroke)
+        canvas.drawLine(21.4f, 3.6f, 21.4f, 20.4f, stroke)
+        stroke.strokeWidth = wall
+        rect.set(4.9f, 7.4f, 10.6f, 16.6f)
+        canvas.drawRoundRect(rect, 1.5f, 1.5f, fill)
+        rect.set(13.4f, 7.4f, 19.1f, 16.6f)
+        canvas.drawRoundRect(rect, 1.5f, 1.5f, fill)
     }
 
     /** 箭嘴頭：尖喺 ([tipX], 12)，[dir] = -1 指左、+1 指右，[back] 長、[half] 半高 */

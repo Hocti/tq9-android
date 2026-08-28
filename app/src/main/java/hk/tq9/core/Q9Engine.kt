@@ -37,7 +37,6 @@ class Q9Engine(val db: Q9Db) {
         fun bumpChar(ch: String)
         /** 連續打咗兩個中文字（`a+b`） */
         fun bumpBigram(pair: String)
-        fun charFreq(ch: String): Int
         fun bigramCount(pair: String): Int
     }
 
@@ -229,7 +228,7 @@ class Q9Engine(val db: Q9Db) {
      */
     fun homoAt(slot: Int): Boolean {
         if (!selectMode || openclose || slot !in 1..9) return false
-        val idx = currPage * 9 + slot - 1
+        val idx = currPage * 9 + rankOfSlot(slot)
         if (idx >= selectWords.size) return false
         val word = selectWords[idx]
         if (word.isEmpty() || word == "*") return false
@@ -249,7 +248,8 @@ class Q9Engine(val db: Q9Db) {
     fun pickQuick(word: String) {
         if (word.isEmpty() || word == "*") return
         startSelectWord(listOf(word))
-        selectWord(1)
+        // 得一個字，即係排第一 —— 佢坐邊格要問 [SLOT_ORDER]，唔係粒 `1`
+        selectWord(slotOfRank(0))
         changed()
     }
 
@@ -257,7 +257,7 @@ class Q9Engine(val db: Q9Db) {
     fun pickCandidateAt(index: Int) {
         if (!selectMode || index < 0 || index >= selectWords.size) return
         currPage = index / 9
-        selectWord(index % 9 + 1)
+        selectWord(slotOfRank(index % 9))
         changed()
     }
 
@@ -296,7 +296,7 @@ class Q9Engine(val db: Q9Db) {
         if (selectMode) {
             if (digit == 0) return if (totalPage > 1) 0f else -0.8f
             // 選字途中滑過某格就揀錯字代價好大，所以中性；冇字嘅格就直接否決
-            val idx = currPage * 9 + digit - 1
+            val idx = currPage * 9 + rankOfSlot(digit)
             return if (idx < selectWords.size && selectWords[idx].isNotEmpty()) 0f else -1f
         }
         val next = currCode + digit
@@ -317,25 +317,23 @@ class Q9Engine(val db: Q9Db) {
     }
 
     /**
-     * 頭九個（第一頁）：同上一個字組成過 [MIN_USAGE_COUNT] 次嘅 bigram 推去前面，
-     * 次數越大越前。第九個之後：跟住打過幾多次（[Host.charFreq]）推前，唔郁第一頁。
+     * **淨係郁第一頁**：頭九個字入面，同上一個字組成過 [MIN_USAGE_COUNT] 次
+     * bigram 嘅推去前面，次數越大越前（排第一嗰個就會坐正中間嗰格，見 [SLOT_ORDER]）。
      *
-     * **兩邊都要打夠 [MIN_USAGE_COUNT] 次先算數**：打過一次就當「常用」太急，
+     * 第二頁開始嗰啲字**一律唔郁**，保留返字碼表原本嘅位置 —— 唔會因為打得多咗
+     * 就由第三頁彈上第二頁，揭頁揀字先至有得靠記憶。
+     *
+     * 要打夠 [MIN_USAGE_COUNT] 次先算數：打過一次就當「常用」太急，
      * 撳錯一下就會累住之後個次序都唔同咗，user 會覺得個字表自己識郁。
      */
     private fun reorderByUsage(words: List<String>): List<String> {
         val h = host ?: return words
-        if (!usageReorder || words.size <= 1) return words
-        val head = words.take(9)
-        val tail = words.drop(9)
         val prev = bigramPrev
-        val newHead = if (prev.isEmpty()) head else head.sortedByDescending { w ->
+        if (!usageReorder || words.size <= 1 || prev.isEmpty()) return words
+        val head = words.take(9).sortedByDescending { w ->
             if (isHanChar(w)) qualified(h.bigramCount(prev + w)) else -1
         }
-        val newTail = if (tail.isEmpty()) tail else tail.sortedByDescending { w ->
-            if (isHanChar(w)) qualified(h.charFreq(w)) else -1
-        }
-        return newHead + newTail
+        return head + words.drop(9)
     }
 
     /** 未打夠 [MIN_USAGE_COUNT] 次就當冇打過（-1 = 排返原本個位，穩定排序唔會亂） */
@@ -363,9 +361,10 @@ class Q9Engine(val db: Q9Db) {
 
     private fun showPage(page: Int) {
         currPage = page
-        for (i in 1..9) {
-            val p = page * 9 + i - 1
+        for (rank in 0..8) {
+            val p = page * 9 + rank
             val w = if (p >= selectWords.size || selectWords[p] == "*") "" else selectWords[p]
+            val i = slotOfRank(rank)
             keys[i].clear()
             keys[i].text = w
             keys[i].enabled = w.isNotEmpty()
@@ -375,7 +374,9 @@ class Q9Engine(val db: Q9Db) {
     }
 
     private fun selectWord(slot: Int) {
-        val key = currPage * 9 + slot - 1
+        val rank = rankOfSlot(slot)
+        if (rank < 0) return
+        val key = currPage * 9 + rank
         if (key >= selectWords.size) return
         val typeWord = selectWords[key]
         if (typeWord.isEmpty()) return
@@ -485,5 +486,20 @@ class Q9Engine(val db: Q9Db) {
          * 少過呢個數就當冇打過 —— 撳錯一次唔應該就影響到之後嘅選字次序。
          */
         const val MIN_USAGE_COUNT = 2
+
+        /**
+         * 選字擺入九宮格嘅**格仔先後次序**：排第一嗰個字擺 `5`，跟住 `4`、`6`…
+         *
+         * 九宮格排位係 numpad（`7 8 9` 喺最上），所以 `5` 喺正中間，最易撳到；
+         * `4 6 2 8` 四邊次之；`1 3 7 9` 四角最難撳，排最後。
+         * 即係話一頁得三個字嘅時候，佢哋會坐 `5 4 6`，唔會由 `1` 開始排。
+         */
+        private val SLOT_ORDER = intArrayOf(5, 4, 6, 2, 8, 1, 3, 7, 9)
+
+        /** 一頁入面排第 [rank]（由 0 起）嗰個字擺喺邊格 */
+        fun slotOfRank(rank: Int): Int = SLOT_ORDER[rank]
+
+        /** [slot]（1~9）嗰格擺住嘅係一頁入面排第幾（由 0 起，唔喺表入面就 -1） */
+        fun rankOfSlot(slot: Int): Int = SLOT_ORDER.indexOf(slot)
     }
 }

@@ -207,8 +207,8 @@ class ChinesePadView(context: Context, private val engine: Q9Engine) : KeyboardB
         key.action == KeyAction.DIGIT && Prefs.swipeEnabled(context) && !engine.selectMode
 
     /**
-     * **撳落即出碼**（唔等放手）。淨係 `1`~`9`，而且淨係喺「長撳 = 連撳」嗰個
-     * 狀態先做得 —— 嗰陣粒鍵之後唯一會發生嘅事就係再出多次佢自己，
+     * **撳落即出碼**（唔等放手，冇得熄）。淨係 `1`~`9`，而且淨係喺「長撳 = 連撳」
+     * 嗰個狀態先做得 —— 嗰陣粒鍵之後唯一會發生嘅事就係再出多次佢自己，
      * 撳落一下 + 長撳一下 = 連撳兩下，同以前一模一樣。
      *
      * 兩種情況照舊等放手，因為粒鍵長撳有第二個意思，一撳落就出咗碼會兩樣一齊做：
@@ -218,7 +218,7 @@ class ChinesePadView(context: Context, private val engine: Q9Engine) : KeyboardB
      * `0` 亦都唔做（長撳 = 開關標點／上頁）。
      */
     override fun instantKey(k: Key): Boolean =
-        k.action == KeyAction.DIGIT && k.digit in 1..9 && Prefs.instantKey(context) &&
+        k.action == KeyAction.DIGIT && k.digit in 1..9 &&
             !engine.selectMode &&
             !(Prefs.longPressShortcut(context) && engine.currCode.isEmpty())
 
