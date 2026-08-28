@@ -67,9 +67,10 @@ class SidePanelView(context: Context) : LinearLayout(context) {
             gravity = Gravity.CENTER
             textSize = 15f
             setOnClickListener { listener?.onCycleAlign(); refreshAlignLabel() }
-            setOnTouchListener { _, e -> handleSizeDrag(e) }
-            // 撳實唔拉 = 一下子拉到最闊（同工具 bar 嗰粒一樣）
-            setOnLongClickListener { listener?.onMaxWidth(); true }
+            setOnTouchListener { v, e -> handleSizeDrag(v, e) }
+            // 撳實唔拉 = 一下子拉到最闊（同工具 bar 嗰粒一樣：呢度淨係記低，
+            // 放手嗰陣先算 —— 見 [handleSizeDrag]）
+            setOnLongClickListener { longPressArmed = true; true }
         }
         tool(pasteBtn, ToolIcon.PASTE, "貼上", KeyAction.PASTE)
         pasteBtn.setOnLongClickListener { listener?.onPasteHistory(); true }
@@ -236,12 +237,18 @@ class SidePanelView(context: Context) : LinearLayout(context) {
     private var dragX = 0f
     private var dragY = 0f
     private var dragging = false
+    /**
+     * 長撳已經 fire 咗，但係**未做嘢**（見 [handleSizeDrag] 嘅 `ACTION_UP`）。
+     * 撳實之後仲可以變成拖，所以要等放手先知呢一下到底係「撳實唔郁」定係拖。
+     */
+    private var longPressArmed = false
     private var horizontal = false
 
-    private fun handleSizeDrag(e: MotionEvent): Boolean {
+    private fun handleSizeDrag(v: View, e: MotionEvent): Boolean {
         when (e.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
                 dragX = e.rawX; dragY = e.rawY; dragging = false; horizontal = false
+                longPressArmed = false
             }
             MotionEvent.ACTION_MOVE -> {
                 val dx = e.rawX - dragX
@@ -249,6 +256,9 @@ class SidePanelView(context: Context) : LinearLayout(context) {
                 if (!dragging && (abs(dx) > dp(8f) || abs(dy) > dp(8f))) {
                     dragging = true
                     horizontal = abs(dx) > abs(dy)
+                    // 開始拖 = 唔會再有長撳。`View` 自己淨係喺手指行出粒掣範圍先會
+                    // 取消，而粒掣好闊（打橫成 170dp），慢慢拖根本行唔出去
+                    v.cancelLongPress()
                 }
                 if (dragging) {
                     val d = resources.displayMetrics.density
@@ -258,7 +268,18 @@ class SidePanelView(context: Context) : LinearLayout(context) {
                     dragY = e.rawY
                 }
             }
-            MotionEvent.ACTION_UP -> if (dragging) { dragging = false; return true }
+            MotionEvent.ACTION_UP -> {
+                // 撳實唔郁（長撳）先至「一下子拉到最闊」。**一定要等到放手先做**：
+                // 好多人係撳落、停一停、先至拖，長撳（約半秒）嗰陣手指仲未郁，
+                // 即刻做就會拖到一半突然彈晒去最闊（2026-08-28 user 踩到：
+                // 左右拆開拖拖下兩橛突然併埋）。有拖過就當拖，唔理個長撳
+                val hold = longPressArmed && !dragging
+                longPressArmed = false
+                if (dragging) { dragging = false; return true }
+                if (hold) { listener?.onMaxWidth(); return true }
+            }
+            // 拖到一半俾人搶咗個 gesture（重排／view 換走）：清返個狀態
+            MotionEvent.ACTION_CANCEL -> { dragging = false; longPressArmed = false }
         }
         return false
     }

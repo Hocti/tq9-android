@@ -12,10 +12,10 @@ abstract class RowsPadView(context: Context) : KeyboardBaseView(context) {
     protected abstract fun rows(): List<List<Key>>
 
     /**
-     * 攞邊套大細設定。英文同符號自成一套（[PadGroup.LATIN]），
+     * 攞邊套大細／字體設定。英文同符號自成一套（[PadGroup.LATIN]），
      * 純數字 keypad 就跟返中文九宮格（見 [NumberPadView]）。
      */
-    protected open val padGroup: PadGroup get() = PadGroup.LATIN
+    override val padGroup: PadGroup get() = PadGroup.LATIN
 
     /**
      * 高度唔係逐行算，係成組一個高度 —— 英文有 4~5 行、符號有 5 行，

@@ -59,6 +59,12 @@ class PadMetrics(
         // 本體再窄都要有 [MIN_CONTENT_DP] 咁闊（螢幕本身窄過呢個數就用盡螢幕）——
         // 拉到得幾格咁窄嘅鍵盤，每粒鍵細過隻手指，根本撳唔中
         val minContent = min(dp(MIN_CONTENT_DP), availW.toFloat())
+        // 左右拆開嗰陣，兩橛夾埋唔可以鋪滿成行：中間永遠要留返 [MIN_SPLIT_GAP_DP]
+        // 咁闊條罅，唔係拉到最闊就兩橛併埋，同「拉闊」一模一樣，分割等於冇咗
+        // （2026-08-28 user 踩到）。最闊嗰個位收窄咗，拉嘅範圍照樣由頭用到尾。
+        val maxContent =
+            if (align == PadAlign.SPLIT) max(minContent, availW - dp(MIN_SPLIT_GAP_DP))
+            else availW.toFloat()
         val ws = Prefs.widthScale(ctx, group)
         contentW = when {
             align == PadAlign.STRETCH -> availW.toFloat()
@@ -69,10 +75,10 @@ class PadMetrics(
             group == PadGroup.LATIN -> {
                 val t = ((ws - Prefs.MIN_WIDTH_SCALE) /
                     (Prefs.MAX_WIDTH_SCALE - Prefs.MIN_WIDTH_SCALE)).coerceIn(0f, 1f)
-                minContent + (availW - minContent) * t
+                minContent + (maxContent - minContent) * t
             }
             // 九宮格：格仔要保持返個高闊比，所以由 `unit`（高度嗰個 unit）出闊度
-            else -> max(min(unit * ws * cols, availW.toFloat()), minContent)
+            else -> max(min(unit * ws * cols, maxContent), minContent)
         }
         cellW = contentW / cols
 
@@ -98,6 +104,15 @@ class PadMetrics(
          * 拉窄（工具 bar 最左嗰粒左右拖）同 [Prefs.KEY_WIDTH_SCALE] 都收唔過呢條線。
          */
         const val MIN_CONTENT_DP = 320f
+
+        /**
+         * [PadAlign.SPLIT] 之下，兩橛中間最少要留咁闊條罅。
+         *
+         * 冇咗呢條線，`widthScale` 拉到盡（或者長撳粒掣「一下子拉到最闊」）
+         * 就會兩橛併埋鋪滿成行 —— 睇落同「拉闊」一模一樣，用家以為分割壞咗。
+         * 而家最闊 = 螢幕闊度減呢條罅，兩橛永遠分得開。
+         */
+        const val MIN_SPLIT_GAP_DP = 80f
 
         /**
          * 一組鍵盤（[PadGroup]）**成塊嘅高度**。

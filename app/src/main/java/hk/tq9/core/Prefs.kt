@@ -118,6 +118,8 @@ object Prefs {
     const val KEY_H_RATIO = "key_h_ratio"          // 中文格仔高度 / 闊度
     const val KEY_GAP_DP = "key_gap_dp"
     const val KEY_FONT_SCALE = "key_font_scale"
+    /** 英文／符號鍵盤嘅字體大細（中文嗰組行 [KEY_FONT_SCALE]，見 [fontScale]） */
+    const val KEY_FONT_SCALE_LATIN = "key_font_scale_latin"
 
     // behaviour
     const val KEY_SC_OUTPUT = "sc_output"          // 輸出簡體
@@ -134,6 +136,8 @@ object Prefs {
     const val KEY_LONG_PRESS_SHORTCUT = "long_press_shortcut"
     const val KEY_STT_LOCALE = "stt_locale"
     const val KEY_DB_LABEL = "db_label"
+    const val KEY_DB_CUSTOM = "db_custom"
+    const val KEY_DB_ASSET_VER = "db_asset_ver"
     const val KEY_LATIN_NUM_ROW = "latin_num_row"  // 英文鍵盤上面加一行數字
     const val KEY_USAGE_REORDER = "usage_reorder"  // 打得多嘅字推前（usage_stats.db）
     const val KEY_PAGER_LAYOUT = "pager_layout"    // PagerLayout.name（選字揭頁嗰兩粒點排）
@@ -248,7 +252,7 @@ object Prefs {
     }
 
     /** 螢幕闊過呢個數（dp）先至有 [PadAlign.SPLIT] 揀 —— 再窄拆開兩橛就細到撳唔到 */
-    const val SPLIT_MIN_WIDTH_DP = 600
+    const val SPLIT_MIN_WIDTH_DP = 500
 
     /**
      * 呢組鍵盤而家揀得邊幾個顯示方式。
@@ -276,7 +280,17 @@ object Prefs {
     /** 正方形會太高，預設矮 20% */
     fun keyHeightRatio(ctx: Context) = sp(ctx).getFloat(KEY_H_RATIO, 0.8f)
     fun gapDp(ctx: Context) = sp(ctx).getInt(KEY_GAP_DP, 2)
-    fun fontScale(ctx: Context) = sp(ctx).getFloat(KEY_FONT_SCALE, 1.0f)
+    /**
+     * 鍵面字體大細。**兩組各有各一個**（2026-08-28 user 要求）：中文九宮格＋純數字
+     * keypad 一套（[KEY_FONT_SCALE]），英文＋符號另一套（[KEY_FONT_SCALE_LATIN]）——
+     * 中文字要夠大先睇得清，英文字母同數字用同一個倍數就會逼爆粒鍵。
+     *
+     * 英文嗰個未校過就跟返中文嗰個，升級之後個樣唔會即刻變。
+     */
+    fun fontScale(ctx: Context, g: PadGroup = PadGroup.CJK): Float {
+        val cjk = sp(ctx).getFloat(KEY_FONT_SCALE, 1.0f)
+        return if (g == PadGroup.LATIN) sp(ctx).getFloat(KEY_FONT_SCALE_LATIN, cjk) else cjk
+    }
 
     /** 拉高／拉低成個鍵盤（每個螢幕尺寸 × [PadGroup] 各有各套，見 [profKey]） */
     fun heightScale(ctx: Context, g: PadGroup = PadGroup.CJK) =
@@ -477,8 +491,31 @@ object Prefs {
     fun aiCustomResponsePath(ctx: Context): String =
         sp(ctx).getString(KEY_AI_RESPONSE_PATH, DEFAULT_AI_RESPONSE_PATH)!!.ifBlank { DEFAULT_AI_RESPONSE_PATH }
 
-    fun dbLabel(ctx: Context): String = sp(ctx).getString(KEY_DB_LABEL, "內置 dataset.db")!!
+    /** 冇自己換過字碼表嗰陣個 label（`Q9Db` 靠佢認返「而家用緊內置嗰份」） */
+    const val BUILTIN_DB_LABEL = "內置 dataset.db"
+
+    fun dbLabel(ctx: Context): String = sp(ctx).getString(KEY_DB_LABEL, BUILTIN_DB_LABEL)!!
     fun setDbLabel(ctx: Context, v: String) = sp(ctx).edit().putString(KEY_DB_LABEL, v).apply()
+
+    /**
+     * User 自己揀過 sqlite 檔換走字碼表未（設定頁「選取 sqlite 檔案…」）。
+     *
+     * **升級唔可以踩親自己換嗰份**，所以呢個 flag 一 true 就永遠唔會再由 assets
+     * 覆蓋，要撳「還原內置字碼表」先返得轉頭。舊版冇記過呢樣嘢，
+     * 所以 [Q9Db] 嗰邊會連個 [dbLabel] 一齊睇（換過就唔會係 [BUILTIN_DB_LABEL]）。
+     */
+    fun dbCustom(ctx: Context): Boolean = sp(ctx).getBoolean(KEY_DB_CUSTOM, false)
+    fun setDbCustom(ctx: Context, v: Boolean) =
+        sp(ctx).edit().putBoolean(KEY_DB_CUSTOM, v).apply()
+
+    /**
+     * 而家部機入面嗰份內置字碼表，係邊個 versionCode 嘅 apk 抄出嚟
+     * （`0` = 未記過／舊版裝落嚟嗰份）。裝咗新版 apk 之後對唔上就抄多次，
+     * 唔係舊版嗰份會一路留到死，新版嘅字碼表點改都冇效。
+     */
+    fun dbAssetVersion(ctx: Context): Long = sp(ctx).getLong(KEY_DB_ASSET_VER, 0L)
+    fun setDbAssetVersion(ctx: Context, v: Long) =
+        sp(ctx).edit().putLong(KEY_DB_ASSET_VER, v).apply()
 
     // ---- AI profiles：save/load/delete 成套 AI 設定 -----------------------
 

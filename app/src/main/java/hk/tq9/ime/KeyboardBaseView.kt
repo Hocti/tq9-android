@@ -13,6 +13,7 @@ import android.os.SystemClock
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewConfiguration
+import hk.tq9.core.PadGroup
 import hk.tq9.core.Prefs
 import hk.tq9.swipe.GestureKeyTracker
 import kotlin.math.abs
@@ -59,8 +60,15 @@ abstract class KeyboardBaseView(context: Context) : View(context) {
         strokeJoin = Paint.Join.ROUND
     }
 
+    /**
+     * 呢塊鍵盤攞邊套設定（大細、字體）。中文九宮格同純數字 keypad 係 [PadGroup.CJK]，
+     * 英文同符號係 [PadGroup.LATIN]（見 [RowsPadView]）。
+     */
+    protected open val padGroup: PadGroup get() = PadGroup.CJK
+
     protected val gapPx get() = dp(Prefs.gapDp(context).toFloat())
-    protected val fontScale get() = Prefs.fontScale(context)
+    /** 字體大細兩組各有各一個（見 [Prefs.fontScale]） */
+    protected val fontScale get() = Prefs.fontScale(context, padGroup)
     protected val radius get() = dp(6f)
 
     protected val tracker = GestureKeyTracker(

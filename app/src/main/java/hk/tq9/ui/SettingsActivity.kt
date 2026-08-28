@@ -239,10 +239,10 @@ class SettingsActivity : AppCompatActivity() {
         note("選取一個 sqlite 檔案後會立即覆蓋現有資料庫（舊版不會保留）。" +
             "檔案須包含 mapped_table、related_candidates_table、ts_chinese_table、" +
             "word_meta 四張表。")
-        note("由舊版升級上來的話，資料庫仍然是當初安裝的那一份，不會自動更新。" +
-            "候選字欄的兩項新功能（輸入一兩個字碼即顯示最常用的九個字、" +
-            "游標前無中文時顯示的預設字）需要較新的資料庫，" +
-            "按「還原內置字碼表」即可取得（自訂過資料庫的話會被覆蓋）。")
+        note("未自訂過資料庫的話，每次升級都會自動換上新版內置的那一份" +
+            "（舊版一直沿用當初安裝的那份，新版改了字碼表也不會生效）。" +
+            "自己選過 sqlite 檔之後就當是你自己的資料，升級不會覆蓋，" +
+            "要按「還原內置字碼表」才會換回內置版本。")
         row(
             button("選取 sqlite 檔案…") {
                 pickDb.launch(arrayOf("*/*"))
@@ -291,9 +291,17 @@ class SettingsActivity : AppCompatActivity() {
             "上下拖動改高度，左右拖動改闊度（限「靠左」或「靠右」顯示方式）。")
         note("大小會分開記住：中文與純數字鍵盤一套、英文與符號鍵盤另一套，" +
             "而且再按當時的螢幕尺寸分開（摺疊機的內外屏、直向與橫向各自一套），" +
-            "所以在哪一個畫面調整，就只影響該畫面的那組鍵盤。")
-        slider("字體大細", 70, 140, (Prefs.fontScale(this) * 100).toInt(), "%") { v ->
+            "所以在哪一個畫面調整，就只影響該畫面的那組鍵盤。" +
+            "下面的字體大細同樣分中文、英文兩套，但不分螢幕尺寸。")
+        // 字體大細跟大細設定一樣分兩組：中文字要夠大先睇得清，英文字母同數字
+        // 用同一個倍數就會逼爆粒鍵（見 [Prefs.fontScale]）
+        slider("中文鍵盤字體大細", 70, 140, (Prefs.fontScale(this) * 100).toInt(), "%") { v ->
             Prefs.sp(this).edit().putFloat(Prefs.KEY_FONT_SCALE, v / 100f).apply(); rebuildPreview()
+        }
+        slider("英文鍵盤字體大細", 70, 140,
+            (Prefs.fontScale(this, PadGroup.LATIN) * 100).toInt(), "%") { v ->
+            Prefs.sp(this).edit().putFloat(Prefs.KEY_FONT_SCALE_LATIN, v / 100f).apply()
+            rebuildPreview()
         }
         slider("邊框粗幼", 0, 8, Prefs.gapDp(this), "dp") { v ->
             Prefs.sp(this).edit().putInt(Prefs.KEY_GAP_DP, v).apply(); rebuildPreview()

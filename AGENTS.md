@@ -26,7 +26,7 @@ adb shell ime enable hk.tq9/.ime.TQ9InputMethodService
 adb shell ime set    hk.tq9/.ime.TQ9InputMethodService
 ```
 
-### 喺模擬器度試鍵盤，有三個陷阱
+### 喺模擬器度試鍵盤，有四個陷阱
 
 1. **一定要 `adb shell settings put secure show_ime_with_hard_keyboard 1`**。
    模擬器當自己有實體鍵盤，唔開呢個 setting 就唔會彈輸入法出嚟。
@@ -34,6 +34,24 @@ adb shell ime set    hk.tq9/.ime.TQ9InputMethodService
    force-stop 會殺埋 IME，系統就會跌返去 Gboard。用 `am start` 就夠。
 3. **每次 `adb install -r` 之後都要再 `ime enable` + `ime set` 一次**，
    系統會當佢 reinstall 而 reset。
+4. **`screencap` 影出嚟成塊黑／白（WSL + swiftshader）**，睇唔到個鍵盤實際點。
+   改為用數字驗證：
+
+```bash
+# 鍵盤（IME window）實際幾闊幾高
+adb shell dumpsys window windows | sed -n '/InputMethod}/,/Frames/p' | grep -E "Requested|Frames"
+# 睇得到嘅 view（app 嗰邊）搵輸入框坐標 —— 鍵盤本身係自己畫嘅，dump 唔到粒鍵
+adb shell uiautomator dump /sdcard/u.xml && adb pull /sdcard/u.xml
+# 改設定／睇 pref（app debuggable，唔使 root）
+adb shell run-as hk.tq9 cat shared_prefs/tq9_settings.xml
+```
+
+   要開英文鍵盤就撳 Chrome 個網址欄（URI 欄 → `PadMode.LATIN`），中文就搵個
+   普通文字欄（例如 `am start -a android.intent.action.INSERT -t vnd.android.cursor.dir/contact`）。
+   撳條 bar 上面粒大細掣要自己計坐標：條 bar 高 42dp 喺 IME window 最頂，
+   英文／符號頁最左仲有粒 42dp 嘅 `⇄`（`setSwitchVisible`），跟住先至係
+   工具列五粒（padding 4dp、每粒 margin 3dp）—— 而且要條 bar 喺「工具」嗰段
+   （`bar_mode`）先撳得到。撳一下 = 轉顯示方式，拖 = 拉大細。
 
 設定頁最底本來有「試打」四個欄（普通／email／PIN／搜尋）同埋實時預覽，
 **而家收埋咗**（`SettingsActivity.SHOW_DEBUG_SECTIONS = false`，user 唔想見到）。
@@ -281,9 +299,18 @@ gravity 跟 `PadAlign` 反過嚟擺）：上面一（兩）行功能掣，下面
   一唔小心就會變成「左右拉埋高度都跟住變」。
   方向要跟顯示方式反（見 `onWidthDrag`）：永遠都係「拖向留白嗰邊 = 拉闊」。
 - **長撳（撳實唔拉）= 一下子拉到最闊**（`Listener.onMaxWidth`，2026-08-25 加）：
-  `widthScale` 直接寫 `MAX_WIDTH_SCALE`。`handleSizeDrag` 喺 DOWN／MOVE 一路回
-  `false`，所以 `View` 本身照計長撳；真係拉起上嚟過咗 touch slop，系統自己會取消
-  長撳，兩樣唔會撞。手機直度嘅「最闊」＝螢幕闊度（`cellW` 會頂到 `availW / cols`）。
+  `widthScale` 直接寫 `MAX_WIDTH_SCALE`。手機直度嘅「最闊」＝螢幕闊度
+  （`cellW` 會頂到 `availW / cols`）。
+
+  **粒長撳唔可以即刻做嘢，要等放手先算**（2026-08-28 執，user 踩到：
+  「左右拆開拖拖下兩橛突然併埋」）。`View` 個長撳大約半秒就 fire，而
+  **淨係手指行出咗粒掣範圍先會自動取消** —— 粒掣好闊（打橫成 170dp），
+  慢慢拖、或者好正常噉「撳落 → 停一停 → 先至拖」，長撳都會喺途中 fire，
+  即刻做就會拖到一半彈晒去最闊（喺 `SPLIT` 之下就係兩橛併埋）。
+  而家 `setOnLongClickListener` 淨係 `longPressArmed = true`，`handleSizeDrag`
+  收到 `ACTION_UP` 先睇：**有拖過（`dragging`）就當拖，冇拖過先至叫
+  `onMaxWidth()`**；一鎖實拖動方向亦都順手 `cancelLongPress()`。
+  `OptionBarsView` 同 `SidePanelView` 兩邊一模一樣，改就兩邊一齊改。
 
 **中文本體最少 `PadMetrics.MIN_CONTENT_DP`（320dp）闊**（螢幕本身窄過 320dp
 就用盡螢幕）—— 拉窄同 `widthScale` 都收唔過呢條線。順帶影響：直度手機
@@ -292,7 +319,18 @@ gravity 跟 `PadAlign` 反過嚟擺）：上面一（兩）行功能掣，下面
 
 設定頁嗰幾條尺寸 slider（按鍵大細／最大闊度／最大高度／按鍵高度／鍵盤高度）
 全部收埋咗（`SettingsActivity.SHOW_HIDDEN_OPTIONS = false`，一行 code 都冇刪），
-剩返「字體大細」同「邊框粗幼」—— 長闊而家一律喺鍵盤度直接拖。
+剩返「字體大細」（中文一條、英文一條）同「邊框粗幼」—— 長闊而家一律喺鍵盤度直接拖。
+
+### 字體大細都係分兩組（2026-08-28 user 要求）
+
+`Prefs.fontScale(ctx, group)`：`CJK` 行 `KEY_FONT_SCALE`、`LATIN` 行
+`KEY_FONT_SCALE_LATIN`（未校過就跟返 `CJK` 嗰個值，升級之後個樣唔會變）。
+中文字要夠大先睇得清，英文字母同數字用同一個倍數就會逼爆粒鍵。
+
+分組跟返 `PadGroup`（**唔係**「中文 pad vs 其餘」）：純數字 keypad 排位同大細
+本來就跟九宮格，所以字體都跟 `CJK`。`KeyboardBaseView.padGroup` 就係攞邊套嘅入口
+（預設 `CJK`，`RowsPadView` override 做 `LATIN`，`NumberPadView` 再 override 返 `CJK`），
+`fontScale` 同 `PadMetrics` 兩邊都靠佢。
 
 ### 大細設定分組存（2026-08-28 user 要求）
 
@@ -337,7 +375,7 @@ key 照留返做預設值**（`sp.getFloat(profKey(...), sp.getFloat(舊 key, 1f
 
 `Prefs.alignOptions(ctx, group)` 話你知**而家揀得邊幾個**顯示方式：
 
-- `LATIN` + 螢幕闊過 `Prefs.SPLIT_MIN_WIDTH_DP`（600dp）→ 得 `STRETCH` 同 `SPLIT`
+- `LATIN` + 螢幕闊過 `Prefs.SPLIT_MIN_WIDTH_DP`（500dp）→ 得 `STRETCH` 同 `SPLIT`
   （靠左／靠右嗰陣收起 —— 咁闊嘅螢幕靠實一邊，另一邊嗰橛位就係嘥咗）
 - 其餘（`CJK`、或者窄螢幕）→ 原本三個，冇 `SPLIT`
 
@@ -352,7 +390,13 @@ key 照留返做預設值**（`sp.getFloat(profKey(...), sp.getFloat(舊 key, 1f
 
 排位喺 `RowsPadView.buildLayout()`：每行用 `splitRow()` 由左邊夾夠一半 weight
 斬開（`asdfg` | `hjkl`、`⇧zxcv` | `bnm⌫`），兩橛各 `PadMetrics.halfW` 咁闊，
-一橛貼 `0`、一橛貼 `w - halfW`。**斬到一半嗰粒啱啱係 `␣` 就拆佢做兩粒**
+一橛貼 `0`、一橛貼 `w - halfW`。
+
+**`SPLIT` 之下最闊 = 螢幕闊度減 `PadMetrics.MIN_SPLIT_GAP_DP`（80dp）**
+（2026-08-28 user 踩到）：唔封住個頂，`widthScale` 拉到盡（或者長撳粒大細掣
+「一下子拉到最闊」）就會兩橛併埋鋪滿成行，中間條罅變 0，睇落同「拉闊」
+一模一樣 —— 用家以為分割壞咗。`contentW` 條線性式最闊嗰端跟住收窄，
+所以由最窄拉到最闊成段都用得着。**斬到一半嗰粒啱啱係 `␣` 就拆佢做兩粒**
 （`k.copy(weight = k.weight / 2f)`），唔係得左邊有 space，右手姆指撳唔到。
 
 `EmojiPadView` 同 `ClipboardListView` 唔係 `KeyboardBaseView`，
@@ -366,6 +410,38 @@ targetSdk 35+ 之後 IME window 一路去到螢幕最底，`outer` 個
 「收起鍵盤／轉鍵盤」就喺嗰度）。**嗰忽 padding 係 `outer` 自己嘅底色**——
 唔 set 就透見住下面個 app，一忽色唔同好突兀，所以 `outer.setBackgroundColor(theme.background)`
 （`root` 嗰個 background 蓋唔到 padding 區）。
+
+### 開鍵盤嗰下要補度尺寸（2026-08-28 加）
+
+由**冇到有**彈鍵盤出嚟嗰下，個窗未必即刻報得返啱嘅闊度／導覽列高度，量出嚟成塊
+鍵盤高過個窗，最底嗰行就俾導覽列冚咗 —— 要拉一拉高度或者轉一次橫直先返到正常。
+
+`TQ9InputMethodService.scheduleSizeRecheck()` 喺 `onWindowShown()`／
+`onStartInputView()`／`onConfigurationChanged()` 三個位排隊，之後每
+`SIZE_RECHECK_MS`（100ms）補度一次，總共 `SIZE_RECHECK_TRIES + 1` 次
+（＝ 100…400ms）。每次做兩件事：
+
+1. `ViewCompat.requestApplyInsets(outer)` —— 有啲機第一次唔會派 insets 落嚟，
+   底下就唔會閃開導覽列。
+2. `fixPadSizeIfOff()`：攞**而家**個 `padHolder.width` 重新計 `PadMetrics.padHeightPx`，
+   同排住嗰塊鍵盤實際高度比。**唔同先至** `relayoutPads()` + `root.requestLayout()`
+   + `refreshBars()`。真係重排過就再補多一輪（`SIZE_MAX_FIXES`，個窗要下一個
+   layout pass 先跟得上）。
+
+**除咗塊 pad 自己幾高，仲要比「擺唔擺得落」**（`padHolder.height >= pad.height`，
+2026-08-28 user 踩到）：打橫改完高度 → 熄屏 → 轉直 → 解鎖，塊 pad 自己係量返
+直度嗰套（啱），但係個窗仲係停留喺打橫嗰個高度，`padHolder` 俾裁短咗，最底成行
+唔見咗。淨係比塊 pad 就當一切正常，一路都唔會執返。
+
+但係「`padHolder` 矮過塊 pad」唔一定係出事：鍵盤本身拉到高過個螢幕（打橫好易），
+個窗頂到盡都一定裁到。所以重排之前記低度到嘅尺寸（`lastFixState`），
+**重排完一模一樣就唔再試**；一見返正常尺寸就清返做空，下次再撞到同一個壞尺寸
+照樣執。
+
+**一定要「度到唔啱先至重排」**，唔可以硬行一次 —— 唔係每次開鍵盤都會見到跳一跳。
+最後嗰句 `refreshBars()` 唔可以慳：側邊欄個高度係寫死 `PadMetrics.totalHeight` 嘅
+（見上面「中文拉窄就唔要上面條 bar」），唔重新加返就會跟住錯埋。
+emoji 表／剪貼簿跟 `forcedHeightPx`，唔喺呢度計（`as? KeyboardBaseView` 濾走）。
 
 ---
 
@@ -605,21 +681,41 @@ app 入面所有 user 見到嘅字（設定頁、toast、鍵面、空狀態提�
   要 `GROUP BY char ORDER BY MAX(freq)`。同一個碼查一次就 cache 住（`codePreviewFor`），
   唔係每撳一下鍵都查次 sqlite。
 
-## 選字擺入九宮格：中間格行先（2026-08-28 user 要求）
+## 選字擺入九宮格：**唔止一頁嘅第一頁唔准郁**
 
-一頁九隻字**唔係**由 `1` 排到 `9`，係跟 `Q9Engine.SLOT_ORDER`
-（`5 4 6 2 8 1 3 7 9`）擺：排第一嗰個字坐正中間嗰格 `5`，跟住四邊（`4 6 2 8`），
-四角（`1 3 7 9`）排最後。九宮格係 numpad 排位，`5` 喺正中最易撳，
-所以「常用字排前」推上嚟嗰個字要坐嗰度，唔係坐左下角粒 `1`。
-一頁得三隻字就淨係佔 `5 4 6`，四角吉住。
+（2026-08-28 user 要求，同日**改正**過兩次 —— 一開始成個表都用中間格次序，
+係嚴重錯誤；跟住加返「得一頁就照用」呢個特例。落手改之前睇清楚成張表。）
 
-`slotOfRank()` / `rankOfSlot()` 兩個 helper 一定要**成對咁用**，
-凡係「格號 ↔ `selectWords` 入面第幾個」嘅換算全部要行佢哋，四處：
+規矩全部寫喺 `Q9Engine.slotOrder(page, totalPage, priority)`（分頁嗰半交俾
+`centreFirst(page, totalPage)`）：
 
-- `showPage()`：`rank` → `slotOfRank(rank)` 擺落 `keys[]`
-- `selectWord(slot)` / `homoAt(slot)`：`slot` → `rankOfSlot(slot)` 攞返 index
+| 情況 | 排法 | 點解 |
+| --- | --- | --- |
+| **成個表得一頁**（`totalPage <= 1`） | **最後撳嗰個碼行先**，跟住 `SLOT_ORDER`＝`5 4 6 2 8 1 3 7 9`（打 `159` → `9 5 4 6 2 8 1 3 7`） | 揀得晒喺一版，冇下頁、冇「翻到第幾頁」，易撳行先；而隻手指啱啱就撳緊嗰格，排第一嗰個字擺返落嗰度就零位移。冇碼可攞（`0` 收尾、同音／關聯字表）就照 `SLOT_ORDER` |
+| **多過一頁**嘅第一頁（`page == 0`） | `1` 排到 `9`，同字碼表次序一模一樣 | 嗰個格號**就係隻字個碼最後嗰個數字**（狀態列「碼:」寫嘅嘢、打熟咗嘅手勢全部靠佢）。一調位就即刻全部作廢 |
+| 第二頁開始（`page > 0`） | `SLOT_ORDER` | 嗰啲字本來就冇碼可以記，一定要望住揀，所以邊格易撳擺邊格：`5` 喺正中最易撳，跟住四邊（`4 6 2 8`），四角（`1 3 7 9`）最後。嗰頁得三隻字就淨係佔 `5 4 6`，四角吉住 |
+
+所以「常用字排前」推到第一位嗰個字坐邊格**要睇有幾多頁**（得一頁 → `5`；
+唔止一頁 → `1`）—— `reorderByUsage()` 淨係換 `selectWords` 個次序，
+格號永遠由 `slotOfRank()` 話事。
+
+「最後撳嗰個碼」＝ `priorityDigit`，喺 `startSelectWord()` **清 `currCode` 之前**
+由 `currCode.lastOrNull()` 攞（`1`~`9` 先算，`0` 收尾就當冇）。`cancel()` / `reset()`
+要一齊清走，唔係下一個表會用返上一次嗰個碼。
+
+引擎入面兩個私家 helper `slotAt(rank, page)` / `rankAt(slot)` 幫你填晒
+`currPage` / `totalPage` / `priorityDigit`，一定要**成對咁用**。凡係
+「格號 ↔ `selectWords` 入面第幾個」嘅換算全部要行佢哋，四處：
+
+- `showPage(page)`：`rank` → `slotAt(rank, page)` 擺落 `keys[]`（呢個要傳 `page`，
+  因為 `currPage` 未 set 好）
+- `selectWord(slot)` / `homoAt(slot)`：`slot` → `rankAt(slot)` 攞返 index
 - `plausibility(digit)`（滑動評估，選字模式嗰段）：一樣要換
-- `pickCandidateAt(index)`（條 bar 撳落嚟嘅絕對位置）：`selectWord(slotOfRank(index % 9))`
+- `pickCandidateAt(index)`（條 bar 撳落嚟嘅絕對位置）：**先** `currPage = index / 9`，
+  跟住 `selectWord(slotAt(index % 9))`
+
+`startSelectWord()` 一定要**先** set `totalPage` 同 `priorityDigit` 先至 `showPage(0)`，
+唔係第一版就會用錯排法。`SlotOrderTest` 盯住成張表。
 
 漏咗其中一處就會「見到嘅字」同「撳落去出嘅字」對唔上，而且測唔到——
 `ChinesePadView` 淨係照 `engine.keys[d]` 畫，佢自己唔知個次序。

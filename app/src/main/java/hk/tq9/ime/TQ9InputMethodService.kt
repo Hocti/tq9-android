@@ -5,6 +5,7 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.content.res.Configuration
 import android.graphics.Color
 import android.media.AudioManager
 import android.media.ToneGenerator
@@ -189,10 +190,10 @@ class TQ9InputMethodService : android.inputmethodservice.InputMethodService(),
         engine.scOutput = Prefs.scOutput(this)
         engine.usageReorder = Prefs.usageReorder(this)
         barMode = Prefs.barMode(this)
-        // 舊版嘅 dataset.db 冇 id 1010（亦都冇 word_meta.freq / .code），
-        // 而 `ensureInstalled` 唔會覆蓋 user 手上嗰個 —— 攞唔到就跌返落速選字表
-        // （id 1000，即係以前嘅做法），總好過條 bar 一路吉住。
-        // 想攞返新功能就喺設定頁撳「還原內置字碼表」。
+        // 好舊嘅 dataset.db 冇 id 1010（亦都冇 word_meta.freq / .code）。升級而家會
+        // 自動換返新嗰份內置表，但係 user 自己揀過 sqlite 嗰啲就唔會踩親（見
+        // `Q9Db.ensureInstalled`）—— 攞唔到就跌返落速選字表（id 1000，即係以前
+        // 嘅做法），總好過條 bar 一路吉住。想攞返新功能就撳「還原內置字碼表」。
         defaultPicks = runCatching {
             db?.keyInput(DEFAULT_PICK_ID)?.takeIf { it.isNotEmpty() }
                 ?: db?.keyInput(LEGACY_PICK_ID).orEmpty()
@@ -313,10 +314,29 @@ class TQ9InputMethodService : android.inputmethodservice.InputMethodService(),
         }
         switchMode(want, force = true)
         refreshBars()
+        scheduleSizeRecheck()
+    }
+
+    /** 由**冇到有**出鍵盤嗰下個窗啱啱先定形，遲少少要再度一次（見 [scheduleSizeRecheck]） */
+    override fun onWindowShown() {
+        super.onWindowShown()
+        scheduleSizeRecheck()
+    }
+
+    override fun onWindowHidden() {
+        super.onWindowHidden()
+        ui.removeCallbacks(sizeRecheck)
+    }
+
+    /** 轉橫直／摺機開合：`Prefs.profKey` 轉咗組，成塊鍵盤要重新度過 */
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        scheduleSizeRecheck()
     }
 
     override fun onFinishInputView(finishingInput: Boolean) {
         super.onFinishInputView(finishingInput)
+        ui.removeCallbacks(sizeRecheck)
         stopStt()
         // 個欄冇咗就冇地方入返段字，唔好嘥個 API call（亦都唔好留住支咪）
         cancelAiStt()
@@ -424,6 +444,94 @@ class TQ9InputMethodService : android.inputmethodservice.InputMethodService(),
         padHeightPx = 0
         emojiPad?.forcedHeightPx = 0
         overlay?.requestLayout()
+    }
+
+    // ---- 開鍵盤嗰下再度多次尺寸 --------------------------------------------
+
+    /** 仲有幾多次補度（見 [scheduleSizeRecheck]），0 = 呢一輪度完 */
+    private var sizeRechecksLeft = 0
+
+    /**
+     * 呢一輪仲准重排幾多次（見 [recheckPadSize]）。改完個窗要下一個 layout pass
+     * 先跟得上，所以改完會再補度多一輪；有上限就唔會度極都唔啱一路重排落去。
+     */
+    private var sizeFixesLeft = 0
+
+    /**
+     * 上一次重排之前度到嘅尺寸（見 [fixPadSizeIfOff]）。重排完一模一樣就唔好再試 ——
+     * 嗰陣係真係頂到盡（鍵盤本身高過個螢幕），唔係量錯。
+     * 一見到正常尺寸就清返做空，所以淨係擋住「執極都一樣」嗰段，
+     * 之後再撞到同一個壞尺寸一樣會照執。
+     */
+    private var lastFixState = ""
+
+    private val sizeRecheck = Runnable { recheckPadSize() }
+
+    /**
+     * 由**冇到有**開鍵盤嗰下，個窗未必即刻報得返啱嘅闊度／導覽列高度：量出嚟
+     * 成塊鍵盤高過個窗，最底嗰行就俾導覽列冚咗，要拉一拉高度或者轉一次橫直
+     * 先返到正常（user 2026-08-28 踩到）。
+     *
+     * 所以出咗嚟之後每隔 [SIZE_RECHECK_MS] 補度 [SIZE_RECHECK_TRIES] 次
+     * ——**度到唔啱先至重排**，啱就乜都唔做，平時開鍵盤唔會見到跳一跳。
+     */
+    private fun scheduleSizeRecheck() {
+        if (!::padHolder.isInitialized) return
+        sizeRechecksLeft = SIZE_RECHECK_TRIES
+        sizeFixesLeft = SIZE_MAX_FIXES
+        ui.removeCallbacks(sizeRecheck)
+        ui.postDelayed(sizeRecheck, SIZE_RECHECK_MS)
+    }
+
+    private fun recheckPadSize() {
+        if (!::padHolder.isInitialized) return
+        // 有啲機第一次唔會派 insets 落嚟，底下就唔會閃開導覽列
+        // （見 AGENTS.md「底下閃開導覽列嗰條要有底色」）
+        ViewCompat.requestApplyInsets(outer)
+        // 真係重排咗就再補度多一輪：個窗要下一個 layout pass 先跟得上，
+        // 一次未必夠（鎖住屏幕轉橫直嗰個 case 就係）
+        if (fixPadSizeIfOff() && sizeFixesLeft > 0) {
+            sizeFixesLeft--
+            sizeRechecksLeft = SIZE_RECHECK_TRIES
+        }
+        if (sizeRechecksLeft > 0) {
+            sizeRechecksLeft--
+            ui.postDelayed(sizeRecheck, SIZE_RECHECK_MS)
+        }
+    }
+
+    /**
+     * 而家排住嗰塊鍵盤，同用**而家**個闊度重新計出嚟嘅高度唔同 → 開頭嗰次量錯咗，
+     * 重排一次，回傳有冇真係重排過。連 `refreshBars()` 都要行返：側邊欄個高度係寫死
+     * `PadMetrics.totalHeight` 嘅（見「中文拉窄就唔要上面條 bar」），唔重新加返就會跟住錯埋。
+     *
+     * **塊 pad 自己夠唔夠位擺都要比。** 打橫改完高度、熄咗屏幕轉返直、再解鎖
+     * 嗰下（2026-08-28 user 踩到）：塊 pad 自己係量返啱嘅（直度嗰套 630），
+     * 但係個窗仲係停留喺打橫嗰個高度，`padHolder` 得 504 咁高，最底成行俾裁走 ——
+     * 淨係比塊 pad 就當一切正常，要拉一拉高度或者再轉多次橫直先返到正常。
+     *
+     * 但係「`padHolder` 矮過塊 pad」唔一定係出事：鍵盤本身拉到高過個螢幕
+     * （打橫好易），個窗頂到盡都一定裁到。所以重排之前記低度到嘅尺寸
+     * （[lastFixState]），**重排完一模一樣就唔再試**，唔係就會一路重排落去。
+     */
+    private fun fixPadSizeIfOff(): Boolean {
+        // emoji 表／剪貼簿係跟 `forcedHeightPx`，唔喺度計
+        val pad = padHolder.getChildAt(0) as? KeyboardBaseView ?: return false
+        val w = padHolder.width
+        if (w <= 0 || pad.height <= 0) return false
+        val want = PadMetrics.padHeightPx(this, w, padGroup).roundToInt()
+        // 量啱咗（塊 pad 高度啱），而且真係擺得落（個 holder 冇裁到佢）
+        if (abs(pad.height - want) <= 1 && padHolder.height >= pad.height - 1) {
+            lastFixState = "" // 而家正常，下次再撞到同一個壞尺寸都要照執
+            return false
+        }
+        val state = "${padHolder.width}x${padHolder.height}/${pad.height}/${outer.height}/$want"
+        if (state == lastFixState) return false
+        lastFixState = state
+        relayoutPads()
+        root.requestLayout()
+        refreshBars()
+        return true
     }
 
     // ---- Q9Engine.Host ----------------------------------------------------
@@ -1810,5 +1918,11 @@ class TQ9InputMethodService : android.inputmethodservice.InputMethodService(),
         private const val LEGACY_PICK_ID = 1000
         /** 打咗一兩個碼嗰陣，條 bar 出幾多隻「呢個碼最常用」嘅字 */
         private const val BAR_PREVIEW_COUNT = 9
+        /** 開完鍵盤幾耐補度一次尺寸（見 [scheduleSizeRecheck]） */
+        private const val SIZE_RECHECK_MS = 100L
+        /** 補度幾多次 —— 有啲機要等埋 insets 落嚟先報得到啱嘅高度 */
+        private const val SIZE_RECHECK_TRIES = 3
+        /** 一輪入面最多重排幾多次（見 [recheckPadSize]），唔係就可能一路重排落去 */
+        private const val SIZE_MAX_FIXES = 2
     }
 }

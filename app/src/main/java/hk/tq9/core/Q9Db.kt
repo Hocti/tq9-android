@@ -3,6 +3,7 @@ package hk.tq9.core
 import android.content.Context
 import android.database.sqlite.SQLiteDatabase
 import android.net.Uri
+import android.os.Build
 import android.util.Log
 import java.io.File
 import java.text.BreakIterator
@@ -12,7 +13,9 @@ import kotlin.math.ln
  * 字碼資料庫。對應 Windows 版的 Q9Core.cs。
  *
  * 資料庫檔案放喺 filesDir/dataset.db，第一次開機由 assets 複製過去，
- * setting page 可以揀另一個 sqlite file 直接覆蓋（舊版唔會保留）。
+ * **裝咗新版 apk 亦都會抄多次**（見 [Q9Db.ensureInstalled]）。
+ * setting page 可以揀另一個 sqlite file 直接覆蓋（舊版唔會保留），
+ * 換過之後就當係 user 自己嘅嘢，升級唔會再踩親。
  */
 class Q9Db private constructor(private val db: SQLiteDatabase) {
 
@@ -192,10 +195,22 @@ class Q9Db private constructor(private val db: SQLiteDatabase) {
 
         fun file(ctx: Context): File = File(ctx.applicationContext.filesDir, DB_NAME)
 
-        /** 第一次執行：由 assets 複製內置字碼表 */
+        /**
+         * 第一次執行：由 assets 複製內置字碼表。
+         *
+         * **裝咗新版 apk 亦都會抄多次**（[Prefs.dbAssetVersion] 對唔上而家個
+         * versionCode）—— 以前淨係「檔案存在就唔理」，所以由舊版升上嚟嗰啲人
+         * 一世都用緊當初裝機嗰份，新版點改字碼表都冇效。
+         *
+         * **除非 user 自己揀過 sqlite 換走佢**（[isCustom]）：嗰份係佢自己嘅嘢，
+         * 升幾多次版都唔准踩親，要撳設定頁「還原內置字碼表」先返得轉頭。
+         */
         fun ensureInstalled(ctx: Context) {
             val f = file(ctx)
-            if (f.exists() && f.length() > 0) return
+            if (!f.exists() || f.length() <= 0) { installFromAssets(ctx); return }
+            if (isCustom(ctx)) return
+            val v = appVersion(ctx)
+            if (v <= 0 || Prefs.dbAssetVersion(ctx) == v) return
             installFromAssets(ctx)
         }
 
@@ -205,10 +220,31 @@ class Q9Db private constructor(private val db: SQLiteDatabase) {
             ctx.assets.open(DB_NAME).use { input ->
                 f.outputStream().use { out -> input.copyTo(out) }
             }
-            Prefs.setDbLabel(ctx, "內置 dataset.db")
+            Prefs.setDbLabel(ctx, Prefs.BUILTIN_DB_LABEL)
+            Prefs.setDbCustom(ctx, false)
+            Prefs.setDbAssetVersion(ctx, appVersion(ctx))
         }
 
-        /** setting page 揀咗新 sqlite：直接覆蓋，舊版唔留 */
+        /**
+         * User 係咪自己換過字碼表。舊版冇記過 [Prefs.dbCustom]，所以連個 label
+         * 一齊睇 —— 換過就會寫住嗰個檔案名，唔會係 [Prefs.BUILTIN_DB_LABEL]。
+         */
+        private fun isCustom(ctx: Context): Boolean =
+            Prefs.dbCustom(ctx) || Prefs.dbLabel(ctx) != Prefs.BUILTIN_DB_LABEL
+
+        /** 而家個 apk 嘅 versionCode（問唔到就 `0`，嗰陣當冇升過級，唔會亂咁覆蓋） */
+        private fun appVersion(ctx: Context): Long {
+            val pi = runCatching {
+                ctx.packageManager.getPackageInfo(ctx.packageName, 0)
+            }.getOrNull() ?: return 0L
+            return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) pi.longVersionCode
+                   else @Suppress("DEPRECATION") pi.versionCode.toLong()
+        }
+
+        /**
+         * setting page 揀咗新 sqlite：直接覆蓋，舊版唔留。
+         * 順手記低「呢部機用緊自己嘅字碼表」，之後升級唔會由 assets 抄返過去。
+         */
         fun replaceFrom(ctx: Context, uri: Uri): Result<Unit> = runCatching {
             val tmp = File(ctx.cacheDir, "incoming.db")
             ctx.contentResolver.openInputStream(uri)?.use { input ->
@@ -219,6 +255,7 @@ class Q9Db private constructor(private val db: SQLiteDatabase) {
             if (target.exists()) target.delete()
             tmp.copyTo(target, overwrite = true)
             tmp.delete()
+            Prefs.setDbCustom(ctx, true)
         }
 
         private fun validate(f: File) {
