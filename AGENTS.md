@@ -274,10 +274,57 @@ ui/     SettingsActivity / MicPermissionActivity
 
 ### 上面條 bar 三段都係一行
 
-`OptionBarsView` 三段（`BarMode`）每段都係得**一行 42dp**。以前有條「狀態」細字
+`OptionBarsView` 三段（`BarMode`）每段都係得**一行**。以前有條「狀態」細字
 （字碼、`[同音]`、頁數）擺喺最上面，一出現就成個鍵盤高咗一截，已經**拆咗**——
 `Q9Engine.status` 仲計緊，但係冇人畫。要出 message 就用 `toast()`，
 唔好再喺條 bar 上面加行。
+
+高度**唔再係寫死 42dp**（2026-08-29 user 要求）：由 `CandChip` 度候選字實際
+要幾高，再加上下 3dp margin，最矮 42dp。100% 之下實測 47dp。
+**三段共用同一個高度**，轉段一樣唔會跳。
+
+改完字體要行 `bars.refreshFontScale()`（`refreshBars()` 入面，喺
+`setCandidates` 之前）—— 佢見到 sp 冇變就即刻返轉頭，所以逐粒鍵行都唔怕。
+側邊欄嗰邊係 `SidePanelView.refreshFontScale()`：**唔可以靠 `setCandidates`**，
+佢見個 list 冇變就唔會重砌啲 chip，改完字體返嚟仲係舊 size。
+
+### 候選字 chip 嘅高度／padding 一定要行 `CandChip`
+
+大細全部喺 `CandChip` 度計，`OptionBarsView` 同 `SidePanelView` 兩份 `makeChip()`
+共用。裡面有兩個踩過嘅坑（2026-08-29 user 影實機相踩到「上面 padding 多過下面」），
+改之前一定要睇：
+
+1. **唔可以問 `Paint` 攞 metrics 去定高度。** `Paint.getFontMetrics()` 回嘅係
+   **primary typeface（拉丁）**嗰套；中文字係跌落 CJK fallback 字型畫。實測
+   20sp / density 2.625：`Paint` 話 `descent - ascent` = 61.5px，但真正
+   `layout.height` = 75px。用細嗰個數，chip（要 105px）就會俾 `AT_MOST`
+   迫窄到 96px，上下 padding 寫到幾對稱都冇用。所以要**開個真 `TextView` 度**。
+2. **`gravity = CENTER` 置中嘅係 line box，唔係個字嘅墨。** CJK 個墨企得高：
+   baseline 上面 box 有 60px 但個墨淨係去到 44，下面 box 15 個墨得 5 ——
+   上面鬆 16、下面鬆 10，置中完個字實偏低。所以 `padTop` / `padBottom`
+   **特登唔對稱**（實測 13 / 18），差額啱啱抵消。
+
+度嘅時候用**固定嘅參考字**（中文 `字`、英文 `Ag`），**唔可以**用 chip 自己
+嗰個字 —— 唔同字個墨唔同高（`一` 淨係一橫、`我` 佔成格），逐個各自置中就會
+粒粒 baseline 唔同，一行睇落高高低低。實測結果（gapTop/gapBot）：
+`我` 29/28、`的` 28/29、`一` 50/51、`是` 30/28、`不` 32/28。
+
+### 字體大細：條 slider 淨係郁得到「字」，郁唔到功能鍵
+
+設定頁兩條字體 slider（`Prefs.KEY_FONT_SCALE` / `..._LATIN`）**淨係**放大
+真係打得出嚟嗰啲字符：九宮格嘅候選字同筆形提示、英文字母、符號、數字，
+加埋上面條 bar 同側邊欄嘅候選字（`Prefs.candTextSp`）。
+
+**功能鍵（同音、取消、Eng、中、⌫、⏎、␣、?123、€£¥…）唔跟**
+（2026-08-29 user 要求）：行 `Prefs.funcFontScale()`，永遠當 100%
+（英文組照樣乘 `LATIN_FONT_BOOST`，所以 slider 停喺 100% 個樣同以前一樣）。
+粒鍵做乜早就記熟咗，唔使睇得咁清，跟住一齊大就逼爆粒鍵。
+
+畫嗰陣點分：`RowsPadView` 睇 `isFunctionKey(k)`（`action != CHAR`），
+`ChinesePadView` 就係 `drawFunction()` 嗰條路（`DIGIT` 以外全部）。
+**成粒鍵一齊行同一個倍數** —— 鍵面個 label、左上／左下／右上角細字、
+`Eng` 個 🌐，全部都要傳 `scale =` 落 `KeyboardBaseView` 嗰幾個 `draw*` helper，
+唔好淨係改個 label。工具 bar 嗰啲圖案（`ICON_DP`）同一個道理，一樣唔跟。
 
 ### 粒 `▼`（拉大候選字）淨係喺真係捲得到嗰陣先出
 

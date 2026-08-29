@@ -1086,6 +1086,10 @@ class TQ9InputMethodService : android.inputmethodservice.InputMethodService(),
             return
         }
 
+        // 大細／貼邊／候選字字體全部跟而家見緊嗰組（見 [padGroup]）。要喺
+        // setCandidates 之前做 —— 條 bar 幾高、啲 chip 幾大都係跟呢個組行
+        bars.padGroup = padGroup
+        bars.refreshFontScale()
         bars.setMode(effective)
         bars.setCandidates(if (effective == BarMode.CANDIDATES) cands else emptyList())
         bars.setCloseVisible(specialPad)
@@ -1096,9 +1100,9 @@ class TQ9InputMethodService : android.inputmethodservice.InputMethodService(),
         bars.setAiVisible(aiKeySet)
         // 大細／貼邊分咗兩組存，粒「靠左／靠右」掣要拉、要著返邊個樣，
         // 都係跟而家見緊嗰組（見 [padGroup]）
-        bars.padGroup = padGroup
         bars.refreshAlignLabel()
-        // 條 bar 高度定死，唔會因為有冇候選字而跳高跳低
+        // 條 bar 高度淨係跟候選字嘅字體行（見 [OptionBarsView.barHeightFor]），
+        // 唔會因為有冇候選字、而家喺邊一段而跳高跳低
         bars.visibility = if (effective == BarMode.OFF) View.GONE else View.VISIBLE
     }
 
@@ -1192,6 +1196,7 @@ class TQ9InputMethodService : android.inputmethodservice.InputMethodService(),
             old.gravity != lp.gravity) {
             panel.layoutParams = lp
         }
+        panel.refreshFontScale()
         panel.setCandidates(cands)
         panel.setAiReady(aiUsable)
         panel.setAiVisible(aiKeySet)

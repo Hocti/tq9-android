@@ -301,6 +301,29 @@ object Prefs {
     fun fontScale(ctx: Context, g: PadGroup = PadGroup.CJK): Float =
         fontScalePref(ctx, g) * if (g == PadGroup.LATIN) LATIN_FONT_BOOST else 1f
 
+    /**
+     * **功能鍵**（同音、Eng、中、⌫、⏎、␣、?123…）鍵面用嘅倍數 ——
+     * 固定係 100%，**唔跟設定頁條 slider**（2026-08-29 user 要求）。
+     *
+     * 條 slider 係為咗睇清楚**啲字**（九宮格出嘅候選字、英文字母、符號）而拉嘅；
+     * 功能鍵寫住嗰兩三隻中文字跟住一齊大就會逼爆粒鍵，而且粒鍵做乜早就記熟咗，
+     * 根本唔使睇得咁清。英文組照樣乘 [LATIN_FONT_BOOST]，所以條 slider 停喺 100%
+     * 嗰陣個樣同以前一模一樣。
+     */
+    fun funcFontScale(g: PadGroup = PadGroup.CJK): Float =
+        if (g == PadGroup.LATIN) LATIN_FONT_BOOST else 1f
+
+    /** 上面條 bar／側邊欄嘅候選字，倍數 100% 嗰陣幾大（sp） */
+    const val CAND_TEXT_SP = 20f
+
+    /**
+     * 候選字幾大（sp）。跟 [fontScalePref]（**唔乘** [LATIN_FONT_BOOST] ——
+     * 嗰個倍數係為咗補返鍵面咁窄，條 bar 唔關事），條 bar 高度亦都跟住佢大
+     * （見 `OptionBarsView.barHeightFor`）。
+     */
+    fun candTextSp(ctx: Context, g: PadGroup = PadGroup.CJK): Float =
+        CAND_TEXT_SP * fontScalePref(ctx, g)
+
     /** 拉高／拉低成個鍵盤（每個螢幕尺寸 × [PadGroup] 各有各套，見 [profKey]） */
     fun heightScale(ctx: Context, g: PadGroup = PadGroup.CJK) =
         sp(ctx).getFloat(profKey(ctx, KEY_HEIGHT_SCALE, g), sp(ctx).getFloat(KEY_HEIGHT_SCALE, 1.0f))

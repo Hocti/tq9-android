@@ -316,27 +316,30 @@ class ChinesePadView(context: Context, private val engine: Q9Engine) : KeyboardB
             else -> theme.keyFaceAlt
         }
         drawFace(canvas, box, color)
+        // 功能鍵成粒都行 [funcFontScale]：設定頁條字體 slider 係為咗睇清楚啲**字**
+        // （下面啲候選字）而拉，「同音」「取消」「Eng」呢啲跟住一齊大就逼爆粒鍵
         drawLabel(
             canvas, box, labelOf(k),
             sizeRatio = if (k.action == KeyAction.CANCEL) 0.36f else 0.40f,
-            color = if (usable) theme.text else theme.textDim
+            color = if (usable) theme.text else theme.textDim,
+            scale = funcFontScale
         )
         // `on` 淨係同音／簡體／工具 bar 三粒先會 true，嗰陣粒鍵係 accent 色底
         val hintColor = if (on) theme.onAccentText else theme.textDim
         // 左上角跟返成個 app 嘅規矩：**一律寫「長撳做乜」**
-        if (k.hint.isNotEmpty()) drawCornerHint(canvas, box, k.hint, hintColor)
+        if (k.hint.isNotEmpty()) drawCornerHint(canvas, box, k.hint, hintColor, funcFontScale)
         if (k.action == KeyAction.HOMO) {
             // 同音鍵嘅即時提示喺**左下角**（左上角個位讓咗俾長撳）：攤開緊同音字表
             // 就寫住而家搵緊邊隻字嘅同音（成頁都係同音字，冇個字擺喺度就唔知搵緊
             // 邊隻）；揀完就換做嗰個字正路點打嘅字碼
             val tip = engine.homoWord.ifEmpty { engine.homoCodeHint }
-            if (tip.isNotEmpty()) drawCornerHintBottom(canvas, box, tip, hintColor)
+            if (tip.isNotEmpty()) drawCornerHintBottom(canvas, box, tip, hintColor, funcFontScale)
         }
         // `Eng` 長撳 = 轉輸入法，所以左上角擺個地球（獨立嗰粒 🌐 收埋咗，
         // 冇呢個 icon 就冇人知撳得長撳，見 [engLongAction]）
         if (k.action == KeyAction.TO_LATIN &&
             (k.longAction == KeyAction.IME_SWITCH || k.longAction == KeyAction.IME_PICKER)) {
-            drawCornerIcon(canvas, box, ToolIcon.GLOBE, hintColor)
+            drawCornerIcon(canvas, box, ToolIcon.GLOBE, hintColor, funcFontScale)
         }
     }
 }

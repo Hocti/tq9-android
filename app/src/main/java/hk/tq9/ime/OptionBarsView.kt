@@ -32,7 +32,8 @@ import kotlin.math.roundToInt
  *  [BarMode.TOOLS]      大細位置、貼上、emoji、AI
  *
  * emoji 表／剪貼簿開住嗰陣，最左嗰粒位讓返俾 ✖（[setCloseVisible]），
- * 唔會同切換掣同時出現。無論邊個狀態都係得一行 42dp，所以轉狀態唔會令個鍵盤跳高跳低。
+ * 唔會同切換掣同時出現。三段都係**得一行**，而且三段一樣高（見 [barHeightFor]），
+ * 所以轉狀態唔會令個鍵盤跳高跳低。
  */
 @SuppressLint("ViewConstructor")
 class OptionBarsView(context: Context) : LinearLayout(context) {
@@ -117,10 +118,20 @@ class OptionBarsView(context: Context) : LinearLayout(context) {
     private fun dp(v: Float) =
         TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, v, resources.displayMetrics)
 
-    private val barH get() = dp(42f).roundToInt()
+    /** 候選字而家幾大（sp）。跟 [padGroup] 嗰組嘅字體設定，見 [Prefs.candTextSp] */
+    private var candSp = 0f
+
+    /**
+     * chip 而家幾高、上下 padding 各幾多（見 [CandChip]）。條 bar 嘅高度就係
+     * 由佢嚟 —— **三段（關／候選字／工具）共用同一個高度**，工具嗰行冇候選字
+     * 都一樣要跟，唔係轉一轉段個鍵盤就跳高跳低。
+     */
+    private var chip = CandChip.measure(context, Prefs.candTextSp(context), PadGroup.CJK)
 
     init {
         orientation = VERTICAL
+        candSp = Prefs.candTextSp(context, padGroup)
+        chip = CandChip.measure(context, candSp, padGroup)
 
         @Suppress("ClickableViewAccessibility")
         sizeBtn.apply {
@@ -212,7 +223,7 @@ class OptionBarsView(context: Context) : LinearLayout(context) {
         // 同一個位、同一份 LayoutParams —— GONE 嗰粒唔佔位，所以永遠淨係得一粒喺最左見到
         barRow.addView(switchBtn, LayoutParams(closeLp))
         barRow.addView(swap, LayoutParams(0, LayoutParams.MATCH_PARENT, 1f))
-        addView(barRow, LayoutParams(LayoutParams.MATCH_PARENT, barH))
+        addView(barRow, LayoutParams(LayoutParams.MATCH_PARENT, CandChip.barHeightPx(context, chip)))
 
         applyTheme(theme)
         refreshAlignLabel()
@@ -379,21 +390,40 @@ class OptionBarsView(context: Context) : LinearLayout(context) {
 
     private fun makeChip(text: String, index: Int): TextView = TextView(context).apply {
         this.text = text
-        textSize = 20f
+        textSize = candSp
         gravity = Gravity.CENTER
+        // 熄咗 `includeFontPadding`，再用 [CandChip] 計出嚟嗰個**唔對稱** padding
+        // —— 兩樣都要，個字先至真係睇落上下置中（點解見 [CandChip]）
+        includeFontPadding = false
         setTextColor(theme.text)
         background = chipBg(theme.keyFace)
-        val h = dp(6f).toInt()
-        setPadding(dp(10f).toInt(), h, dp(10f).toInt(), h)
+        setPadding(dp(10f).toInt(), chip.padTop, dp(10f).toInt(), chip.padBottom)
         minWidth = dp(38f).roundToInt()
         setOnClickListener { listener?.onPickCandidate(index) }
+    }
+
+    /**
+     * 設定頁校完字體、或者轉咗組（中↔英）之後重新計啲候選字幾大、條 bar 幾高。
+     *
+     * `refreshBars()` 每撳一粒鍵都會行一次，所以**冇變就即刻返轉頭** ——
+     * 唔係就次次都 `requestLayout` 成條 bar。
+     */
+    fun refreshFontScale() {
+        val want = Prefs.candTextSp(context, padGroup)
+        if (want == candSp) return
+        candSp = want
+        chip = CandChip.measure(context, want, padGroup)
+        barRow.layoutParams = barRow.layoutParams.also {
+            it.height = CandChip.barHeightPx(context, chip)
+        }
+        rebuildChips()
     }
 
     private fun rebuildChips() {
         strip.removeAllViews()
         flow.removeAllViews()
         val target: ViewGroup = if (expanded) flow else strip
-        val gap = dp(3f).toInt()
+        val gap = dp(CandChip.MARGIN_DP).toInt()
         for ((i, w) in candidates.withIndex()) {
             if (w.isEmpty()) continue
             val chip = makeChip(w, i)
@@ -486,7 +516,11 @@ class OptionBarsView(context: Context) : LinearLayout(context) {
     private var horizontal = false
 
     private companion object {
-        /** 工具掣個圖案畫幾大（粒掣本身 42dp 高，減埋上下 3dp padding） */
+        /**
+         * 工具掣個圖案畫幾大。**唔跟字體 slider 行** —— 佢哋係功能掣，
+         * 同鍵盤啲功能鍵一樣（見 [Prefs.funcFontScale]）；條 bar 拉高咗就
+         * 上下鬆啲，個圖案唔會跟住大。
+         */
         const val ICON_DP = 21f
     }
 }

@@ -70,6 +70,13 @@ abstract class KeyboardBaseView(context: Context) : View(context) {
     protected val gapPx get() = dp(Prefs.gapDp(context).toFloat())
     /** 字體大細兩組各有各一個（見 [Prefs.fontScale]） */
     protected val fontScale get() = Prefs.fontScale(context, padGroup)
+
+    /**
+     * 功能鍵（同音／Eng／⌫／⏎…）用嘅倍數 —— **唔跟設定頁條 slider**
+     * （見 [Prefs.funcFontScale]）。畫功能鍵嗰陣要成粒鍵一齊行呢個倍數：
+     * 鍵面個 label、左上／左下／右上角嗰啲細字、同埋 `Eng` 個 🌐 都係。
+     */
+    protected val funcFontScale get() = Prefs.funcFontScale(padGroup)
     protected val radius get() = dp(6f)
 
     protected val tracker = GestureKeyTracker(
@@ -581,15 +588,21 @@ abstract class KeyboardBaseView(context: Context) : View(context) {
         else -> theme.keyFace
     }
 
-    /** 置中文字，會按格闊自動縮細 */
+    /**
+     * 置中文字，會按格闊自動縮細。
+     *
+     * [scale] 預設係設定頁條 slider（[fontScale]）；功能鍵要傳 [funcFontScale]
+     * 入嚟，佢哋唔跟條 slider 行。
+     */
     protected fun drawLabel(
         canvas: Canvas, box: KeyBox, s: String,
-        sizeRatio: Float = 0.42f, color: Int = theme.text, bold: Boolean = false
+        sizeRatio: Float = 0.42f, color: Int = theme.text, bold: Boolean = false,
+        scale: Float = fontScale
     ) {
         if (s.isEmpty()) return
         textPaint.isFakeBoldText = bold
         textPaint.color = color
-        val base = min(box.w, box.h) * sizeRatio * fontScale
+        val base = min(box.w, box.h) * sizeRatio * scale
         var size = base
         textPaint.textSize = size
         val avail = box.w - gapPx * 2 - dp(4f)
@@ -602,12 +615,15 @@ abstract class KeyboardBaseView(context: Context) : View(context) {
         canvas.drawText(s, box.cx, box.cy - (fm.ascent + fm.descent) / 2f, textPaint)
     }
 
-    protected fun drawCornerHint(canvas: Canvas, box: KeyBox, s: String, color: Int = theme.textDim) {
+    protected fun drawCornerHint(
+        canvas: Canvas, box: KeyBox, s: String, color: Int = theme.textDim,
+        scale: Float = fontScale
+    ) {
         if (s.isEmpty()) return
         textPaint.isFakeBoldText = false
         textPaint.color = color
         textPaint.textAlign = Paint.Align.LEFT
-        textPaint.textSize = min(box.w, box.h) * 0.2f * fontScale
+        textPaint.textSize = min(box.w, box.h) * 0.2f * scale
         val avail = box.w - gapPx * 2 - dp(4f)
         val need = textPaint.measureText(s)
         if (need > avail) textPaint.textSize *= avail / need
@@ -621,12 +637,15 @@ abstract class KeyboardBaseView(context: Context) : View(context) {
      * 左上角個位有規矩 —— 一律係「長撳做乜」（見 [drawCornerHint] 啲 caller），
      * 所以要多寫一段**即時狀態**（例如同音鍵而家搵緊邊隻字）就落呢度。
      */
-    protected fun drawCornerHintBottom(canvas: Canvas, box: KeyBox, s: String, color: Int = theme.textDim) {
+    protected fun drawCornerHintBottom(
+        canvas: Canvas, box: KeyBox, s: String, color: Int = theme.textDim,
+        scale: Float = fontScale
+    ) {
         if (s.isEmpty()) return
         textPaint.isFakeBoldText = false
         textPaint.color = color
         textPaint.textAlign = Paint.Align.LEFT
-        textPaint.textSize = min(box.w, box.h) * 0.2f * fontScale
+        textPaint.textSize = min(box.w, box.h) * 0.2f * scale
         val avail = box.w - gapPx * 2 - dp(4f)
         val need = textPaint.measureText(s)
         if (need > avail) textPaint.textSize *= avail / need
@@ -643,10 +662,13 @@ abstract class KeyboardBaseView(context: Context) : View(context) {
      * 唔寫 emoji —— 鍵面其餘全部單色，一粒彩色 emoji 好突兀（同
      * [ToolIcons] 個講法一樣）。Drawable cache 住，唔好每 frame 起過。
      */
-    protected fun drawCornerIcon(canvas: Canvas, box: KeyBox, icon: ToolIcon, color: Int = theme.textDim) {
+    protected fun drawCornerIcon(
+        canvas: Canvas, box: KeyBox, icon: ToolIcon, color: Int = theme.textDim,
+        scale: Float = fontScale
+    ) {
         val d = cornerIcons.getOrPut(icon to color) { ToolIconDrawable(icon, color) }
         // 比左上角細字大少少：呢個 icon 冇字咁多線索，太細就乜都睇唔到
-        val size = (min(box.w, box.h) * 0.26f * fontScale).roundToInt().coerceAtLeast(1)
+        val size = (min(box.w, box.h) * 0.26f * scale).roundToInt().coerceAtLeast(1)
         val l = (box.left + gapPx + dp(2f)).roundToInt()
         val t = (box.top + gapPx + dp(1f)).roundToInt()
         d.setBounds(l, t, l + size, t + size)
@@ -656,12 +678,15 @@ abstract class KeyboardBaseView(context: Context) : View(context) {
     private val cornerIcons = HashMap<Pair<ToolIcon, Int>, ToolIconDrawable>()
 
     /** 右上角細字（長撳彈得出嘅符號） */
-    protected fun drawCornerHintRight(canvas: Canvas, box: KeyBox, s: String, color: Int = theme.textDim) {
+    protected fun drawCornerHintRight(
+        canvas: Canvas, box: KeyBox, s: String, color: Int = theme.textDim,
+        scale: Float = fontScale
+    ) {
         if (s.isEmpty()) return
         textPaint.isFakeBoldText = false
         textPaint.color = color
         textPaint.textAlign = Paint.Align.RIGHT
-        textPaint.textSize = min(box.w, box.h) * 0.2f * fontScale
+        textPaint.textSize = min(box.w, box.h) * 0.2f * scale
         val avail = box.w - gapPx * 2 - dp(4f)
         val need = textPaint.measureText(s)
         if (need > avail) textPaint.textSize *= avail / need

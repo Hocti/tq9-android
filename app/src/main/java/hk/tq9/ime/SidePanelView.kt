@@ -13,6 +13,7 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import hk.tq9.core.PadAlign
+import hk.tq9.core.PadGroup
 import hk.tq9.core.Prefs
 import kotlin.math.abs
 import kotlin.math.roundToInt
@@ -55,6 +56,12 @@ class SidePanelView(context: Context) : LinearLayout(context) {
     private var candidates: List<String> = emptyList()
     private var aiReady = false
     private var sttActive = false
+
+    /** 候選字而家幾大（sp），見 [Prefs.candTextSp]。側邊欄淨係中文，所以永遠 CJK 嗰組 */
+    private var candSp = Prefs.candTextSp(context)
+
+    /** chip 上下 padding（**特登唔對稱**，點解見 [CandChip]），同上面條 bar 一模一樣 */
+    private var chip = CandChip.measure(context, candSp, PadGroup.CJK)
 
     private fun dp(v: Float) =
         TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, v, resources.displayMetrics)
@@ -197,6 +204,21 @@ class SidePanelView(context: Context) : LinearLayout(context) {
         candScroll.scrollTo(0, 0)
     }
 
+    /**
+     * 設定頁校完字體之後重新砌啲 chip。**唔可以靠 [setCandidates]** ——
+     * 佢見到個 list 冇變就唔會做嘢，改完字體返嚟啲字仲係舊 size。
+     *
+     * 側邊欄啲 chip 係 flow 排、下面又有得 scroll，字大咗自己會摺多行，
+     * 所以唔使似 [OptionBarsView] 咁計高度。
+     */
+    fun refreshFontScale() {
+        val want = Prefs.candTextSp(context)
+        if (want == candSp) return
+        candSp = want
+        chip = CandChip.measure(context, want, PadGroup.CJK)
+        rebuildChips()
+    }
+
     private fun rebuildChips() {
         candFlow.removeAllViews()
         for ((i, w) in candidates.withIndex()) {
@@ -205,14 +227,17 @@ class SidePanelView(context: Context) : LinearLayout(context) {
         }
     }
 
+    /** 同 [OptionBarsView.makeChip] 一樣，字體跟設定頁條 slider（[Prefs.candTextSp]） */
     private fun makeChip(text: String, index: Int): TextView = TextView(context).apply {
         this.text = text
-        textSize = 20f
+        textSize = candSp
         gravity = Gravity.CENTER
+        // 同 [OptionBarsView.makeChip] 一樣：熄咗 includeFontPadding，
+        // 再用 [CandChip] 嗰個唔對稱 padding，個字先至睇落上下置中
+        includeFontPadding = false
         setTextColor(theme.text)
         background = chipBg(theme.keyFace)
-        val h = dp(6f).toInt()
-        setPadding(dp(10f).toInt(), h, dp(10f).toInt(), h)
+        setPadding(dp(10f).toInt(), chip.padTop, dp(10f).toInt(), chip.padBottom)
         minWidth = dp(38f).roundToInt()
         setOnClickListener { listener?.onPickCandidate(index) }
     }

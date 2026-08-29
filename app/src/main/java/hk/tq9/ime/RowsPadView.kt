@@ -102,6 +102,9 @@ abstract class RowsPadView(context: Context) : KeyboardBaseView(context) {
             else -> theme.keyFace
         }
         drawFace(canvas, box, face)
+        // 功能鍵（Eng／中／⌫／⏎／⇧／?123…）唔跟設定頁條字體 slider ——
+        // 條 slider 淨係郁得到真係打得出嚟嗰啲字符（見 [Prefs.funcFontScale]）
+        val scale = if (isFunctionKey(k)) funcFontScale else fontScale
         drawLabel(
             canvas, box, displayLabel(k),
             sizeRatio = if (k.bigLabel) 0.44f else 0.36f,
@@ -109,10 +112,11 @@ abstract class RowsPadView(context: Context) : KeyboardBaseView(context) {
                 !keyEnabled(k) -> theme.textDim
                 k.accent -> theme.onAccentText
                 else -> theme.text
-            }
+            },
+            scale = scale
         )
-        if (k.hint.isNotEmpty()) drawCornerHint(canvas, box, k.hint)
-        if (k.hintRight.isNotEmpty()) drawCornerHintRight(canvas, box, k.hintRight)
+        if (k.hint.isNotEmpty()) drawCornerHint(canvas, box, k.hint, scale = scale)
+        if (k.hintRight.isNotEmpty()) drawCornerHintRight(canvas, box, k.hintRight, scale = scale)
     }
 
     protected open fun displayLabel(k: Key): String = labelOf(k)
