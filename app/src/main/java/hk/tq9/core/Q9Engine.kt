@@ -67,14 +67,6 @@ class Q9Engine(val db: Q9Db) {
     var currPage: Int = 0; private set
     var totalPage: Int = 0; private set
 
-    /**
-     * 攤開而家個字表之前，最後撳嗰個碼（`1`~`9`；`0` 收尾、或者根本冇打過碼就 `0`）。
-     *
-     * 隻手指啱啱就喺嗰格，所以**得一頁**嘅時候排第一嗰個字就擺返落嗰格，
-     * 撳落去唔使郁位。詳情見 [slotOrder]。
-     */
-    private var priorityDigit: Int = 0
-
     /** 送去 option bar 顯示嘅關聯字（未入選字模式嗰陣） */
     var relateHints: List<String> = emptyList(); private set
 
@@ -123,7 +115,6 @@ class Q9Engine(val db: Q9Db) {
         currPage = 0
         totalPage = 0
         selectWords = emptyList()
-        priorityDigit = 0
         relateHints = emptyList()
         lastWord = ""
         statusPrefix = ""
@@ -257,7 +248,7 @@ class Q9Engine(val db: Q9Db) {
     fun pickQuick(word: String) {
         if (word.isEmpty() || word == "*") return
         startSelectWord(listOf(word))
-        // 得一個字（即係得一頁，排第一）—— 坐邊格要問 [slotOrder]，唔係粒 `1`
+        // 得一個字，即係第一頁排第一 —— 坐邊格要問 [slotOrder]
         selectWord(slotAt(0))
         changed()
     }
@@ -327,8 +318,8 @@ class Q9Engine(val db: Q9Db) {
 
     /**
      * **淨係郁第一頁**：頭九個字入面，同上一個字組成過 [MIN_USAGE_COUNT] 次
-     * bigram 嘅推去前面，次數越大越前（推到第一位嗰個坐邊格睇 [slotOrder]：
-     * 得一頁就坐返最後撳嗰格、冇碼就坐正中間粒 `5`，唔止一頁就坐粒 `1`）。
+     * bigram 嘅推去前面，次數越大越前（推到第一位嗰個就坐粒 `1` —— 第一頁
+     * 永遠 `1`~`9` 順住排，見 [slotOrder]）。
      *
      * 第二頁開始嗰啲字**一律唔郁**，保留返字碼表原本嘅位置 —— 唔會因為打得多咗
      * 就由第三頁彈上第二頁，揭頁揀字先至有得靠記憶。
@@ -358,8 +349,6 @@ class Q9Engine(val db: Q9Db) {
         selectWords = words
         totalPage = ceil(words.size / 9.0).toInt()
         selectMode = true
-        // 隻手指而家喺邊格（`0` 收尾、同音／關聯字嗰啲根本冇碼就當冇）
-        priorityDigit = currCode.lastOrNull()?.takeIf { it in '1'..'9' }?.minus('0') ?: 0
         currCode = ""
         showPage(0)
         cancelLabel = "取消"
@@ -367,12 +356,11 @@ class Q9Engine(val db: Q9Db) {
     }
 
     /** 而家攤開緊嗰個表：第 [page] 頁排第 [rank] 嗰個字坐邊格 */
-    private fun slotAt(rank: Int, page: Int = currPage): Int =
-        slotOrder(page, totalPage, priorityDigit)[rank]
+    private fun slotAt(rank: Int, page: Int = currPage): Int = slotOrder(page)[rank]
 
     /** 而家攤開緊嗰個表：[slot] 格坐住嘅係排第幾（由 0 起，唔喺表入面就 -1） */
     private fun rankAt(slot: Int, page: Int = currPage): Int =
-        if (slot !in 1..9) -1 else slotOrder(page, totalPage, priorityDigit).indexOf(slot)
+        if (slot !in 1..9) -1 else slotOrder(page).indexOf(slot)
 
     private fun addPage(delta: Int) {
         val p = currPage + delta
@@ -467,7 +455,6 @@ class Q9Engine(val db: Q9Db) {
         currPage = 0
         totalPage = 0
         selectWords = emptyList()
-        priorityDigit = 0
         statusPrefix = ""
         statusText = ""
         homoWord = ""
@@ -515,37 +502,23 @@ class Q9Engine(val db: Q9Db) {
          * `4 6 2 8` 四邊次之；`1 3 7 9` 四角最難撳，排最後。
          * 即係話第二頁得三個字嘅時候，佢哋會坐 `5 4 6`，唔會由 `1` 開始排。
          */
-        private val SLOT_ORDER = intArrayOf(5, 4, 6, 2, 8, 1, 3, 7, 9)
+        private val SLOT_ORDER = listOf(5, 4, 6, 2, 8, 1, 3, 7, 9)
+
+        /** 第一頁嘅次序：照字碼表順住排 */
+        private val FIRST_PAGE_ORDER = (1..9).toList()
 
         /**
-         * 呢一頁用唔用 [SLOT_ORDER]（中間格行先）。
-         *
-         * **成個表得一頁（[totalPage] `<= 1`）就用**：揀得晒喺一版，冇下頁，
-         * 亦都冇「翻到第幾頁」呢回事，所以易撳行先。
-         *
-         * **多過一頁嘅時候，第一頁唔准郁**（`page == 0` 用返 `1`~`9`）：
-         * 嗰個格號就係隻字個碼最後嗰個數字（狀態列「碼:」寫嘅嘢、打熟咗嘅手勢
-         * 全部靠佢），一調位就即刻全部作廢。第二頁開始就冇碼可以記，一定要望住揀，
-         * 所以照樣易撳行先。
-         */
-        private fun centreFirst(page: Int, totalPage: Int) = page > 0 || totalPage <= 1
-
-        /**
-         * 第 [page] 頁（由 0 起、成個表共 [totalPage] 頁）啲字**由邊格排起**：
+         * 第 [page] 頁（由 0 起）啲字**由邊格排起**：
          * 頭一個格號擺排第一嗰個字，如此類推。
          *
-         * [priority]（`1`~`9`，`0` = 冇）係攤開個表之前最後撳嗰個碼。
-         * **得一頁嗰陣佢排最前**：隻手指啱啱就撳緊嗰格，排第一嗰個字擺返落嗰度
-         * 就唔使郁位 —— 打 `159` 出得一版字，次序就係 `9 5 4 6 2 8 1 3 7`
-         * （`9` 抽咗出嚟排頭，其餘照 [SLOT_ORDER]）。
-         * 多過一頁就唔會咁做：第一頁要留返俾字碼（見 [centreFirst]），
-         * 而第二頁開始隻手指老早已經郁過（撳過「下頁」）。
+         * **第一頁永遠 `1`~`9`，冇任何例外**：嗰個格號就係隻字個碼最後嗰個數字
+         * （狀態列「碼:」寫嘅嘢、打熟咗嘅手勢全部靠佢），一調位就即刻全部作廢。
+         * 一版揀得晒都好、啱啱撳完邊個碼都好，通通唔關事。
+         *
+         * **第二頁開始**先至行 [SLOT_ORDER]：嗰啲字本來就冇碼可以記，
+         * 一定要望住揀，所以邊格易撳就擺邊格。
          */
-        fun slotOrder(page: Int, totalPage: Int, priority: Int): List<Int> = when {
-            !centreFirst(page, totalPage) -> (1..9).toList()
-            priority in 1..9 && totalPage <= 1 ->
-                listOf(priority) + SLOT_ORDER.filter { it != priority }
-            else -> SLOT_ORDER.toList()
-        }
+        fun slotOrder(page: Int): List<Int> =
+            if (page == 0) FIRST_PAGE_ORDER else SLOT_ORDER
     }
 }

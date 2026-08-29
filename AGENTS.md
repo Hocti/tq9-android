@@ -737,31 +737,28 @@ app 入面所有 user 見到嘅字（設定頁、toast、鍵面、空狀態提�
   要 `GROUP BY char ORDER BY MAX(freq)`。同一個碼查一次就 cache 住（`codePreviewFor`），
   唔係每撳一下鍵都查次 sqlite。
 
-## 選字擺入九宮格：**唔止一頁嘅第一頁唔准郁**
+## 選字擺入九宮格：**第一頁永遠 `1`~`9`**
 
-（2026-08-28 user 要求，同日**改正**過兩次 —— 一開始成個表都用中間格次序，
-係嚴重錯誤；跟住加返「得一頁就照用」呢個特例。落手改之前睇清楚成張表。）
+規矩得一條，寫喺 `Q9Engine.slotOrder(page)`：
 
-規矩全部寫喺 `Q9Engine.slotOrder(page, totalPage, priority)`（分頁嗰半交俾
-`centreFirst(page, totalPage)`）：
-
-| 情況 | 排法 | 點解 |
+| 頁 | 排法 | 點解 |
 | --- | --- | --- |
-| **成個表得一頁**（`totalPage <= 1`） | **最後撳嗰個碼行先**，跟住 `SLOT_ORDER`＝`5 4 6 2 8 1 3 7 9`（打 `159` → `9 5 4 6 2 8 1 3 7`） | 揀得晒喺一版，冇下頁、冇「翻到第幾頁」，易撳行先；而隻手指啱啱就撳緊嗰格，排第一嗰個字擺返落嗰度就零位移。冇碼可攞（`0` 收尾、同音／關聯字表）就照 `SLOT_ORDER` |
-| **多過一頁**嘅第一頁（`page == 0`） | `1` 排到 `9`，同字碼表次序一模一樣 | 嗰個格號**就係隻字個碼最後嗰個數字**（狀態列「碼:」寫嘅嘢、打熟咗嘅手勢全部靠佢）。一調位就即刻全部作廢 |
-| 第二頁開始（`page > 0`） | `SLOT_ORDER` | 嗰啲字本來就冇碼可以記，一定要望住揀，所以邊格易撳擺邊格：`5` 喺正中最易撳，跟住四邊（`4 6 2 8`），四角（`1 3 7 9`）最後。嗰頁得三隻字就淨係佔 `5 4 6`，四角吉住 |
+| **第一頁**（`page == 0`） | `1` 排到 `9`，同字碼表次序一模一樣 | 嗰個格號**就係隻字個碼最後嗰個數字**（狀態列「碼:」寫嘅嘢、打熟咗嘅手勢全部靠佢）。一調位就即刻全部作廢 |
+| **第二頁開始**（`page > 0`） | `SLOT_ORDER`＝`5 4 6 2 8 1 3 7 9` | 嗰啲字本來就冇碼可以記，一定要望住揀，所以邊格易撳擺邊格：`5` 喺正中最易撳，跟住四邊（`4 6 2 8`），四角（`1 3 7 9`）最後。嗰頁得三隻字就淨係佔 `5 4 6`，四角吉住 |
 
-所以「常用字排前」推到第一位嗰個字坐邊格**要睇有幾多頁**（得一頁 → `5`；
-唔止一頁 → `1`）—— `reorderByUsage()` 淨係換 `selectWords` 個次序，
-格號永遠由 `slotOfRank()` 話事。
+**第一頁冇任何例外。** 2026-08-28 一日之內試過三個版本，最後定咗上面呢個：
 
-「最後撳嗰個碼」＝ `priorityDigit`，喺 `startSelectWord()` **清 `currCode` 之前**
-由 `currCode.lastOrNull()` 攞（`1`~`9` 先算，`0` 收尾就當冇）。`cancel()` / `reset()`
-要一齊清走，唔係下一個表會用返上一次嗰個碼。
+1. 成個表（連第一頁）都用 `SLOT_ORDER` —— user 叫「嚴重錯誤」，即日收返
+2. 「成個表得一頁就成頁用 `SLOT_ORDER`」—— 收返
+3. 「得一頁嗰陣，最後撳嗰個碼排最前（`159` → `9 5 4 6…`）」—— 收返
 
-引擎入面兩個私家 helper `slotAt(rank, page)` / `rankAt(slot)` 幫你填晒
-`currPage` / `totalPage` / `priorityDigit`，一定要**成對咁用**。凡係
-「格號 ↔ `selectWords` 入面第幾個」嘅換算全部要行佢哋，四處：
+所以下次見到「一版揀得晒／啱啱撳完邊個碼」呢類特例，**唔好自己加返落第一頁**。
+
+「常用字排前」推到第一位嗰個字就坐粒 `1` —— `reorderByUsage()` 淨係換
+`selectWords` 個次序，格號永遠由 `slotOrder()` 話事。
+
+引擎入面兩個私家 helper `slotAt(rank, page)` / `rankAt(slot)` 幫你填返 `currPage`，
+一定要**成對咁用**。凡係「格號 ↔ `selectWords` 入面第幾個」嘅換算全部要行佢哋，四處：
 
 - `showPage(page)`：`rank` → `slotAt(rank, page)` 擺落 `keys[]`（呢個要傳 `page`，
   因為 `currPage` 未 set 好）
@@ -770,11 +767,9 @@ app 入面所有 user 見到嘅字（設定頁、toast、鍵面、空狀態提�
 - `pickCandidateAt(index)`（條 bar 撳落嚟嘅絕對位置）：**先** `currPage = index / 9`，
   跟住 `selectWord(slotAt(index % 9))`
 
-`startSelectWord()` 一定要**先** set `totalPage` 同 `priorityDigit` 先至 `showPage(0)`，
-唔係第一版就會用錯排法。`SlotOrderTest` 盯住成張表。
-
 漏咗其中一處就會「見到嘅字」同「撳落去出嘅字」對唔上，而且測唔到——
 `ChinesePadView` 淨係照 `engine.keys[d]` 畫，佢自己唔知個次序。
+`SlotOrderTest` 盯住個次序表本身。
 
 ## 同音字就係一個 flag，唔好再加嘢
 
