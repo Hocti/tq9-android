@@ -764,6 +764,7 @@ class SettingsActivity : AppCompatActivity() {
      * 呢個檔同字碼庫（`dataset.db`）**分開存**，換字碼表唔會累到佢。呢度可以
      * 匯出備份、匯入還原、或者成個清走（等於換返一張新表），
      * 亦都可以熄咗「常用字排前」—— 熄咗照樣繼續記數，淨係唔攞嚟排候選字。
+     * （「常用字排前」淨係郁第 10 位起嗰橛，第一頁永遠唔郁，見 `Q9Engine.reorderByUsage`。）
      */
     private fun buildUsageSection() {
         header("使用習慣統計")
@@ -772,9 +773,9 @@ class SettingsActivity : AppCompatActivity() {
         note("每個字打過多少次、連續兩個字的組合都記錄在 usage_stats.db，" +
             "與字碼資料庫分開存放，更換字碼資料庫不受影響。")
         switch("常用字排前", Prefs.KEY_USAGE_REORDER, true)
-        note("開啟後，候選字第一頁會依與前一個字的組合次數推前" +
-            "（打過 ${Q9Engine.MIN_USAGE_COUNT} 次以上才調動，按錯一下不算），第二頁起不變。" +
-            "關閉則完全依字碼表次序，但仍會繼續記錄。")
+        note("開啟後，第一頁（頭 9 個字）永遠維持字碼表次序不變，第 10 個字起" +
+            "才依與前一個字的組合次數推前（打過 ${Q9Engine.MIN_USAGE_COUNT} 次以上才調動，" +
+            "按錯一下不算）。關閉則完全依字碼表次序，但仍會繼續記錄。")
         row(
             button("匯出…") { saveUsage.launch("usage_stats.db") },
             button("匯入…") { pickUsage.launch(arrayOf("*/*")) },

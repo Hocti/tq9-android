@@ -231,7 +231,7 @@ class Q9Engine(val db: Q9Db) {
         val idx = currPage * 9 + rankAt(slot)
         if (idx >= selectWords.size) return false
         val word = selectWords[idx]
-        if (word.isEmpty() || word == "*") return false
+        if (word.isEmpty()) return false
         val list = db.getHomo(word)
         if (list.isEmpty()) return false
         homo = false
@@ -246,7 +246,7 @@ class Q9Engine(val db: Q9Db) {
 
     /** 上面條 bar 冇候選字嗰陣會出速選字，撳咗就當揀咗佢（會行返同音／關聯字嗰套） */
     fun pickQuick(word: String) {
-        if (word.isEmpty() || word == "*") return
+        if (word.isEmpty() || word == PLACEHOLDER) return
         startSelectWord(listOf(word))
         // 得一個字，即係第一頁排第一 —— 坐邊格要問 [slotOrder]
         selectWord(slotAt(0))
@@ -256,6 +256,8 @@ class Q9Engine(val db: Q9Db) {
     /** option bar 直接揀（index 係整個 selectWords 嘅絕對位置） */
     fun pickCandidateAt(index: Int) {
         if (!selectMode || index < 0 || index >= selectWords.size) return
+        // 佔位嘅吉格：唔好連頁都揭埋（[selectWord] 嗰邊照樣會擋，但頁已經郁咗）
+        if (selectWords[index].isEmpty()) return
         currPage = index / 9
         selectWord(slotAt(index % 9))
         changed()
@@ -317,36 +319,25 @@ class Q9Engine(val db: Q9Db) {
     }
 
     /**
-     * **淨係郁第一頁**：頭九個字入面，同上一個字組成過 [MIN_USAGE_COUNT] 次
-     * bigram 嘅推去前面，次數越大越前（推到第一位嗰個就坐粒 `1` —— 第一頁
-     * 永遠 `1`~`9` 順住排，見 [slotOrder]）。
+     * 「常用字排前」：點排見 companion 嗰個 [Q9Engine.reorderByUsage]。
      *
-     * 第二頁開始嗰啲字**一律唔郁**，保留返字碼表原本嘅位置 —— 唔會因為打得多咗
-     * 就由第三頁彈上第二頁，揭頁揀字先至有得靠記憶。
-     *
-     * 要打夠 [MIN_USAGE_COUNT] 次先算數：打過一次就當「常用」太急，
-     * 撳錯一下就會累住之後個次序都唔同咗，user 會覺得個字表自己識郁。
+     * 熄咗開關、或者根本冇上一個字（啱啱開始打／打完標點換行）就原封不動 ——
+     * 冇 bigram 睇就冇嘢排得。
      */
     private fun reorderByUsage(words: List<String>): List<String> {
         val h = host ?: return words
         val prev = bigramPrev
-        if (!usageReorder || words.size <= 1 || prev.isEmpty()) return words
-        val head = words.take(9).sortedByDescending { w ->
-            if (isHanChar(w)) qualified(h.bigramCount(prev + w)) else -1
-        }
-        return head + words.drop(9)
+        if (!usageReorder || prev.isEmpty()) return words
+        return reorderByUsage(words) { w -> h.bigramCount(prev + w) }
     }
-
-    /** 未打夠 [MIN_USAGE_COUNT] 次就當冇打過（-1 = 排返原本個位，穩定排序唔會亂） */
-    private fun qualified(count: Int): Int = if (count >= MIN_USAGE_COUNT) count else -1
-
-    private fun isHanChar(s: String): Boolean =
-        s.isNotEmpty() && s != "*" && s.codePointCount(0, s.length) == 1 &&
-            Character.UnicodeScript.of(s.codePointAt(0)) == Character.UnicodeScript.HAN
 
     private fun startSelectWord(words: List<String>) {
         if (words.isEmpty()) return
-        selectWords = words
+        // 字碼表入面嘅 `*` 淨係**佔住個位**（後面嗰啲字先至坐得返啱格，例如
+        // `mapped_table` 169 = `********教`，「教」一定要坐第 9 格），本身唔係
+        // 隻打得嘅字。喺呢度一次過變吉 —— 揀字（[selectWord]）／條 bar／
+        // 側邊欄跟住就同「呢一格冇字」一樣咁處理，撳落去乜都唔會出。
+        selectWords = words.map { if (it == PLACEHOLDER) "" else it }
         totalPage = ceil(words.size / 9.0).toInt()
         selectMode = true
         currCode = ""
@@ -371,7 +362,7 @@ class Q9Engine(val db: Q9Db) {
         currPage = page
         for (rank in 0..8) {
             val p = page * 9 + rank
-            val w = if (p >= selectWords.size || selectWords[p] == "*") "" else selectWords[p]
+            val w = if (p >= selectWords.size) "" else selectWords[p]
             val i = slotAt(rank, page)
             keys[i].clear()
             keys[i].text = w
@@ -387,6 +378,7 @@ class Q9Engine(val db: Q9Db) {
         val key = currPage * 9 + rank
         if (key >= selectWords.size) return
         val typeWord = selectWords[key]
+        // 吉位（表尾未排滿、或者字碼表嗰個 `*` 佔位符）撳極都唔會出字
         if (typeWord.isEmpty()) return
 
         if (homo) {
@@ -483,17 +475,55 @@ class Q9Engine(val db: Q9Db) {
      */
     private fun setRelateHints(words: List<String>) {
         setPadImages(0)
-        relateHints = words.filter { it.isNotEmpty() && it != "*" }
+        relateHints = words.filter { it.isNotEmpty() && it != PLACEHOLDER }
     }
 
     private fun changed() { host?.onStateChanged() }
 
     companion object {
         /**
+         * 字碼表（同關聯字表）入面嘅**佔位符**：淨係擺喺度令後面啲字唔會走位，
+         * 唔係一隻打得嘅字。見 [startSelectWord]。
+         */
+        const val PLACEHOLDER = "*"
+
+        /**
          * 「常用字排前」要打過幾多次先至肯郁個次序（bigram 同單字次數都用呢個）。
          * 少過呢個數就當冇打過 —— 撳錯一次唔應該就影響到之後嘅選字次序。
          */
         const val MIN_USAGE_COUNT = 2
+
+        /**
+         * 「常用字排前」點排（[count] = 呢隻字同上一個字組成過幾多次 bigram）。
+         *
+         * **頭 9 個（第一頁）永遠唔郁**：第一頁個格號就係隻字個碼最後嗰個數字
+         * （見 [slotOrder]），次序一調就即刻累到所有打熟咗嘅手勢。所以打得幾多
+         * 都好，頭九位原封不動。
+         *
+         * **第 10 位起（第二頁開始）先至排**：打夠 [MIN_USAGE_COUNT] 次嘅推去
+         * 前面，次數越大越前。即係話「常用但唔喺頭九位」嗰啲字，最多推到第 10 位
+         * （第二頁排第一），撩唔到第一頁 —— 反正第二頁開始本來就冇碼可以記，
+         * 一定要望住揀，推前咗淨係少揭幾版。
+         *
+         * 要打夠 [MIN_USAGE_COUNT] 次先算數：打過一次就當「常用」太急，
+         * 撳錯一下就會累住之後個次序都唔同咗，user 會覺得個字表自己識郁。
+         */
+        fun reorderByUsage(words: List<String>, count: (String) -> Int): List<String> {
+            // 尾巴得一個（或者根本得一頁）點排都係同一個樣
+            if (words.size <= 10) return words
+            val tail = words.drop(9).sortedByDescending { w ->
+                if (isHanChar(w)) qualified(count(w)) else -1
+            }
+            return words.take(9) + tail
+        }
+
+        /** 未打夠 [MIN_USAGE_COUNT] 次就當冇打過（-1 = 排返原本個位，穩定排序唔會亂） */
+        private fun qualified(count: Int): Int = if (count >= MIN_USAGE_COUNT) count else -1
+
+        /** 得一隻漢字先當得（`*` 佔位符、英文、標點、多字詞一律唔算） */
+        private fun isHanChar(s: String): Boolean =
+            s.isNotEmpty() && s != PLACEHOLDER && s.codePointCount(0, s.length) == 1 &&
+                Character.UnicodeScript.of(s.codePointAt(0)) == Character.UnicodeScript.HAN
 
         /**
          * **第二頁開始**先至用嘅格仔先後次序：嗰頁排第一嗰個字擺 `5`，跟住 `4`、`6`…

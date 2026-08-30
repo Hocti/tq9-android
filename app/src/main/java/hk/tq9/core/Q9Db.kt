@@ -38,8 +38,20 @@ class Q9Db private constructor(private val db: SQLiteDatabase) {
         return s.split(' ').filter { it.isNotEmpty() }
     }
 
-    /** 同音字：先出聲調都一樣嘅 */
+    /**
+     * 同音字表：**先同音、尾近音**。
+     *
+     *  - 同音（[exactHomo]）＝ `word_meta.ping` 一模一樣，聲調都夾嗰啲行先；
+     *  - 近音（[nearHomo]）＝ 拼音「懶音化」之後先至夾（`ngo` ↔ `o`、`naa` ↔ `laa`…），
+     *    一律排喺同音之後，唔會擠走本來揀開嗰幾隻字。
+     */
     fun getHomo(word: String): List<String> {
+        val exact = exactHomo(word)
+        return exact + nearHomo(word, exact)
+    }
+
+    /** 同音字：先出聲調都一樣嘅 */
+    fun exactHomo(word: String): List<String> {
         if (word.codePointCount(0, word.length) != 1) return emptyList()
         val out = ArrayList<String>()
         db.rawQuery(
@@ -54,6 +66,71 @@ class Q9Db private constructor(private val db: SQLiteDatabase) {
         }
         return out
     }
+
+    /**
+     * 近音字：拼音行過 [fuzzyPing] 之後撞埋同一組嗰啲 `ping`，**淨係睇 `word_meta.ping`**，
+     * 冇任何逐隻字硬寫嘅對應表。例如揀緊「我」（`ngo`）就連 `o` 嗰堆字一齊搵。
+     *
+     * [skip] 入面嗰啲（＝已經出咗嘅同音字）唔會再出一次。表入面冇 `ping`／舊版
+     * dataset.db 查唔到就當冇近音字，唔會累到同音字本身。
+     */
+    fun nearHomo(word: String, skip: Collection<String> = emptyList()): List<String> {
+        if (word.codePointCount(0, word.length) != 1) return emptyList()
+        val out = ArrayList<String>()
+        runCatching {
+            val own = pingsOf(word)
+            if (own.isEmpty()) return emptyList()
+            // 自己嗰幾個 ping 唔使再搵一次 —— 嗰啲字 [exactHomo] 已經出晒
+            val want = LinkedHashSet<String>()
+            for (p in own) want.addAll(fuzzyGroups()[fuzzyPing(p)].orEmpty())
+            want.removeAll(own)
+            if (want.isEmpty()) return emptyList()
+            val seen = HashSet(skip)
+            seen.add(word)
+            db.rawQuery(
+                "SELECT char FROM word_meta WHERE ping IN (" + want.joinToString(",") { "?" } + ") " +
+                    "AND char <> '' GROUP BY char ORDER BY MAX(freq) DESC",
+                want.toTypedArray()
+            ).use { c ->
+                while (c.moveToNext()) {
+                    val s = c.getString(0) ?: continue
+                    if (seen.add(s)) out.add(s)
+                }
+            }
+        }.onFailure { Log.w(TAG, "近音字查唔到", it) }
+        return out
+    }
+
+    private fun pingsOf(word: String): List<String> {
+        val out = ArrayList<String>(2)
+        db.rawQuery(
+            "SELECT DISTINCT ping FROM word_meta WHERE char = ? AND ping IS NOT NULL AND ping <> ''",
+            arrayOf(word)
+        ).use { c -> while (c.moveToNext()) c.getString(0)?.let { out.add(it) } }
+        return out
+    }
+
+    /**
+     * 模糊音 -> 屬於嗰組嘅 `ping`。成張表得六百幾個 `ping`，開機後查一次就夠。
+     */
+    private var fuzzy: Map<String, List<String>>? = null
+
+    private fun fuzzyGroups(): Map<String, List<String>> {
+        fuzzy?.let { return it }
+        val m = HashMap<String, MutableList<String>>(512)
+        runCatching {
+            db.rawQuery(
+                "SELECT DISTINCT ping FROM word_meta WHERE ping IS NOT NULL AND ping <> ''", null
+            ).use { c ->
+                while (c.moveToNext()) {
+                    val p = c.getString(0) ?: continue
+                    m.getOrPut(fuzzyPing(p)) { ArrayList(4) }.add(p)
+                }
+            }
+        }.onFailure { Log.w(TAG, "ping 表讀唔到", it) }
+        return m.also { fuzzy = it }
+    }
+
 
     /** 反查一個字嘅字碼（打完同音字之後顯示） */
     fun getCode(word: String): List<Int> {
@@ -192,6 +269,70 @@ class Q9Db private constructor(private val db: SQLiteDatabase) {
     companion object {
         private const val TAG = "Q9Db"
         const val DB_NAME = "dataset.db"
+
+        /**
+         * 一個 `ping` 嘅「模糊音」—— 撞到同一個結果嘅就當近音（見 [nearHomo]）。
+         *
+         * 呢度**淨係搞拼音串**，同係邊隻字冇關，所以加減規則唔使掂到字表。
+         *
+         * ## 1. 先夾返同一套拼音
+         *
+         * `word_meta.ping` 主要係耶魯拼音（`ji`＝之、`yi`＝二、`cheui`＝取），
+         * 但係夾雜咗少少粵拼串法嘅冷字（`zi`＝衹、`ci`＝黐、`ceoi`＝綷、`coek`＝焯）。
+         * 唔統一嘅話呢啲字連「同音」都撞唔到，所以先將粵拼嗰套搬返做耶魯：
+         * `z-`→`j-`、`c-`→`ch-`、`eoi/eon/eot`→`eui/eun/eut`、`oe`→`eu`。
+         *
+         * ## 2. 跟住先至係懶音／近音
+         *
+         * | 規則 | 例 |
+         * | --- | --- |
+         * | `ng-` 聲母脫落 | `ngo` ↔ `o`、`ngai` ↔ `ai` |
+         * | `n-` / `l-` 不分 | `naa` ↔ `laa` |
+         * | `gw-` / `g-`、`kw-` / `k-` | `gwong` ↔ `gong`、`kwok` ↔ `kok` |
+         * | 長短元音 `aa` ↔ `a` | `naa` ↔ `na` |
+         * | 鼻音韻尾 `-ng` ↔ `-n` | `sang` ↔ `san` |
+         * | 入聲韻尾 `-k` ↔ `-t` | `baak` ↔ `baat` |
+         *
+         * 淨返個 `ng`／`m`（五、唔嗰啲單鼻音字）唔當佢有聲母，唔會剝到剩返吉。
+         */
+        fun fuzzyPing(raw: String): String {
+            var s = raw.trim().lowercase()
+            if (s.isEmpty()) return s
+
+            // ---- 1. 拼音方案統一（粵拼 -> 耶魯）----
+            if (s.startsWith("z")) s = "j" + s.substring(1)
+            else if (s.startsWith("c") && !s.startsWith("ch")) s = "ch" + s.substring(1)
+            s = s.replace("eoi", "eui").replace("eon", "eun").replace("eot", "eut")
+                .replace("oe", "eu")
+
+            // ---- 2. 聲母懶音 ----
+            if (s.startsWith("ng") && s.length > 2) s = s.substring(2)   // ngo -> o
+            else if (s != "ng" && s.startsWith("n") && s.length > 1) s = "l" + s.substring(1)
+            if (s.startsWith("gw")) s = "g" + s.substring(2)
+            else if (s.startsWith("kw")) s = "k" + s.substring(2)
+
+            // ---- 3. 韻母／韻尾 ----
+            s = s.replace("aa", "a")
+            if (s.endsWith("ng")) s = s.dropLast(2) + "n"
+            if (s.endsWith("k")) s = s.dropLast(1) + "t"
+
+            return EXTRA_GROUP[s] ?: s
+        }
+
+        /**
+         * 上面啲規則夾唔到、但係 user 想撞埋一齊嗰幾組（一樣係**淨係睇拼音**）：
+         * 寫低邊個模糊音併埋落邊個。加多兩組就喺呢度加一行。
+         *
+         *  - `o` ↔ `a`：「我」（`ngo`→`o`）要搵得返「啊」（`a`）。
+         *  - `n` ↔ `m`：淨鼻音字，「五」（`ng`→`n`）同「唔」（`m`）。
+         *
+         * 併埋去嗰個（value）本身**唔可以再係另一行嘅 key** —— 呢度淨係查一次，
+         * 唔會一路跟住條鏈行落去。
+         */
+        private val EXTRA_GROUP = mapOf(
+            "o" to "a",
+            "n" to "m",
+        )
 
         fun file(ctx: Context): File = File(ctx.applicationContext.filesDir, DB_NAME)
 
