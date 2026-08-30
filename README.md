@@ -1,7 +1,10 @@
-# 九万輸入法 TQ9 (Android)
+# 三三正體中文輸入法 ThreeThree (Android)
 
-用九方 **已過期** 的專利 HK1035043 製作的 numpad 式中文輸入法，
-由 Windows 版 [`/mnt/d/dev/Q9/TQ9/`](../TQ9/) 改寫成 Android system keyboard (Kotlin)。
+使用**已過期**專利 HK1035043 製作的 numpad 式中文輸入法，
+由 Windows 版改寫成 Android system keyboard (Kotlin)。
+
+> 名字：全名「三三正體中文輸入法」，通常叫「三三輸入法」，簡稱「三三」；
+> 英文「ThreeThree」，簡稱「TT」。
 
 以 numpad 輸入 2~3 鍵即可開始選字，字碼表、關聯字、同音字全部由一個 sqlite 檔案提供，
 可以喺 app 入面隨時換走。
@@ -280,7 +283,9 @@ API key、model（預設 `gemini-3.7-flash`）、prompt（`%text%` = 揀咗嗰�
 出嚟畫，唔會 decode 90 個 Bitmap。設定頁換得呢幅圖（換咗嗰幅擺喺
 `filesDir/strokes.png`，「還原內置圖片」＝刪咗佢），玩法同換 `dataset.db` 一樣。
 Android 版**唔需要** `10_1`~`10_9`，因為關聯字改咗喺上面條 bar 揀。
-App icon 都係直接用 `TQ9/logo.png`。
+App icon 由 `../logo.jpg`（2048×2048）縮出嚟 —— mipmap 五個 density 嘅
+`ic_launcher_foreground`（透明底，圖佔 canvas 50%，圓形 mask 都唔會切到）
+同埋 legacy 嘅 `ic_launcher` / `ic_launcher_round`，底色見 `values/colors.xml`。
 
 ---
 
@@ -290,13 +295,13 @@ App icon 都係直接用 `TQ9/logo.png`。
 ./gradlew assembleDebug          # app/build/outputs/apk/debug/app-debug.apk
 ./gradlew testDebugUnitTest      # swipe 判定 + 英文詞庫（連真實 20 萬字數據）嘅 unit test
 adb install -r app/build/outputs/apk/debug/app-debug.apk
-adb shell ime enable hk.tq9/.ime.TQ9InputMethodService
-adb shell ime set    hk.tq9/.ime.TQ9InputMethodService
+adb shell ime enable tt.ime.riverine/.ime.TTInputMethodService
+adb shell ime set    tt.ime.riverine/.ime.TTInputMethodService
 ```
 
 minSdk 26 / targetSdk 36 / Kotlin 2.1 / AGP 8.13。
 
-系統嘅輸入法清單入面得**一個**「九万」（中英數符號係喺鍵盤入面自己切，唔使分 subtype）。
+系統嘅輸入法清單入面得**一個**「三三」（中英數符號係喺鍵盤入面自己切，唔使分 subtype）。
 
 開發／改嘢之前請睇 [AGENTS.md](AGENTS.md)，入面有踩過嘅坑同注意事項。
 
@@ -306,16 +311,16 @@ minSdk 26 / targetSdk 36 / Kotlin 2.1 / AGP 8.13。
 ## 檔案結構
 
 ```
-app/src/main/java/hk/tq9/
-  core/   Q9Db          字碼庫（assets 安裝 / 換 db / weight prefix 統計）
-          Q9Engine      九万狀態機（由 Q9Form.cs 移植）
+app/src/main/java/tt/ime/riverine/
+  core/   TTDb          字碼庫（assets 安裝 / 換 db / weight prefix 統計）
+          TTEngine      輸入狀態機（由 Windows 版移植）
           EnDict        20 萬字英文詞庫 + swipe 砌字
           EmojiDict     emoji 表 + 用字搵（assets/emoji.txt）
           ClipHistory   clipboard 歷史
           AiRewrite     Gemini 改寫揀咗嗰段字
           Prefs         設定
   swipe/  GestureKeyTracker   停留 / 轉角 / weight 三合一嘅中間鍵判定
-  ime/    TQ9InputMethodService   IME 主體
+  ime/    TTInputMethodService    IME 主體
           KeyboardBaseView        排版 / 畫鍵 / 掂觸 / 畫線 / 長撳變體 popup / 長撳 ␣ 郁 caret
           ChinesePadView / LatinPadView / SymbolPadView / NumberPadView
           EmojiPadView / ClipboardListView

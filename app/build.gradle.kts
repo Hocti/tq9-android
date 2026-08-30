@@ -8,45 +8,49 @@ plugins {
 // ---- 上架用嘅正式簽名 ---------------------------------------------------------
 //
 // keystore 同密碼一律唔入 repo（見 .gitignore）：
-//   ~/.android/tq9-release.keystore
-//   ~/.android/tq9-release.properties   →  storePassword / keyAlias / keyPassword
+//   ~/.android/tt-release.keystore
+//   ~/.android/tt-release.properties   →  storePassword / keyAlias / keyPassword
 //
-// **要行 `-Ptq9.upload` 先會用呢條 key**（例：`./gradlew bundleRelease -Ptq9.upload`）。
-// 唔加就照用返 debug key —— dl／GitHub 度派嘅 `tq9-v<N>.apk` 一路都係嗰條，
+// **要行 `-Ptt.upload` 先會用呢條 key**（例：`./gradlew bundleRelease -Ptt.upload`）。
+// 唔加就照用返 debug key —— dl／GitHub 度派嘅 `tt-v<N>.apk` 一路都係嗰條，
 // 靜靜雞換咗 key 啲人就要 uninstall 咗先裝到新版（見 AGENTS.md）。
-val useUploadKey = providers.gradleProperty("tq9.upload").isPresent
-val uploadStore = File(System.getProperty("user.home"), ".android/tq9-release.keystore")
-val uploadProps = File(System.getProperty("user.home"), ".android/tq9-release.properties")
+val useUploadKey = providers.gradleProperty("tt.upload").isPresent
+val uploadStore = File(System.getProperty("user.home"), ".android/tt-release.keystore")
+val uploadProps = File(System.getProperty("user.home"), ".android/tt-release.properties")
 val uploadCreds = Properties().apply {
     if (useUploadKey) {
-        require(uploadStore.exists()) { "-Ptq9.upload 但係搵唔到 ${uploadStore.path}" }
-        require(uploadProps.exists()) { "-Ptq9.upload 但係搵唔到 ${uploadProps.path}" }
+        require(uploadStore.exists()) { "-Ptt.upload 但係搵唔到 ${uploadStore.path}" }
+        require(uploadProps.exists()) { "-Ptt.upload 但係搵唔到 ${uploadProps.path}" }
         uploadProps.inputStream().use { load(it) }
     }
 }
 
 android {
-    namespace = "hk.tq9"
+    namespace = "tt.ime.riverine"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "hk.tq9"
+        applicationId = "tt.ime.riverine"
         minSdk = 26
         targetSdk = 36
-        versionCode = 42
-        versionName = "1.3.5"
+        versionCode = 44
+        versionName = "2.0.1"
     }
 
     signingConfigs {
-        // side-load（dl／GitHub release 嗰啲 tq9-v<N>.apk）一路都係簽返同 debug 一樣嘅 key，
-        // 換咗 key 啲人就要 uninstall 先裝到新版，所以呢條唔郁。
+        // side-load（dl／GitHub release 嗰啲 tt-v<N>.apk）一路都係簽返同 debug
+        // 一樣嘅 key，換咗 key 啲人就要 uninstall 先裝到新版，所以呢條唔郁。
+        //
+        // 注意 2.0.0：applicationId 由舊嗰個改咗做 `tt.ime.riverine`，Android 當佢係
+        // 另一個 app —— 就算 key 冇變，舊裝機一樣係 update 唔到，要自己再裝多次
+        // （新舊可以並存）。Play Store 嗰邊亦都要開一個全新 listing。
         create("release") {
             storeFile = file(System.getProperty("user.home") + "/.android/debug.keystore")
             storePassword = "android"
             keyAlias = "androiddebugkey"
             keyPassword = "android"
         }
-        // 上架 Google Play 嗰條（-Ptq9.upload 先會砌出嚟）
+        // 上架 Google Play 嗰條（-Ptt.upload 先會砌出嚟）
         if (useUploadKey) create("upload") {
             storeFile = uploadStore
             storePassword = uploadCreds.getProperty("storePassword")

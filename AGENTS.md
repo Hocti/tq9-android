@@ -1,13 +1,13 @@
-# AGENTS.md — 九万輸入法 TQ9 (Android)
+# AGENTS.md — 三三正體中文輸入法 ThreeThree (Android)
 
-改嘢之前請先讀晒呢版。呢個 repo 係 Windows 版 `/mnt/d/dev/Q9/TQ9/`（C# WinForms）
+改嘢之前請先讀晒呢版。呢個 repo 係 Windows 版（C# WinForms）
 移植過嚟嘅 Android system keyboard，行為要同原版夾得住。
 
 ---
 
 ## 一句講晒
 
-九方過期專利 HK1035043 嘅 numpad 中文輸入法。撳 2~3 個碼查 `mapped_table` 出候選字，
+使用已過期專利 HK1035043 嘅 numpad 中文輸入法。撳 2~3 個碼查 `mapped_table` 出候選字，
 字碼表／關聯字／同音字／繁簡表全部喺一個 sqlite 檔案入面，user 可以喺設定頁換走。
 
 ## 環境
@@ -22,15 +22,15 @@
 ```bash
 JAVA_HOME=/opt/android-studio/jbr ./gradlew :app:assembleDebug :app:testDebugUnitTest
 adb install -r app/build/outputs/apk/debug/app-debug.apk
-adb shell ime enable hk.tq9/.ime.TQ9InputMethodService
-adb shell ime set    hk.tq9/.ime.TQ9InputMethodService
+adb shell ime enable tt.ime.riverine/.ime.TTInputMethodService
+adb shell ime set    tt.ime.riverine/.ime.TTInputMethodService
 ```
 
 ### 喺模擬器度試鍵盤，有四個陷阱
 
 1. **一定要 `adb shell settings put secure show_ime_with_hard_keyboard 1`**。
    模擬器當自己有實體鍵盤，唔開呢個 setting 就唔會彈輸入法出嚟。
-2. **唔好 `adb shell am force-stop hk.tq9`**。IME service 同 app 同一個 package，
+2. **唔好 `adb shell am force-stop tt.ime.riverine`**。IME service 同 app 同一個 package，
    force-stop 會殺埋 IME，系統就會跌返去 Gboard。用 `am start` 就夠。
 3. **每次 `adb install -r` 之後都要再 `ime enable` + `ime set` 一次**，
    系統會當佢 reinstall 而 reset。
@@ -43,8 +43,11 @@ adb shell dumpsys window windows | sed -n '/InputMethod}/,/Frames/p' | grep -E "
 # 睇得到嘅 view（app 嗰邊）搵輸入框坐標 —— 鍵盤本身係自己畫嘅，dump 唔到粒鍵
 adb shell uiautomator dump /sdcard/u.xml && adb pull /sdcard/u.xml
 # 改設定／睇 pref（app debuggable，唔使 root）
-adb shell run-as hk.tq9 cat shared_prefs/tq9_settings.xml
+adb shell run-as tt.ime.riverine cat shared_prefs/tq9_settings.xml
 ```
+
+`shared_prefs` 個檔名**故意仲係舊名** `tq9_settings.xml`（見 `Prefs.FILE`）——
+2.0.0 改名嗰陣冇郁佢，改咗舊裝機啲設定就會一次過 reset。純內部檔名，user 見唔到。
 
    要開英文鍵盤就撳 Chrome 個網址欄（URI 欄 → `PadMode.LATIN`），中文就搵個
    普通文字欄（例如 `am start -a android.intent.action.INSERT -t vnd.android.cursor.dir/contact`）。
@@ -65,7 +68,7 @@ adb shell run-as hk.tq9 cat shared_prefs/tq9_settings.xml
 
 ### 九宮格排位係 numpad，唔係電話
 
-`7 8 9` 喺最上、`1 2 3` 喺最落，跟返 `Q9Form.cs` 嘅 `ResizeAllButton()`。
+`7 8 9` 喺最上、`1 2 3` 喺最落，跟返 Windows 版嘅 `ResizeAllButton()`。
 底行係 `[0 佔兩格][取消]`；選字夠兩頁嗰陣兩格闊嗰粒 `0` 點變由設定話事
 （見下面「選字揭頁」）。改過嚟電話排法就同原版打法唔同曬。
 
@@ -138,7 +141,7 @@ adb shell run-as hk.tq9 cat shared_prefs/tq9_settings.xml
 
 ### `dataset.db` 唔會自動更新，舊機仲用緊裝機嗰陣嗰份
 
-`Q9Db.ensureInstalled()` **淨係喺 `filesDir/dataset.db` 唔見咗嗰陣先由 assets 抄**——
+`TTDb.ensureInstalled()` **淨係喺 `filesDir/dataset.db` 唔見咗嗰陣先由 assets 抄**——
 user 可以喺設定頁換走個字碼表，夾硬覆蓋就會刪咗人哋自己揀嗰份。代價：
 **由舊版升級上嚟嘅機，個 db 仲係當初裝機嗰份**。實測（2026-08-27，模擬器）
 2026-08-21 嗰份 1.7MB 舊 db：
@@ -147,7 +150,7 @@ user 可以喺設定頁換走個字碼表，夾硬覆蓋就會刪咗人哋自己
   throw，佢自己 `runCatching` 食咗）
 - `mapped_table` **冇 id `1010`** → 候選欄嘅預設字攞唔到
 
-所以兩處都要有 fallback（`TQ9InputMethodService`）：`defaultPicks` 攞唔到 1010
+所以兩處都要有 fallback（`TTInputMethodService`）：`defaultPicks` 攞唔到 1010
 就跌返落 1000（速選字表，即係以前嘅做法），`codePreview()` 空就跌返落
 `defaultPicks`。**條 bar 吉住睇落似壞咗，情願出舊嗰套。** 想攞返新功能就叫 user
 喺設定頁撳「還原內置字碼表」（會覆蓋佢自訂過嘅 db，所以唔可以靜靜雞自動做）。
@@ -165,7 +168,7 @@ user 可以喺設定頁換走個字碼表，夾硬覆蓋就會刪咗人哋自己
 | `1000`~`1009` | 速選字表（⭐；首頁 = 1000，撳咗 1~9 之後 = 1001~1009） |
 | `1010` | 候選欄嘅預設字（游標前面吉住／唔係中文嗰陣出，見「候選欄出乜」） |
 
-打碼邏輯（`Q9Engine.press`）：夠三碼、或者中途撳 0 收尾，就查表出候選字。
+打碼邏輯（`TTEngine.press`）：夠三碼、或者中途撳 0 收尾，就查表出候選字。
 
 ### `characters` 入面嘅 `*` 係佔位符，唔係一隻字
 
@@ -176,14 +179,14 @@ user 可以喺設定頁換走個字碼表，夾硬覆蓋就會刪咗人哋自己
 
 2026-08-30 之前淨係 `showPage()` 畫嗰陣當佢吉：格仔望落係空白，但係
 `selectWord()` 照攞 `selectWords[key]` 出嚟 commit，撳落去真係會打隻 `*`
-落個輸入框。而家改成**入口一次過洗乾淨** —— `Q9Engine.startSelectWord()`
-見到 `Q9Engine.PLACEHOLDER` 就換做 `""`，跟落去所有路（九宮格、上面條 bar、
+落個輸入框。而家改成**入口一次過洗乾淨** —— `TTEngine.startSelectWord()`
+見到 `TTEngine.PLACEHOLDER` 就換做 `""`，跟落去所有路（九宮格、上面條 bar、
 側邊欄、`pickCandidateAt`、`plausibility`）都當「呢個位冇字」，唔使逐個位補
 `it != "*"`。關聯字表（`related_candidates_table`）一樣有 `*`，行同一條路。
 
 ### 字要用 grapheme cluster 拆
 
-`Q9Db.splitGraphemes()` 用 `BreakIterator`，等同 C# 嘅 `StringInfo`。
+`TTDb.splitGraphemes()` 用 `BreakIterator`，等同 C# 嘅 `StringInfo`。
 用 `String.length` / `toCharArray` 會拆爛 emoji 同香港增補字符集。
 判斷「係咪單一個字」要用 `codePointCount`，唔係 `length`。
 
@@ -219,26 +222,35 @@ user 想用邊個 sqlite viewer／睇圖 app 都得。App 自己唔識開呢兩�
 猜佢裝咗乜、又或者為咗 `ACTION_VIEW` 開多個 `FileProvider` 出嚟都係多餘。
 兩點要記住：
 
-- **一定要抄 `filesDir` 嗰份**（`Q9Db.file` / `StrokeImages.file`），唔好貪方便
+- **一定要抄 `filesDir` 嗰份**（`TTDb.file` / `StrokeImages.file`），唔好貪方便
   由 assets 攞 —— 唔係就變咗「檢視內置」，睇唔到 user 自己換咗入去嗰份。
 - 筆形圖**冇自訂過就 `filesDir` 度根本冇個檔**（見上面「檔案喺唔喺度就係
   有冇自訂」），所以 `exportImg()` 嗰陣先要 `isCustom()` 分流，
   冇自訂就真係由 assets 抄。字碼庫冇呢個問題（`ensureInstalled` 保證有）。
 
-App icon 直接用 `TQ9/logo.png`。
+App icon 由 `../logo.jpg`（2048×2048）縮出嚟，五個 density 一次過出：
+`ic_launcher_foreground` 透明底、圖佔 canvas **50%**（大過呢個數，圓形 mask 就會
+切到隻箭嘴尖，試過 56% 已經穿），legacy 嘅 `ic_launcher` / `ic_launcher_round`
+分別係 70% / 68%。底色 `@color/ic_launcher_background` = `#F4F8F9`。
 
-### 系統輸入法揀選視窗只可以有一個「九万」
+### 系統輸入法揀選視窗只可以有一個「三三」
 
 `res/xml/method.xml` 得一個 subtype。中英數符號係喺鍵盤入面自己切，
 加多個 subtype 就會喺系統嗰度變兩個輸入法。
+
+粒 subtype 嘅 `android:label` **唔係個 IME 名**，係系統顯示嗰行「語言」——
+寫返 `@string/subtype_name`（`values/` = 「中英混合」、`values-en/` = `Multilingual`），
+唔好再寫 `@string/ime_name`，否則系統嗰度個名同語言一模一樣兩行「三三輸入法」。
+locale 就寫 `zh_HK` + `zh-Hant-HK`（`languageTag`，API 24+ 用嗰個），
+`isAsciiCapable="true"` 要留返，冇咗英文欄位就唔會揀到呢個輸入法。
 
 ---
 
 ## 架構
 
 ```
-core/   Q9Db       sqlite 存取、assets 安裝、換 db、weight prefix 統計
-        Q9Engine   九万狀態機（Q9Form.cs 移植），唔掂 Android UI
+core/   TTDb       sqlite 存取、assets 安裝、換 db、weight prefix 統計
+        TTEngine   輸入狀態機（Windows 版移植），唔掂 Android UI
         EnDict     5 萬字英文詞庫（blob + starts + weight，慳記憶體），淨係
                    `fromPrefix` 打字提示 + `word`/`charAt`/`weightAt` 呢幾個
                    public accessor 畀 `GestureDecoder`／`EnTrie` 用
@@ -257,7 +269,7 @@ core/   Q9Db       sqlite 存取、assets 安裝、換 db、weight prefix 統計
 swipe/  GestureKeyTracker   中文九宮格滑動中間鍵判定（純 Kotlin，有 unit test）
         GestureDecoder      英文 swipe 認字：AOSP 手勢輸入嗰套概念嘅 Kotlin 版
                    （軌跡 vs 候選字理想路徑做形狀比對，唔係逐格判斷撳咗邊粒鍵）
-ime/    TQ9InputMethodService   IME 主體，所有 view 嘅 host
+ime/    TTInputMethodService   IME 主體，所有 view 嘅 host
         KeyboardBaseView        排版／畫鍵／掂觸／畫線／長撳 popup／長撳 ␣ 郁 caret
         KeyPopup                浮喺鍵盤外面嗰啲窗（長撳變體行、滑動 hover 提示）
         ChinesePadView          九宮格（KeyboardBaseView）
@@ -270,7 +282,7 @@ ime/    TQ9InputMethodService   IME 主體，所有 view 嘅 host
 ui/     SettingsActivity / MicPermissionActivity
 ```
 
-`Q9Engine` 唔應該 import 任何 `android.view.*`；佢淨係吐狀態，由 `ChinesePadView` 畫。
+`TTEngine` 唔應該 import 任何 `android.view.*`；佢淨係吐狀態，由 `ChinesePadView` 畫。
 
 ---
 
@@ -290,7 +302,7 @@ ui/     SettingsActivity / MicPermissionActivity
 
 `OptionBarsView` 三段（`BarMode`）每段都係得**一行**。以前有條「狀態」細字
 （字碼、`[同音]`、頁數）擺喺最上面，一出現就成個鍵盤高咗一截，已經**拆咗**——
-`Q9Engine.status` 仲計緊，但係冇人畫。要出 message 就用 `toast()`，
+`TTEngine.status` 仲計緊，但係冇人畫。要出 message 就用 `toast()`，
 唔好再喺條 bar 上面加行。
 
 高度**唔再係寫死 42dp**（2026-08-29 user 要求）：由 `CandChip` 度候選字實際
@@ -383,7 +395,7 @@ gravity 跟 `PadAlign` 反過嚟擺）：上面一（兩）行功能掣，下面
 
 - **上下** = `Prefs.heightScale`（0.6~1.8）。`PadMetrics.cellH` 同
   `PadMetrics.rowHeightPx()` 兩邊都要乘返佢，唔係英文鍵盤就唔會跟住變。
-  拉邊組要睇 `TQ9InputMethodService.padGroup`（見「大細設定分組存」）。
+  拉邊組要睇 `TTInputMethodService.padGroup`（見「大細設定分組存」）。
 - **左右** = `Prefs.widthScale`（0.45~1.6），淨係 `LEFT_GAP` / `RIGHT_GAP` 有用。
   **淨係入 `cellW`，唔可以入 `cellH`** —— 兩者本來都由同一個 `unit` 出，
   一唔小心就會變成「左右拉埋高度都跟住變」。
@@ -418,7 +430,7 @@ gravity 跟 `PadAlign` 反過嚟擺）：上面一（兩）行功能掣，下面
 
 **「顯示方式」嗰粒掣 2026-08-29 由設定頁移走咗**（user 要求）：條工具列最左粒掣
 撳一下就轉下一個，設定頁再擺多個入口做同一件事係多舊雲。`Prefs.align` /
-`setAlign` / `nextAlign` 一個字都冇刪，`TQ9InputMethodService.onCycleAlign` 仲用緊。
+`setAlign` / `nextAlign` 一個字都冇刪，`TTInputMethodService.onCycleAlign` 仲用緊。
 
 ### 字體大細都係分兩組（2026-08-28 user 要求）
 
@@ -452,7 +464,7 @@ gravity 跟 `PadAlign` 反過嚟擺）：上面一（兩）行功能掣，下面
 key 照留返做預設值**（`sp.getFloat(profKey(...), sp.getFloat(舊 key, 1f))`），
 升級之後大細唔會走位，兩組都由舊嗰個值起步。
 
-`TQ9InputMethodService.padGroup` 睇住 `mode` 答而家郁緊邊組（`LATIN`／`SYMBOL`
+`TTInputMethodService.padGroup` 睇住 `mode` 答而家郁緊邊組（`LATIN`／`SYMBOL`
 係 `LATIN`，其餘全部 `CJK`），`onSizeDrag` / `onWidthDrag` / `onMaxWidth` /
 `onCycleAlign` 四個都要攞佢，跟住一律 `relayoutPads()`（所有已經砌咗嘅 pad 一齊重排，
 唔使逐個 `?.rebuild()` 撩漏）。`OptionBarsView.padGroup` 亦都要喺 `refreshBars()`
@@ -522,7 +534,7 @@ targetSdk 35+ 之後 IME window 一路去到螢幕最底，`outer` 個
 由**冇到有**彈鍵盤出嚟嗰下，個窗未必即刻報得返啱嘅闊度／導覽列高度，量出嚟成塊
 鍵盤高過個窗，最底嗰行就俾導覽列冚咗 —— 要拉一拉高度或者轉一次橫直先返到正常。
 
-`TQ9InputMethodService.scheduleSizeRecheck()` 喺 `onWindowShown()`／
+`TTInputMethodService.scheduleSizeRecheck()` 喺 `onWindowShown()`／
 `onStartInputView()`／`onConfigurationChanged()` 三個位排隊，之後每
 `SIZE_RECHECK_MS`（100ms）補度一次，總共 `SIZE_RECHECK_TRIES + 1` 次
 （＝ 100…400ms）。每次做兩件事：
@@ -571,7 +583,7 @@ emoji 表／剪貼簿跟 `forcedHeightPx`，唔喺呢度計（`as? KeyboardBaseV
 
 三處要一齊夾：
 
-- `TQ9InputMethodService.toggleBar()` 第一句就分流去 `onSwitchView()`。
+- `TTInputMethodService.toggleBar()` 第一句就分流去 `onSwitchView()`。
 - `refreshBars()` 開頭見到 `pinned && barMode == OFF` 就當場升做 `CANDIDATES`
   **兼且寫返落 pref**（設定頁㩒個掣唔會 restart 個 service）。
 - `ChinesePadView.optionKey()` 換鍵面；`optionOn`（著唔著燈）常駐嗰陣代表
@@ -680,9 +692,13 @@ app 入面所有 user 見到嘅字（設定頁、toast、鍵面、空狀態提�
 
 一般 user 唔會逐段睇，寫長咗等於冇寫。
 
-個名一律叫「**九万輸入法**」，簡稱「**九万**」。「TQ9」係 project 個英文名，
-**淨係可以喺 code／檔名／package 度出現**，唔可以出現喺畀人睇嘅字入面
-（`strings.xml` 個 `subtype_en` 就係因為咁刪咗）。
+全名叫「**三三正體中文輸入法**」，通常叫「**三三輸入法**」，簡稱「**三三**」；
+英文「**ThreeThree**」，簡稱「**TT**」。系統輸入法揀選視窗嗰行位窄，出簡稱
+（`ime_name`）；launcher 同應用程式清單出全名（`app_name`）。
+
+**唔可以喺 app、文件、commit message 入面點名任何輸入法品牌**——
+講個專利就淨係寫「使用已過期專利 HK1035043」，唔好帶埋邊間公司。
+（2.0.0 商標避嫌改嘅，見 CHANGELOG。）
 
 ## AI 設定頁分三大類
 
@@ -772,14 +788,14 @@ app 入面所有 user 見到嘅字（設定頁、toast、鍵面、空狀態提�
 ## 候選欄出乜（中文，2026-08-27 重寫）
 
 `refreshBars()` 喺中文模式分三種情況，**兩種係「唔關 engine 事」嘅**
-（`showingContextPicks = true`，撳落去要行 `Q9Engine.pickQuick()`，
+（`showingContextPicks = true`，撳落去要行 `TTEngine.pickQuick()`，
 **唔係** `pickCandidateAt()` —— 嗰陣根本冇入過 selectMode。`pickQuick()` 內部係
 `startSelectWord(listOf(word))` + `selectWord(1)`，所以簡繁輸出、同音、關聯字全部照行）：
 
 | 狀態 | 出乜 |
 | --- | --- |
 | `engine.selectMode` | `engine.selectWords`（照舊，撳 = `pickCandidateAt`） |
-| `currCode` 有 1~2 個碼 | `codePreview()` → `Q9Db.topByCodePrefix`，最常用嗰 9 隻字 |
+| `currCode` 有 1~2 個碼 | `codePreview()` → `TTDb.topByCodePrefix`，最常用嗰 9 隻字 |
 | 乜都未打 | `contextPicks()` → **游標前面嗰隻字**嘅關聯字，冇就 `mapped_table` id `1010` |
 
 - **速選字表（id 1000）唔再喺條 bar 出現**（以前吉住就出佢）。`quickPicks` 個 field
@@ -788,9 +804,9 @@ app 入面所有 user 見到嘅字（設定頁、toast、鍵面、空狀態提�
   user 撳過個輸入框郁咗游標、或者啱啱開個鍵盤，`relateHints` 已經係舊嘢。
   而家逐次 `getTextBeforeCursor(2, 0)` 攞返游標前面嗰個 grapheme 去查。
   所以 `onUpdateSelection` 喺中文、`!engine.busy`、唔喺 emoji 搜尋嗰陣要 `refreshBars()`
-  —— 游標一郁，條 bar 就要換。（`Q9Engine.pickRelateAt` 冇人叫，但係冇刪。）
+  —— 游標一郁，條 bar 就要換。（`TTEngine.pickRelateAt` 冇人叫，但係冇刪。）
 - **開咗「輸出簡體」個欄入面係簡體**，但 `related_candidates_table` 淨係有正體，
-  所以查唔到就 `Q9Db.sctc()` 轉返正體再查一次。`sctc` 係由 `ts_chinese_table` 反轉出嚟嘅
+  所以查唔到就 `TTDb.sctc()` 轉返正體再查一次。`sctc` 係由 `ts_chinese_table` 反轉出嚟嘅
   （多對一，第一個當代表）—— **淨係可以攞嚟查表，唔可以攞嚟做輸出**，出街嘅字一律行 `tcsc`。
 - **`topByCodePrefix` 個 LIKE 一定要連埋粒逗號**：`word_meta.code` 每個打法都以 `,`
   開頭（「為」＝ `,470,480,970`），所以 pattern 係 `%,<prefix>%`。打 `4`／`47`／`48`
@@ -800,7 +816,7 @@ app 入面所有 user 見到嘅字（設定頁、toast、鍵面、空狀態提�
 
 ## 選字擺入九宮格：**第一頁永遠 `1`~`9`**
 
-規矩得一條，寫喺 `Q9Engine.slotOrder(page)`：
+規矩得一條，寫喺 `TTEngine.slotOrder(page)`：
 
 | 頁 | 排法 | 點解 |
 | --- | --- | --- |
@@ -834,20 +850,20 @@ app 入面所有 user 見到嘅字（設定頁、toast、鍵面、空狀態提�
 
 ## 同音字就係一個 flag，唔好再加嘢
 
-`Q9Engine.pressHomo()` **淨係** `homo = !homo`，跟返原版（`Q9Form.cs:316`）：
+`TTEngine.pressHomo()` **淨係** `homo = !homo`，跟返 Windows 原版：
 打字後不出字，要打碼揀個字先至彈同音字表出嚟。試過改成「一撳就即刻開表」
 （有 `lastWord` 就開佢嘅同音字，冇就開速選字表），user 話打斷咗打字流程，**收返咗**。
 撳一下淨係著／熄粒掣（會變藍），唔可以換走而家個字表。
 
 ### 同音字表尾會補一橛「近音字」（2026-08-30 加）
 
-`Q9Db.getHomo()` = `exactHomo()`（`ping` 一模一樣，聲調都夾嗰啲行先）
+`TTDb.getHomo()` = `exactHomo()`（`ping` 一模一樣，聲調都夾嗰啲行先）
 **＋ `nearHomo()`（近音，一律排最尾）**。近音淨係為咗補漏 —— 唔會擠走本來
 揀開嗰幾隻字嘅位。
 
 點分近音：**淨係睇 `word_meta.ping` 呢一欄**，冇任何「邊隻字似邊隻字」嘅
 硬寫對應表（2026-08-30 user 明確講明要咁做）。兩個 `ping` 行過
-`Q9Db.fuzzyPing()` 揉到同一個結果就當近音，即係「揀緊 `ngo`，順手連 `o`
+`TTDb.fuzzyPing()` 揉到同一個結果就當近音，即係「揀緊 `ngo`，順手連 `o`
 嗰堆字一齊搵」。
 
 `fuzzyPing()` 分兩截，睇該函式個 doc 有齊例：
@@ -902,14 +918,14 @@ app 入面所有 user 見到嘅字（設定頁、toast、鍵面、空狀態提�
 
 同音鍵同右上角嗰粒**短撳換唔到**（開關同音／開關上面條 bar），淨係長撳揀得；
 兩粒都係 `ChinesePadView.funcLongKey()` 幫粒鍵補返 `hint` ＋ `longAction`。
-長撳實際點行完全靠 `TQ9InputMethodService.onLongPress` 開頭嗰句
+長撳實際點行完全靠 `TTInputMethodService.onLongPress` 開頭嗰句
 「`key.longAction != NOOP` 就照 `onKey` 行一次」—— **唔好**再喺下面個 `when`
-度為某粒鍵寫死長撳做乜（同音鍵以前寫死 `Q9Cmd.RELATE`，設定揀「停用」都照行）。
+度為某粒鍵寫死長撳做乜（同音鍵以前寫死 `TTCmd.RELATE`，設定揀「停用」都照行）。
 
 同音鍵**左下角**一個位、兩樣嘢，**攤開緊個表嗰陣行 `homoWord`，揀完先至行
 `homoCodeHint`**：
 
-- `Q9Engine.homoWord` = 而家搵緊邊隻字嘅同音（兩條入口都會 set）。成頁都係
+- `TTEngine.homoWord` = 而家搵緊邊隻字嘅同音（兩條入口都會 set）。成頁都係
   同音字，唔擺個字出嚟就唔知係邊隻字嘅音。`cancel()` 會清走佢。
 - `homoCodeHint` = 用同音字打完之後，嗰個字**正路點打**（`db.getCode()`），
   提你返轉頭應該撳邊幾個掣。打多一個普通字就喺 `selectWord()` 度清走。
@@ -920,14 +936,14 @@ app 入面所有 user 見到嘅字（設定頁、toast、鍵面、空狀態提�
 嗰陣 `selectWord()` 會直接 `cancel()`。
 
 除咗個 flag，仲有第二條路入同音字表：**選字模式長撳嗰格**
-（`Q9Engine.homoAt()`，2026-08-25 加）。兩條路出嚟嘅表一模一樣（同一句
+（`TTEngine.homoAt()`，2026-08-25 加）。兩條路出嚟嘅表一模一樣（同一句
 `db.getHomo()`），亦都一樣會 set `afterHomo`，所以揀完照樣喺同音鍵左下角
 寫返個字正路點打。`homoAt()` 唔會掂 `homo` 個 flag 以外嘅嘢，
 開關標點模式（`openclose`）就直接唔做 —— 嗰陣個表係「」呢啲一對對嘅標點。
 
 ## 搵 emoji 唔會真係入字落個欄，但會 set 做 composing text
 
-`emojiSearch` 開住嗰陣，`typeChar()` 同 `Q9Engine.Host.commitText()` 兩邊
+`emojiSearch` 開住嗰陣，`typeChar()` 同 `TTEngine.Host.commitText()` 兩邊
 都會攔住啲字入條 `emojiQuery`，結果出喺候選字條 bar，**唔會** `commitText`。
 但為咗等 user 見到自己打緊乜（唔係就淨係得個候選字 bar，睇唔到個 input），
 每次 `emojiQuery` 一變就會 `syncEmojiComposing()` set 做 composing text，
@@ -947,7 +963,7 @@ app 入面所有 user 見到嘅字（設定頁、toast、鍵面、空狀態提�
 ## 中文使用習慣統計：bigram 同每字次數
 
 `UsageStats`（`usage_stats.db`，同 `dataset.db` 分開存）記兩樣嘢：連續打嘅
-兩個中文字（`Q9Engine.bigramPrev`）、同每隻字打咗幾多次。淨係計**單字**
+兩個中文字（`TTEngine.bigramPrev`）、同每隻字打咗幾多次。淨係計**單字**
 （`isHanChar()` 篩走標點同多字詞），揀咗多字詞、標點、或者換咗行
 （`onLineBreak()`）都會斷咗個 bigram 鏈，唔會屈埋唔啱嘅組合。
 
@@ -959,11 +975,11 @@ app 入面所有 user 見到嘅字（設定頁、toast、鍵面、空狀態提�
 `-wal` / `-shm` / `-journal` 都要刪埋（唔清就會攞住舊 WAL 蓋返落新 db 度）。
 
 同一段仲有「**常用字排前**」開關（`Prefs.KEY_USAGE_REORDER`，預設開）：
-熄咗淨係 `Q9Engine.usageReorder = false`（`reorderByUsage()` 即刻 return），
+熄咗淨係 `TTEngine.usageReorder = false`（`reorderByUsage()` 即刻 return），
 **照樣繼續記數**。設定頁改完唔會 restart 個 service，所以 `onStartInputView`
 每次都要重新讀一次。
 
-`Q9Engine.reorderByUsage()` 淨係喺 `processResult()`（打碼揀字嗰條主線）用，
+`TTEngine.reorderByUsage()` 淨係喺 `processResult()`（打碼揀字嗰條主線）用，
 而且**頭 9 個（第一頁）一律唔郁**，保留返字碼表原本嘅位置 —— 第一頁個格號就係
 隻字個碼最後嗰個數字，調過位就即刻累到打熟咗嘅手勢。**第 10 位起（即係第二頁
 開始）先至睇 bigram 排**：常用但唔喺頭九位嘅字最多推到第 10 位，反正嗰啲字本來
@@ -972,9 +988,9 @@ app 入面所有 user 見到嘅字（設定頁、toast、鍵面、空狀態提�
 ⚠️ 呢條規矩 2026-08-30 反轉過：**2026-08-28 至 08-30 期間啱啱相反**（淨係郁
 第一頁、第二頁起唔郁），user 話係 bug 收返咗。下次見到「頭九位排靚啲」呢類諗頭，
 **唔好郁第一頁**。實際個排法抽咗做 companion 嘅 pure function
-`Q9Engine.reorderByUsage(words, count)`（instance 嗰個淨係包住開關同 `bigramPrev`），
+`TTEngine.reorderByUsage(words, count)`（instance 嗰個淨係包住開關同 `bigramPrev`），
 `UsageReorderTest` 盯死佢。
-（順帶 `Host.charFreq` 冇人用，一齊刪咗，但 `UsageStats` 照樣繼續記單字次數。）**要打過至少 `Q9Engine.MIN_USAGE_COUNT`
+（順帶 `Host.charFreq` 冇人用，一齊刪咗，但 `UsageStats` 照樣繼續記單字次數。）**要打過至少 `TTEngine.MIN_USAGE_COUNT`
 （＝ 2）次先至郁個次序**（2026-08-27 user 要求，以前 bigram 係 3 次）——
 撳錯一下唔應該影響到之後嘅選字。用**穩定排序**（`sortedByDescending`），
 冇資格嘅嘢（`qualified()` 回 -1）唔會亂咗原本次序。
@@ -1019,7 +1035,7 @@ app 入面所有 user 見到嘅字（設定頁、toast、鍵面、空狀態提�
 ```
 
 - 幾何：**明顯減速再加速**（V 形）、入格出格方向轉得夠多
-- weight：`mapped_table.weight` 砌成 prefix 權重表（`Q9Db.prefixPlausibility`），
+- weight：`mapped_table.weight` 砌成 prefix 權重表（`TTDb.prefixPlausibility`），
   加咗呢一碼之後完全冇字就 -1 直接剔走，大路字碼就加分
 - **起點同終點永遠計**，唔會被 weight 否決
 
@@ -1073,9 +1089,9 @@ user 報過滑 `7→9→0` 出到字之後，最尾嗰個 `0` 走咗去揭第二
 | `NEXT_PREV` | 拆兩粒正常闊：左 `0`（＝「下頁」）、右「上頁」 |
 | `WIDE_NEXT`（**預設**） | 唔拆，成兩格闊嗰粒 `0` 就係「下頁」，**長撳 = 上頁** |
 
-「上頁」係 `KeyAction.PREV_PAGE` → `Q9Cmd.PREV`。
+「上頁」係 `KeyAction.PREV_PAGE` → `TTCmd.PREV`。
 
-粒「下頁」**寫住 `1/10`**（`Q9Engine.pageHint`，由 1 起計，唔係 0）。
+粒「下頁」**寫住 `1/10`**（`TTEngine.pageHint`，由 1 起計，唔係 0）。
 同同音鍵一樣係喺 `drawDigit` 度即時問 engine 攞，唔係 `Key.hint`（`boxes`
 唔會逐次重砌）。拆兩粒嗰兩個排法擺喺**左上角**，冇分頁嗰陣 `pageHint` 係空，
 個位就讓返俾長撳提示 `「」`。
@@ -1085,12 +1101,12 @@ user 報過滑 `7→9→0` 出到字之後，最尾嗰個 `0` 走咗去揭第二
 - **排位由頭到尾唔郁**（`wantSplitPager()` 見到 `WIDE_NEXT` 一律回 false），
   所以粒鍵嘅 `Key` object 唔會重砌 —— 「而家係咪揭緊頁」一定要即場問
   `ChinesePadView.wideNextPage()`，唔可以入 `Key` 度。
-- **長撳嗰個「」讓咗俾「上頁」**：`TQ9InputMethodService.onLongPress` 嘅
-  `digit == 0` 嗰路要先問 `chinesePad?.wideNextPage()`，係就 `Q9Cmd.PREV`，
-  唔係先至照舊 `Q9Cmd.OPENCLOSE`。畫面上左上角寫「上頁」（＝長撳做乜，
+- **長撳嗰個「」讓咗俾「上頁」**：`TTInputMethodService.onLongPress` 嘅
+  `digit == 0` 嗰路要先問 `chinesePad?.wideNextPage()`，係就 `TTCmd.PREV`，
+  唔係先至照舊 `TTCmd.OPENCLOSE`。畫面上左上角寫「上頁」（＝長撳做乜，
   同其他鍵一致），頁數讓咗去**右上角**（`drawCornerHintRight`）。
 
-排位跟住 engine 狀態變，所以 `Q9Engine.Host.onStateChanged()` 唔可以淨係
+排位跟住 engine 狀態變，所以 `TTEngine.Host.onStateChanged()` 唔可以淨係
 `invalidate()`：要行 `ChinesePadView.onEngineState()`，佢見到 `splitPager`
 同而家想要嘅唔一樣先至 `relayout()`（每次 `onStateChanged` 都重排就嘥）。
 
@@ -1143,21 +1159,21 @@ user 要求永遠開住，所以 `Prefs.KEY_INSTANT_KEY` 同設定頁嗰個開�
 回 `false` 先至行到佢。九宮格 `1`~`9` 有兩個情況會截走（2026-08-25 加）：
 
 - **一個碼都未打**（`!selectMode && currCode.isEmpty()`）→
-  `Q9Engine.shortcutDigit(d)`：直接開嗰格嘅速選字表（`mapped_table` id
+  `TTEngine.shortcutDigit(d)`：直接開嗰格嘅速選字表（`mapped_table` id
   `1000 + d`），唔使再「撳個碼再撳速選掣」。打緊碼（`currCode` 有嘢）就唔截，
   照行返連撳，`77x` 呢啲碼撳得返。
   **呢一路預設熄咗**（`Prefs.longPressShortcut`，設定 →「其他」，2026-08-25 加）：
   就算未打碼，佢一樣食咗「長撳 = 連撳」嘅頭一下，`77`／`88` 撳極都唔出，
   所以要 user 自己開。
-- **選字模式**→ `Q9Engine.homoAt(slot)`：開嗰格嗰個字嘅同音字表，
+- **選字模式**→ `TTEngine.homoAt(slot)`：開嗰格嗰個字嘅同音字表，
   **唔使先撳「同音」掣**。就算查唔到同音字（多字詞、標點、`word_meta` 冇記錄）
   `onLongPress` 都要回 `true` 食咗佢 —— 跌返落連撳就會即刻揀咗個字，
   跟住放手嗰下再攞個數字起新碼，一撳出兩樣嘢。
 
 ## 開關標點（長撳 `0`）：包住 vs 移 caret
 
-`Q9Engine` 揀完一對標點係行 `host?.commitPair()`（**唔係** `commitText`），
-`TQ9InputMethodService.commitPair()` 分兩種情況：
+`TTEngine` 揀完一對標點係行 `host?.commitPair()`（**唔係** `commitText`），
+`TTInputMethodService.commitPair()` 分兩種情況：
 
 - **揀住咗一段字** → 「」**包住**佢：`揀咗嘅字` 變 `「揀咗嘅字」`。
   注意 `commitText` 本身係**取代**揀咗嗰段，所以一定要自己
@@ -1165,7 +1181,7 @@ user 要求永遠開住，所以 `Prefs.KEY_INSTANT_KEY` 同設定頁嗰個開�
 - **冇揀字** → 出一對「」，再將 caret 移返兩個標點**中間**（`setSelection`，
   attach 唔到 `getExtractedText` 就跌落去發 DPAD_LEFT）。
 
-長撳 `0` 嗰下（`onLongPress` → `Q9Cmd.OPENCLOSE`）淨係改 engine 狀態，
+長撳 `0` 嗰下（`onLongPress` → `TTCmd.OPENCLOSE`）淨係改 engine 狀態，
 唔會 commit 任何嘢，所以 app 嗰邊揀住嘅字一路留到揀完標點先用得着。
 
 ### 長撳變體 popup：PopupWindow，永遠向上彈 + 絕對位置揀
@@ -1199,7 +1215,7 @@ window 範圍，彈上 app 嗰邊；`isTouchable = false`，所以 touch 一路�
 
 ### 英文滑動：空格、context、候選欄
 
-`TQ9InputMethodService.onSwipePath()` 一次過處理四樣嘢，改其中一樣之前睇清楚
+`TTInputMethodService.onSwipePath()` 一次過處理四樣嘢，改其中一樣之前睇清楚
 另外幾樣：
 
 - `latinWordDone`（啱啱滑完／喺候選欄揀完一個字）→ 今次係**下一個字**，
@@ -1281,25 +1297,25 @@ UI 就上模擬器影相睇。
 
 | 用途 | key | 點行 |
 | --- | --- | --- |
-| side-load（dl 嘅 `tq9-v<N>.apk`、GitHub release） | `~/.android/debug.keystore` | `./gradlew assembleRelease`（預設） |
-| 上架 Google Play | `~/.android/tq9-release.keystore` | `./gradlew bundleRelease -Ptq9.upload` |
+| side-load（dl 嘅 `threethree-v<N>.apk`、GitHub release） | `~/.android/debug.keystore` | `./gradlew assembleRelease`（預設） |
+| 上架 Google Play | `~/.android/tt-release.keystore` | `./gradlew bundleRelease -Ptt.upload` |
 
 正式嗰條 key（2026-08-25 user 自己 `keytool -genkeypair` 出嚟）**唔喺 repo 入面**，
 密碼亦都唔會入 git：
 
 ```
-~/.android/tq9-release.keystore
-~/.android/tq9-release.properties   # storePassword / keyAlias / keyPassword
+~/.android/tt-release.keystore
+~/.android/tt-release.properties   # storePassword / keyAlias / keyPassword
 ```
 
-`app/build.gradle.kts` 見到 `-Ptq9.upload` 先至砌 `upload` 呢個 `signingConfig`，
-兩個檔案有一個唔見就即刻 fail（唔會靜靜雞跌返落 debug key）。**冇加 `-Ptq9.upload`
+`app/build.gradle.kts` 見到 `-Ptt.upload` 先至砌 `upload` 呢個 `signingConfig`，
+兩個檔案有一個唔見就即刻 fail（唔會靜靜雞跌返落 debug key）。**冇加 `-Ptt.upload`
 就一定係 debug key** —— side-load 果條線一路都係嗰條 key 簽，靜靜雞換咗，
 啲人就要 uninstall 咗先裝到新版。`.gitignore` 已經封晒 `*.keystore` / `*.jks` /
 `*keystore.properties`，keystore 唔見咗就永遠再 update 唔到個 app，記住備份。
 
 Play 收 `.aab` 唔收 `.apk`（新 app），所以上架果個係 `bundleRelease`；
-想自己裝嚟試就 `assembleRelease -Ptq9.upload`（同 debug key 嗰個裝唔埋同一部機）。
+想自己裝嚟試就 `assembleRelease -Ptt.upload`（同 debug key 嗰個裝唔埋同一部機）。
 
 ## 版本號：每次改完自動加一
 
@@ -1307,5 +1323,5 @@ Play 收 `.aab` 唔收 `.apk`（新 app），所以上架果個係 `bundleReleas
 **user 叫改嘢（唔理係加功能定係 fix bug），一改完就自動兩個一齊 +1**——
 `versionName` 加返 patch（`1.0.0` → `1.0.1`），`versionCode` 都 +1，
 唔使 user 特登講先做。第一個正式版由 `1.0.0` 開始（2026-08-21 定嘅）。
-呢個同 `/mnt/nas4/web/subdomains/dl/` 度 `tq9-v<N>.apk` 個 `N`（每次 build release 版都加一）
+呢個同 `/mnt/nas4/web/subdomains/dl/` 度 `threethree-v<N>.apk` 個 `N`（每次 build release 版都加一）
 係兩件唔同嘅嘢，唔好搞埋一齊。

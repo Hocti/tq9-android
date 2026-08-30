@@ -1,7 +1,67 @@
 # Changelog
 
-TQ9 九万輸入法 (Android) 嘅改動記錄。版本號規則見 `AGENTS.md`
+三三正體中文輸入法 (Android) 嘅改動記錄。版本號規則見 `AGENTS.md`
 「版本號：每次改完自動加一」一節。
+
+---
+
+## [2.0.1] — 2026-08-31
+
+### 系統輸入法清單嗰行「語言」唔再重覆個名
+
+`method.xml` 粒 subtype 一路都係 `android:label="@string/ime_name"`，
+所以 Android 「螢幕鍵盤」清單同輸入法揀選視窗上下兩行都出「三三輸入法」——
+上面嗰行係 IME 名，下面嗰行本來應該講語言。
+
+- 新增 `subtype_name`：中文機出「**中英混合**」，英文機（`values-en/`）出
+  「**Multilingual**」——中英數本來就係喺同一個鍵盤入面自己切，一粒 subtype 冚晒。
+- subtype 補返 `android:languageTag="zh-Hant-HK"`（API 24+ 認嗰個），
+  舊嘅 `imeSubtypeLocale="zh_HK"` 留返畀更舊嘅 API。
+
+---
+
+## [2.0.0] — 2026-08-31
+
+### 全面改名 + 換 icon（商標避嫌）
+
+舊個名同舊個 logo 有機會同人哋個註冊商標撞到，所以成個 app 由名到圖一次過換走。
+文件同 app 入面**一律唔再點名任何輸入法品牌**，淨係講「使用已過期專利 HK1035043」。
+
+- **個名**：全名「**三三正體中文輸入法**」，通常叫「**三三輸入法**」，簡稱「**三三**」；
+  英文「**ThreeThree**」，簡稱「**TT**」。系統輸入法揀選視窗嗰行位窄，出「三三」
+  （`ime_name`），launcher 同應用程式清單出全名（`app_name`）。
+- **Icon**：全部由 `../logo.jpg`（2048×2048 嘅「三」字圖）縮出嚟，五個 density
+  嘅 `ic_launcher_foreground` / `ic_launcher` / `ic_launcher_round` 一次過換晒。
+  Adaptive icon 個圖佔 canvas 50%，圓形 mask 都唔會切到隻箭嘴；底色由深色
+  `#101418` 改做 `#F4F8F9`（配返個 logo 嘅淺色底）。
+  Play Store 嘅 512 icon 同 feature graphic 一齊重出。
+
+### ⚠️ applicationId 改咗，舊裝機 update 唔到
+
+`applicationId` 由舊嗰個改做 **`tt.ime.riverine`**。Android 當佢係另一個 app：
+
+- **側載**：舊版**收唔到更新**，要自己再裝多次（新舊可以並存，舊嗰個自己 uninstall）。
+- **Google Play**：要開一個**全新 listing**，舊 listing 唔會過到去。
+- **設定唔會冧**：SharedPreferences 個檔名特登冇改，同一部機上返新版嘅設定照樣讀到
+  舊裝機嗰份（見 `Prefs.FILE`）。
+
+### 內部命名
+
+Kotlin package 全部搬去 `tt.ime.riverine.*`（`core` / `ime` / `swipe` / `ui` 四個
+subpackage 冇變），舊嘅 class 前綴一律改成 **`TT`**：
+
+| 而家 | 做乜 |
+| --- | --- |
+| `TTEngine` | 輸入狀態機（唔掂 Android UI） |
+| `TTDb` | 字碼庫 sqlite 存取 |
+| `TTCmd` | engine 收嘅指令 enum |
+| `TTInputMethodService` | IME 主體 |
+| `Theme.TT` / `Theme.TT.Transparent` | 兩個 style |
+
+Gradle 嗰邊：`rootProject.name` = `ThreeThree`、上架 key 嘅 flag 改做 **`-Ptt.upload`**、
+keystore 路徑改做 `~/.android/tt-release.keystore` 同 `~/.android/tt-release.properties`
+（**舊嗰兩個檔要自己 `mv` 過新名**，唔係加 `-Ptt.upload` 會即刻 fail）。
+`release.sh` 出嘅 APK 改名做 `tt-<ver>.apk`。
 
 ---
 
@@ -17,7 +77,7 @@ bigram，越大越前，一樣要打夠 2 次先算數）—— 即係最多推�
 撩唔到第一頁。反正第二頁開始本來就冇碼可以記，一定要望住揀，推前咗淨係少揭幾版。
 
 1.1.6 起啱啱相反（淨係郁第一頁、第二頁起唔郁），而家收返。個排法抽咗做 pure
-function `Q9Engine.reorderByUsage(words, count)`，新加 `UsageReorderTest`
+function `TTEngine.reorderByUsage(words, count)`，新加 `UsageReorderTest`
 盯死「唔郁頭九位」呢條規矩。
 
 ## [1.3.4] — 2026-08-30
@@ -26,7 +86,7 @@ function `Q9Engine.reorderByUsage(words, count)`，新加 `UsageReorderTest`
 
 `mapped_table.characters` 用 `*` 霸位（例如 id `169` = `********教`，「教」
 一定要坐第 9 格）。以前淨係畫嗰陣當佢吉 —— 格仔望落空白，但係揀字嗰下照
-commit，撳落去真係打隻 `*` 落個輸入框。而家 `Q9Engine.startSelectWord()`
+commit，撳落去真係打隻 `*` 落個輸入框。而家 `TTEngine.startSelectWord()`
 一入口就將 `*` 換做吉，九宮格、上面條 bar、側邊欄、`pickCandidateAt()`
 全部一致當「呢個位冇字」。關聯字表嗰啲 `*` 一樣。
 
@@ -34,7 +94,7 @@ commit，撳落去真係打隻 `*` 落個輸入框。而家 `Q9Engine.startSelec
 
 揀同音字嗰陣，除咗聲母韻母聲調都夾嗰啲（照舊行先），表尾再補「近音」——
 **淨係睇 `word_meta.ping`**，冇逐隻字硬寫嘅對應表。兩個 `ping` 行過
-`Q9Db.fuzzyPing()` 揉到同一個結果就當近音：
+`TTDb.fuzzyPing()` 揉到同一個結果就當近音：
 
 - 先夾返同一套拼音（表入面耶魯夾雜住少少粵拼冷字：`zi`＝衹、`ceoi`＝綷、
   `coek`＝焯），`z-`→`j-`、`c-`→`ch-`、`eoi/eon/eot`→`eui/eun/eut`、`oe`→`eu`；
@@ -448,7 +508,7 @@ commit，撳落去真係打隻 `*` 落個輸入框。而家 `Q9Engine.startSelec
   冇分頁就照舊喺嗰個位寫長撳提示 `「」`。
 - **同音鍵左上角寫住搵緊邊隻字嘅同音**：攤開同音字表嗰陣，成頁都係同音字，
   以前唔知係邊隻字嘅同音。揀完照舊變返「嗰個字正路點打」嘅字碼
-  （`Q9Engine.homoWord` 新增，`homoCodeHint` 冇變）。
+  （`TTEngine.homoWord` 新增，`homoCodeHint` 冇變）。
 - **中文本體最少 320dp 闊**（螢幕本身窄過 320dp 就用盡螢幕）：
   左右拖同 `widthScale` 都收唔過呢條線，唔會再拉到粒粒鍵細過隻手指。
 - **長撳工具列「靠左／靠右」嗰粒（撳實唔拉）= 一下子拉到最闊**，
@@ -472,7 +532,7 @@ commit，撳落去真係打隻 `*` 落個輸入框。而家 `Q9Engine.startSelec
 
 - 新增**「使用習慣統計」**一段：`usage_stats.db` 匯出／匯入／清除（重設做新表），
   同埋「**常用字排前**」開關（預設開）。熄咗照樣繼續記數，淨係唔攞嚟排候選字
-  （`Prefs.KEY_USAGE_REORDER` → `Q9Engine.usageReorder`）。
+  （`Prefs.KEY_USAGE_REORDER` → `TTEngine.usageReorder`）。
 
 ## [1.0.13] — 2026-08-25
 
@@ -497,8 +557,8 @@ commit，撳落去真係打隻 `*` 落個輸入框。而家 `Q9Engine.startSelec
 ### 上架
 
 - Release 簽名分做兩條 key：side-load（dl／GitHub）照舊用 `~/.android/debug.keystore`，
-  Google Play 就行 `./gradlew bundleRelease -Ptq9.upload`，用
-  `~/.android/tq9-release.keystore`（keystore 同密碼都唔喺 repo，`.gitignore`
+  Google Play 就行 `./gradlew bundleRelease -Ptt.upload`，用
+  `~/.android/tt-release.keystore`（keystore 同密碼都唔喺 repo，`.gitignore`
   封晒 `*.keystore` / `*.jks` / `*keystore.properties`）。
 
 ## [1.0.9] — 2026-08-24
@@ -569,7 +629,7 @@ commit，撳落去真係打隻 `*` 落個輸入框。而家 `Q9Engine.startSelec
   **全部淨係收埋，一行 code 都冇刪**（`SHOW_DEBUG_SECTIONS` /
   `SHOW_HIDDEN_OPTIONS` 改返做 `true` 就出返）。
 - app 入面所有畀人睇嘅字由廣東話口語改成正體中文書面語；
-  個名一律叫「九万輸入法」／「九万」，「TQ9」淨係留喺 code 度。
+  個名統一咗（當時嗰個名喺 2.0.0 已經全面換走，見上面）。
 
 ## [1.0.6] — 2026-08-23
 
@@ -711,5 +771,5 @@ commit，撳落去真係打隻 `*` 落個輸入框。而家 `Q9Engine.startSelec
 
 ## [1.0.0] — 2026-08-21
 
-第一個正式版。九方過期專利 HK1035043 嘅 numpad 中文輸入法，
+第一個正式版。使用已過期專利 HK1035043 嘅 numpad 中文輸入法，
 由 Windows 版（C# WinForms）移植過嚟嘅 Android system keyboard。

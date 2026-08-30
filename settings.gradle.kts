@@ -13,5 +13,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "TQ9"
+rootProject.name = "ThreeThree"
 include(":app")

@@ -1,11 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <input-method xmlns:android="http://schemas.android.com/apk/res/android"
-    android:settingsActivity="hk.tq9.ui.SettingsActivity"
+    android:settingsActivity="tt.ime.riverine.ui.SettingsActivity"
     android:supportsSwitchingToNextInputMethod="true">
-    <!-- 中英數全部喺同一個鍵盤入面自己切，所以系統嗰度只出一個「九万」 -->
+    <!-- 中英數全部喺同一個鍵盤入面自己切，所以系統嗰度只出一個「三三」。
+         label 係系統顯示嘅「語言」嗰行，唔可以再寫個 IME 名，否則名同語言一模一樣。 -->
     <subtype
-        android:label="@string/ime_name"
+        android:label="@string/subtype_name"
         android:imeSubtypeLocale="zh_HK"
+        android:languageTag="zh-Hant-HK"
         android:imeSubtypeMode="keyboard"
         android:isAsciiCapable="true" />
 </input-method>

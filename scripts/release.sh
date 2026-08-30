@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# TQ9 — build release APK 然後出 GitHub Release
+# 三三輸入法 (ThreeThree) — build release APK 然後出 GitHub Release
 #
 #   ./scripts/release.sh              # 用 build.gradle.kts 現時嘅版本
 #   ./scripts/release.sh --bump       # 先 patch +1（versionName / versionCode）
@@ -74,7 +74,7 @@ fi
 VER="$(read_ver)"; CODE="$(read_code)"
 [[ -n "$VER" ]] || die "讀唔到 versionName"
 TAG="v$VER"
-APK_NAME="tq9-$VER.apk"
+APK_NAME="tt-$VER.apk"
 info "準備出 $TAG（versionCode $CODE）"
 
 # ---------- build ----------
@@ -114,7 +114,7 @@ else
   printf '完整改動記錄見 [CHANGELOG.md](CHANGELOG.md)。\n' > "$NOTES"
   info "CHANGELOG.md 冇 [$VER] 一節，用返預設 notes"
 fi
-printf '\n---\n\n直接裝 `%s`（versionCode %s）。舊版可以照 update，唔使 uninstall。\n' "$APK_NAME" "$CODE" >> "$NOTES"
+printf '\n---\n\n直接裝 `%s`（versionCode %s）。舊版可以照 update，唔使 uninstall\n（**2.0.0 除外**：applicationId 改咗做 `tt.ime.riverine`，舊裝機 update 唔到，要另外再裝多次）。\n' "$APK_NAME" "$CODE" >> "$NOTES"
 
 [[ -n "$TITLE" ]] || TITLE="$TAG"
 
@@ -134,7 +134,7 @@ if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
   ok "HEAD 已經有 tag $TAG"
 else
   [[ -z "$HEAD_TAGS" ]] || info "HEAD 已經有 tag（$HEAD_TAGS），但係今次出 $TAG，照加多個"
-  git tag -a "$TAG" -m "TQ9 $TAG"
+  git tag -a "$TAG" -m "ThreeThree $TAG"
   ok "加咗 tag $TAG 喺 $(git rev-parse --short HEAD)"
 fi
 git push origin "refs/tags/$TAG"
@@ -146,10 +146,10 @@ FLAGS=()
 
 if gh release view "$TAG" >/dev/null 2>&1; then
   info "$TAG 已經有 release，覆返個 asset 同 notes"
-  gh release upload "$TAG" "$APK#TQ9 $TAG (Android APK)" --clobber
+  gh release upload "$TAG" "$APK#三三輸入法 $TAG (Android APK)" --clobber
   gh release edit "$TAG" --title "$TITLE" --notes-file "$NOTES" "${FLAGS[@]}"
 else
-  gh release create "$TAG" "$APK#TQ9 $TAG (Android APK)" \
+  gh release create "$TAG" "$APK#三三輸入法 $TAG (Android APK)" \
     --title "$TITLE" --notes-file "$NOTES" "${FLAGS[@]}"
 fi
 

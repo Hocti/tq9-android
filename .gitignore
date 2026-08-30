@@ -11,7 +11,7 @@
 
 /docs/
 
-# 簽名用嘅 key 一律唔入 git（正式 key 放喺 ~/.android/tq9-release.keystore）
+# 簽名用嘅 key 一律唔入 git（正式 key 放喺 ~/.android/tt-release.keystore）
 *.keystore
 *.jks
 *keystore.properties

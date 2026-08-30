@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.TQ9" parent="Theme.AppCompat.DayNight.DarkActionBar" />
+    <style name="Theme.TT" parent="Theme.AppCompat.DayNight.DarkActionBar" />
 
-    <style name="Theme.TQ9.Transparent" parent="Theme.AppCompat.DayNight.Dialog">
+    <style name="Theme.TT.Transparent" parent="Theme.AppCompat.DayNight.Dialog">
         <item name="android:windowBackground">@android:color/transparent</item>
         <item name="android:windowIsTranslucent">true</item>
         <item name="android:windowNoTitle">true</item>
