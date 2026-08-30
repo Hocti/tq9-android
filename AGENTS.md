@@ -233,16 +233,20 @@ App icon 由 `../logo.jpg`（2048×2048）縮出嚟，五個 density 一次過�
 切到隻箭嘴尖，試過 56% 已經穿），legacy 嘅 `ic_launcher` / `ic_launcher_round`
 分別係 70% / 68%。底色 `@color/ic_launcher_background` = `#F4F8F9`。
 
-### 系統輸入法揀選視窗只可以有一個「三三」
+### 系統輸入法揀選視窗只出一行「三三輸入法」
 
-`res/xml/method.xml` 得一個 subtype。中英數符號係喺鍵盤入面自己切，
-加多個 subtype 就會喺系統嗰度變兩個輸入法。
+`res/xml/method.xml` **一粒 `<subtype>` 都冇**，係特登嘅（2.0.1 user 要求）。
+中英數符號係喺鍵盤入面自己切，唔使畀系統知道語言：
 
-粒 subtype 嘅 `android:label` **唔係個 IME 名**，係系統顯示嗰行「語言」——
-寫返 `@string/subtype_name`（`values/` = 「中英混合」、`values-en/` = `Multilingual`），
-唔好再寫 `@string/ime_name`，否則系統嗰度個名同語言一模一樣兩行「三三輸入法」。
-locale 就寫 `zh_HK` + `zh-Hant-HK`（`languageTag`，API 24+ 用嗰個），
-`isAsciiCapable="true"` 要留返，冇咗英文欄位就唔會揀到呢個輸入法。
+- 加 subtype = 系統清單／揀選視窗喺個名下面多一行「語言」。粒 subtype 有
+  `android:label` 就出個 label，冇 label 就自動出 locale 名（`zh_HK` → 「中文 (香港)」）
+  —— 兩樣都唔要，user 淨係要一行 `ime_name`。空字串 label 都冇用，
+  `InputMethodSubtype.getDisplayName()` 見到空就會跌返去出 locale 名。
+- 加多過一粒 subtype 仲衰，系統嗰度會變兩個輸入法。
+
+所以呢度**唔好加返** subtype、`imeSubtypeLocale`、`languageTag`、`isAsciiCapable`。
+Kotlin 嗰邊一句 subtype API 都冇用（`grep -ri subtype app/src --include=*.kt` 係空），
+拆走冇嘢會斷。
 
 ---
 

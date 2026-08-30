@@ -7,16 +7,15 @@
 
 ## [2.0.1] — 2026-08-31
 
-### 系統輸入法清單嗰行「語言」唔再重覆個名
+### 系統輸入法清單淨係出一行「三三輸入法」
 
-`method.xml` 粒 subtype 一路都係 `android:label="@string/ime_name"`，
-所以 Android 「螢幕鍵盤」清單同輸入法揀選視窗上下兩行都出「三三輸入法」——
-上面嗰行係 IME 名，下面嗰行本來應該講語言。
+`method.xml` 粒 subtype 一路都係 `android:label="@string/ime_name"`，所以 Android
+「螢幕鍵盤」清單同輸入法揀選視窗上下兩行都出「三三輸入法」—— 上面嗰行係 IME 名，
+下面嗰行係 subtype，本來應該講語言。
 
-- 新增 `subtype_name`：中文機出「**中英混合**」，英文機（`values-en/`）出
-  「**Multilingual**」——中英數本來就係喺同一個鍵盤入面自己切，一粒 subtype 冚晒。
-- subtype 補返 `android:languageTag="zh-Hant-HK"`（API 24+ 認嗰個），
-  舊嘅 `imeSubtypeLocale="zh_HK"` 留返畀更舊嘅 API。
+而家**成粒 `<subtype>` 拆走**：中英數本來就係喺同一個鍵盤入面自己切，唔使
+向系統報語言，冇 subtype 系統就淨係出一行 `ime_name`。留住粒 subtype 冇 label
+都唔得 —— 冇 label 佢會自動出 locale 名（`zh_HK` → 「中文 (香港)」），照樣兩行。
 
 ---
 

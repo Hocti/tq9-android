@@ -2,12 +2,8 @@
 <input-method xmlns:android="http://schemas.android.com/apk/res/android"
     android:settingsActivity="tt.ime.riverine.ui.SettingsActivity"
     android:supportsSwitchingToNextInputMethod="true">
-    <!-- 中英數全部喺同一個鍵盤入面自己切，所以系統嗰度只出一個「三三」。
-         label 係系統顯示嘅「語言」嗰行，唔可以再寫個 IME 名，否則名同語言一模一樣。 -->
-    <subtype
-        android:label="@string/subtype_name"
-        android:imeSubtypeLocale="zh_HK"
-        android:languageTag="zh-Hant-HK"
-        android:imeSubtypeMode="keyboard"
-        android:isAsciiCapable="true" />
+    <!-- 特登冇 <subtype>。中英數全部喺同一個鍵盤入面自己切，唔使畀系統知道語言。
+         一加 subtype，系統輸入法清單就會喺個名下面多一行（subtype 個 label，
+         冇 label 就自動出 locale 名例如「中文 (香港)」）—— user 唔要嗰行，
+         淨係要一行「三三輸入法」。所以呢度一粒 subtype 都唔好加返。 -->
 </input-method>

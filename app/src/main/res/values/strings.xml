@@ -4,7 +4,4 @@
     <string name="app_name">三三輸入法</string>
     <!-- 系統輸入法揀選視窗嗰行，位窄，用簡稱 -->
     <string name="ime_name">三三輸入法</string>
-    <!-- 系統嗰邊 subtype 嗰行係「語言」，唔係個名。中英數全部喺同一個鍵盤入面切，
-         所以寫「中英混合」（英文機睇 values-en 出 Multilingual），唔好再出個名一次。 -->
-    <string name="subtype_name">中英混合</string>
 </resources>

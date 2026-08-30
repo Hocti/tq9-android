@@ -1,5 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <!-- 淨係冚 subtype 嗰行；app_name / ime_name 照跌返去 values/ 出中文名。 -->
-    <string name="subtype_name">Multilingual</string>
-</resources>
