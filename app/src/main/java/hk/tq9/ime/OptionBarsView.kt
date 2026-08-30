@@ -97,11 +97,20 @@ class OptionBarsView(context: Context) : LinearLayout(context) {
     private val strip = LinearLayout(context)
     private val scroller = HorizontalScrollView(context)
     private val expandedScroll = ScrollView(context)
-    private val flow = FlowLayout(context)
+    private val flow = CandFlowView(context)
     private val candRow = LinearLayout(context)
     private val toolRow = LinearLayout(context)
     private val barRow = LinearLayout(context)
     private val swap = FrameLayout(context)
+
+    /**
+     * [strip] 嗰行嘅 chip 池，[syncStrip] 攞嚟 reuse（見該處）。
+     *
+     * **一定要喺 `init` 上面declare**：Kotlin 係由上而下逐句行落嚟嘅，
+     * `init` 入面嗰句 [applyTheme] 會叫 [rebuildChips]，declare 喺下面
+     * 個池就仲係 null，一開個鍵盤就 NPE（2026-08-30 踩過）。
+     */
+    private val stripPool = mutableListOf<TextView>()
 
     /** 邊粒掣用邊個圖案（＋TalkBack 讀嘅名），轉主題重新畫嗰陣要用 */
     private val icons = LinkedHashMap<TextView, Pair<ToolIcon, String>>()
@@ -189,9 +198,8 @@ class OptionBarsView(context: Context) : LinearLayout(context) {
         scroller.isHorizontalScrollBarEnabled = false
         scroller.addView(strip, LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.MATCH_PARENT))
 
-        flow.hGap = dp(4f).toInt()
-        flow.vGap = dp(4f).toInt()
         flow.setPadding(dp(4f).toInt(), dp(4f).toInt(), dp(4f).toInt(), dp(4f).toInt())
+        flow.onPick = { listener?.onPickCandidate(it) }
         expandedScroll.addView(flow, ViewGroup.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
         // 唔加入 `this` —— 拉大嗰陣係 host 攞 expandedView 去蓋喺鍵盤度（向下遮），
@@ -361,6 +369,9 @@ class OptionBarsView(context: Context) : LinearLayout(context) {
     private fun wantExpandBtn(): Int? = when {
         expanded -> View.VISIBLE                  // 攤開咗一定要有得撳返埋
         mode != BarMode.CANDIDATES || candidates.isEmpty() -> View.GONE
+        // 隻字太多俾 rebuildChips 剪咗尾（見 [COLLAPSED_CHIP_LIMIT]）：即使
+        // 頭幾個啱啱好擺得晒一行，都要出返粒 ▼，唔係就永遠冇得睇埋後面嗰啲
+        candidates.size > COLLAPSED_CHIP_LIMIT -> View.VISIBLE
         swap.width <= 0 -> null                   // 未排過版，判斷唔到，唔好亂郁
         strip.width > swap.width -> View.VISIBLE
         else -> View.GONE
@@ -384,22 +395,15 @@ class OptionBarsView(context: Context) : LinearLayout(context) {
         // 大嗰份交俾 host 蓋喺鍵盤度
         scroller.visibility = if (v) View.INVISIBLE else View.VISIBLE
         expandBtn.text = if (v) "▲" else "▼"
-        rebuildChips()
+        // 唔使 rebuildChips —— 拉大同收埋兩邊嘅內容一早就砌好（見 [rebuildChips]）
         listener?.onExpandChanged(v)
     }
 
-    private fun makeChip(text: String, index: Int): TextView = TextView(context).apply {
-        this.text = text
-        textSize = candSp
-        gravity = Gravity.CENTER
-        // 熄咗 `includeFontPadding`，再用 [CandChip] 計出嚟嗰個**唔對稱** padding
-        // —— 兩樣都要，個字先至真係睇落上下置中（點解見 [CandChip]）
-        includeFontPadding = false
-        setTextColor(theme.text)
-        background = chipBg(theme.keyFace)
-        setPadding(dp(10f).toInt(), chip.padTop, dp(10f).toInt(), chip.padBottom)
-        minWidth = dp(38f).roundToInt()
-        setOnClickListener { listener?.onPickCandidate(index) }
+    /** 用喺新起同 reuse 嘅 chip 都要——見 [syncStrip] */
+    private fun styleChip(view: TextView, text: String, index: Int) {
+        view.text = text
+        CandFlowView.styleChip(view, candSp, chip, theme.text, theme.keyFace)
+        view.setOnClickListener { listener?.onPickCandidate(index) }
     }
 
     /**
@@ -419,23 +423,39 @@ class OptionBarsView(context: Context) : LinearLayout(context) {
         rebuildChips()
     }
 
+    /**
+     * 收埋（未撳 ▼）嗰陣條 [strip] 淨係擺得落一行，所以最多起頭
+     * [COLLAPSED_CHIP_LIMIT] 個 chip —— 打緊碼嗰陣 `refreshBars()` 一鍵一次，
+     * 起多咗嘅都係白起。呢廿個 chip 唔拆重起，交俾 [syncStrip] reuse。
+     *
+     * 拉大嗰個表就唔使剪 —— [CandFlowView] 自己識得 recycle（見該 class），
+     * 成千隻字都照畀佢，佢淨係會為見得到嗰幾行起 view。
+     */
     private fun rebuildChips() {
-        strip.removeAllViews()
-        flow.removeAllViews()
-        val target: ViewGroup = if (expanded) flow else strip
+        flow.applyStyle(candSp, chip, theme.text, theme.keyFace)
+        flow.setItems(candidates)
+        syncStrip(candidates.take(COLLAPSED_CHIP_LIMIT))
+    }
+
+    /** 夠用就淨改 text，唔夠先加，多咗就 hide 多嗰啲 */
+    private fun syncStrip(source: List<String>) {
         val gap = dp(CandChip.MARGIN_DP).toInt()
-        for ((i, w) in candidates.withIndex()) {
+        var j = 0
+        for ((i, w) in source.withIndex()) {
             if (w.isEmpty()) continue
-            val chip = makeChip(w, i)
-            if (target === strip) {
-                val lp = LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT)
-                lp.setMargins(gap, gap, gap, gap)
-                lp.gravity = Gravity.CENTER_VERTICAL
-                strip.addView(chip, lp)
-            } else {
-                flow.addView(chip)
+            val view = if (j < stripPool.size) stripPool[j] else {
+                TextView(context).also {
+                    val lp = LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT)
+                    lp.setMargins(gap, gap, gap, gap)
+                    lp.gravity = Gravity.CENTER_VERTICAL
+                    strip.addView(it, lp)
+                    stripPool.add(it)
+                }
             }
+            styleChip(view, w, i)
+            j++
         }
+        for (k in j until stripPool.size) stripPool[k].visibility = View.GONE
     }
 
     /**
@@ -522,5 +542,13 @@ class OptionBarsView(context: Context) : LinearLayout(context) {
          * 上下鬆啲，個圖案唔會跟住大。
          */
         const val ICON_DP = 21f
+
+        /**
+         * 冚咗（未撳 ▼）嗰陣，`strip` 最多起幾多個 chip。選字碼太多頁（例如
+         * 一個碼夠成百頁）嗰陣 [candidates] 可以成千個，一次過起晒啲 `TextView`
+         * 會令成個候選字 bar 卡一卡先出到嚟 —— 反正冇拉大嗰陣本來就淨係見到
+         * 頭幾個，起多都係白起。
+         */
+        const val COLLAPSED_CHIP_LIMIT = 20
     }
 }

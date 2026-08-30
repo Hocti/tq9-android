@@ -48,7 +48,7 @@ class SidePanelView(context: Context) : LinearLayout(context) {
 
     private val toolFlow = FlowLayout(context)
     private val candScroll = ScrollView(context)
-    private val candFlow = FlowLayout(context)
+    private val candFlow = CandFlowView(context)
 
     /** 邊粒掣用邊個圖案（＋TalkBack 讀嘅名），轉主題重新畫嗰陣要用 */
     private val icons = LinkedHashMap<TextView, Pair<ToolIcon, String>>()
@@ -112,9 +112,8 @@ class SidePanelView(context: Context) : LinearLayout(context) {
             toolFlow.addView(v)
         }
 
-        candFlow.hGap = dp(4f).toInt()
-        candFlow.vGap = dp(4f).toInt()
         candFlow.setPadding(dp(4f).toInt(), dp(2f).toInt(), dp(4f).toInt(), dp(4f).toInt())
+        candFlow.onPick = { listener?.onPickCandidate(it) }
         candScroll.isVerticalScrollBarEnabled = true
         candScroll.addView(candFlow, ViewGroup.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
@@ -219,27 +218,14 @@ class SidePanelView(context: Context) : LinearLayout(context) {
         rebuildChips()
     }
 
+    /**
+     * 側邊欄係闊 screen 自動彈出嚟嗰版候選字，冇 ▼ 都要睇得晒 ——
+     * 所以**唔剪尾**，成千隻字都照畀 [CandFlowView]，佢自己識得 recycle
+     * （淨係為見得到嗰幾行起 view，見該 class）。
+     */
     private fun rebuildChips() {
-        candFlow.removeAllViews()
-        for ((i, w) in candidates.withIndex()) {
-            if (w.isEmpty()) continue
-            candFlow.addView(makeChip(w, i))
-        }
-    }
-
-    /** 同 [OptionBarsView.makeChip] 一樣，字體跟設定頁條 slider（[Prefs.candTextSp]） */
-    private fun makeChip(text: String, index: Int): TextView = TextView(context).apply {
-        this.text = text
-        textSize = candSp
-        gravity = Gravity.CENTER
-        // 同 [OptionBarsView.makeChip] 一樣：熄咗 includeFontPadding，
-        // 再用 [CandChip] 嗰個唔對稱 padding，個字先至睇落上下置中
-        includeFontPadding = false
-        setTextColor(theme.text)
-        background = chipBg(theme.keyFace)
-        setPadding(dp(10f).toInt(), chip.padTop, dp(10f).toInt(), chip.padBottom)
-        minWidth = dp(38f).roundToInt()
-        setOnClickListener { listener?.onPickCandidate(index) }
+        candFlow.applyStyle(candSp, chip, theme.text, theme.keyFace)
+        candFlow.setItems(candidates)
     }
 
     /**
