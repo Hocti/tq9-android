@@ -11,7 +11,7 @@ import kotlin.math.max
 import kotlin.math.roundToInt
 
 /**
- * 候選字 chip 嘅大細計算。上面條 bar（[OptionBarsView]）同側邊欄（[SidePanelView]）
+ * 關聯字 chip 嘅大細計算。上面條 bar（[OptionBarsView]）同側邊欄（[SidePanelView]）
  * 兩邊個 chip 一模一樣，所以條數擺喺呢度計一次，兩邊共用。
  *
  * ## 點解要用真 `TextView` 度，唔可以問 `Paint`

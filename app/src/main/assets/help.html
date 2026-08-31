@@ -99,9 +99,9 @@
 
 <h2>中文輸入基本操作</h2>
 <ul>
-  <li>按 <span class="key">1</span>～<span class="key">9</span> 揀碼，逐步縮小候選字範圍；候選字會即時顯示喺格內。</li>
+  <li>按 <span class="key">1</span>～<span class="key">9</span> 揀碼，逐步縮小關聯字範圍；關聯字會即時顯示喺格內。</li>
   <li>按 <span class="key">0</span> 開關成對標點「」，並將游標移到中間方便輸入。</li>
-  <li>候選字夠兩頁嗰陣，底行兩格闊嗰粒 <span class="key">0</span> 會變成翻頁鍵。排法有三種，可以喺「一般」分頁嘅<strong>「選字翻頁」</strong>揀：
+  <li>關聯字夠兩頁嗰陣，底行兩格闊嗰粒 <span class="key">0</span> 會變成翻頁鍵。排法有三種，可以喺「一般」分頁嘅<strong>「選字翻頁」</strong>揀：
     <ul>
       <li><strong>大格「下頁」</strong>（預設）：成兩格都係「下頁」，容易撳中；<strong>長按</strong>呢粒就係「上頁」。
           呢個狀態下長按 <span class="key">0</span> 嘅成對標點「」會暫時失效，個位改為喺左上角細字寫住「上頁」，頁數（例如 <span class="key">1/10</span>）就搬去右上角。</li>
@@ -121,7 +121,7 @@
 <h2>滑動輸入 (Swype)</h2>
 <div class="card">
   <p>喺九宮格上滑過幾個數字鍵，等同順序逐個按下：例如滑過 <span class="key">7</span>→<span class="key">9</span>→<span class="key">3</span>
-  就等於按咗三下 <span class="key">7</span><span class="key">9</span><span class="key">3</span>，每滑到一個新格即時出碼、即時更新候選字。</p>
+  就等於按咗三下 <span class="key">7</span><span class="key">9</span><span class="key">3</span>，每滑到一個新格即時出碼、即時更新關聯字。</p>
   <p class="note">中間經過嘅格會按停留幾耐、轉幾多度，再夾埋字碼表嘅使用頻率一齊判斷。</p>
 </div>
 
@@ -147,8 +147,8 @@
 切換輸入法改為長按中文鍵盤嘅 <span class="key">Eng</span> 鍵。</p>
 
 <h2>工具列</h2>
-<p>右上角 <span class="key">☰</span> 負責開關整條工具列，開啟後會先進入候選字畫面；
-之後按工具列最左嘅 <span class="key">⇄</span> 可以喺候選字與工具（大小位置、貼上、語音、表情符號、AI）之間切換。
+<p>右上角 <span class="key">☰</span> 負責開關整條工具列，開啟後會先進入關聯字畫面；
+之後按工具列最左嘅 <span class="key">⇄</span> 可以喺關聯字與工具（大小位置、貼上、語音、表情符號、AI）之間切換。
 英文與符號頁一律強制顯示工具列。</p>
 
 <h2>長按快捷</h2>
@@ -212,7 +212,7 @@
   <p>每隻字打過幾多次、以及連續兩個字嘅組合，都會記錄喺 <code>usage_stats.db</code>，
   同字碼資料庫分開存放（換字碼資料庫唔會影響呢啲記錄）。</p>
   <ul>
-    <li><strong>常用字排前</strong>（預設開）：候選字第一頁會依「同前一個字嘅組合」打過幾多次推前，第九個之後就依該字本身打過幾多次推前。
+    <li><strong>常用字排前</strong>（預設開）：關聯字第一頁會依「同前一個字嘅組合」打過幾多次推前，第九個之後就依該字本身打過幾多次推前。
         熄咗就完全依字碼表原本次序，但仍然會繼續記錄次數。</li>
     <li><strong>匯出 / 匯入</strong>：可以備份或者喺另一部機還原（匯入會覆蓋現有記錄）。</li>
     <li><strong>清除記錄</strong>：全部刪走並重設為新嘅空白記錄，無法復原。</li>

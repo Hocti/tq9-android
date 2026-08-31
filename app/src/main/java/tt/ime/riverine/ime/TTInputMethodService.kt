@@ -84,7 +84,7 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
      * 唔夠窄就一路係 null／detach 咗，成套行為同以前一模一樣。
      */
     private var sidePanel: SidePanelView? = null
-    /** 候選字 bar 拉大咗：`bars.expandedView` 蓋喺 padHolder 度（見 [onExpandChanged]） */
+    /** 關聯字 bar 拉大咗：`bars.expandedView` 蓋喺 padHolder 度（見 [onExpandChanged]） */
     private var candidatesExpanded = false
     private var aiOverlay: View? = null
     private var aiGeneration = 0
@@ -168,7 +168,7 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
 
     /**
      * 九宮格右上角嗰粒要唔要著燈。平時 = 條 bar 開住；條 bar 常駐嗰陣粒鍵已經
-     * 唔再係開關，而係候選字 ⇄ 工具嘅切換掣，所以改為代表「而家喺工具嗰邊」——
+     * 唔再係開關，而係關聯字 ⇄ 工具嘅切換掣，所以改為代表「而家喺工具嗰邊」——
      * 一路著住藍燈冇資訊可言。
      */
     override val optionOn: Boolean
@@ -388,7 +388,7 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
         // 去到第二啲 view 就當唔搵住
         if (m != PadMode.LATIN && m != PadMode.CHINESE) endEmojiSearch()
         hideOverlay()
-        bars.forceCollapse() // 唔係就下面 removeAllViews() 會靜靜雞清埋拉大咗嘅候選字 view
+        bars.forceCollapse() // 唔係就下面 removeAllViews() 會靜靜雞清埋拉大咗嘅關聯字 view
         rememberPadHeight()
         mode = m
         finishLatinComposing()
@@ -1012,10 +1012,10 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
     // ---- 上面條 bar -------------------------------------------------------
 
     /**
-     * 九宮格右上角嗰粒。平時 `☰` = 開／關成條 bar，一開返永遠先入候選字 view。
+     * 九宮格右上角嗰粒。平時 `☰` = 開／關成條 bar，一開返永遠先入關聯字 view。
      *
      * **條 bar 常駐（[Prefs.barPinned]）嗰陣冇嘢好開關**，粒鍵改咗做 `⇄`：
-     * 喺候選字同工具之間切，同條 bar 最左本來嗰粒一模一樣（嗰粒亦都因此收埋咗，
+     * 喺關聯字同工具之間切，同條 bar 最左本來嗰粒一模一樣（嗰粒亦都因此收埋咗，
      * 見 [refreshBars] 嗰句 `setSwitchVisible`）。
      */
     private fun toggleBar() {
@@ -1026,7 +1026,7 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
         chinesePad?.invalidate()
     }
 
-    /** 條 bar 最左嗰粒：喺候選字／工具兩個 view 之間切 */
+    /** 條 bar 最左嗰粒：喺關聯字／工具兩個 view 之間切 */
     override fun onSwitchView() {
         barMode = if (barMode == BarMode.TOOLS) BarMode.CANDIDATES else BarMode.TOOLS
         Prefs.setBarMode(this, barMode)
@@ -1040,7 +1040,7 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
     private fun refreshBars() {
         if (!::bars.isInitialized) return
         val pinned = Prefs.barPinned(this)
-        // 常駐：關唔熄得。舊設定裡面存住 OFF 就當場升做候選字（設定頁開個掣嗰陣
+        // 常駐：關唔熄得。舊設定裡面存住 OFF 就當場升做關聯字（設定頁開個掣嗰陣
         // 唔會 restart 個 service，所以要喺呢度補）
         if (pinned && barMode == BarMode.OFF) {
             barMode = BarMode.CANDIDATES
@@ -1055,11 +1055,11 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
         if ((mode == PadMode.LATIN || mode == PadMode.SYMBOL) && effective == BarMode.OFF) {
             effective = BarMode.CANDIDATES
         }
-        // emoji 表／剪貼簿嗰陣冇候選字可以出，索性成行出工具，唔好淨係得粒 ✖ 吉住
+        // emoji 表／剪貼簿嗰陣冇關聯字可以出，索性成行出工具，唔好淨係得粒 ✖ 吉住
         if (specialPad) effective = BarMode.TOOLS
 
-        // 中文本體窄到夠位喺隔籬擺嘢 → 條 bar 收埋，功能掣同候選字全部搬去側邊欄。
-        // 一早計定：側邊欄兩樣（候選字＋工具）一次過見晒，所以佢出咗嚟就一定要有候選字
+        // 中文本體窄到夠位喺隔籬擺嘢 → 條 bar 收埋，功能掣同關聯字全部搬去側邊欄。
+        // 一早計定：側邊欄兩樣（關聯字＋工具）一次過見晒，所以佢出咗嚟就一定要有關聯字
         val geom = if (barMode == BarMode.OFF || overlay != null) null else sideGeom()
         val wantCands = geom != null || effective == BarMode.CANDIDATES
 
@@ -1069,7 +1069,7 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
             emojiSearch -> emojiResults
             mode == PadMode.CHINESE -> when {
                 engine.selectMode -> engine.selectWords
-                // 根本冇出緊候選字（條 bar 關咗／而家喺工具嗰邊）就唔使查
+                // 根本冇出緊關聯字（條 bar 關咗／而家喺工具嗰邊）就唔使查
                 // ——[contextPicks] 要問個輸入框攞字（IPC），逐粒鍵行一次好唔抵
                 !wantCands -> emptyList()
                 // 打咗一兩個碼（未夠碼出字）：出「呢個碼開頭最常用嗰九隻字」
@@ -1086,7 +1086,7 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
             return
         }
 
-        // 大細／貼邊／候選字字體全部跟而家見緊嗰組（見 [padGroup]）。要喺
+        // 大細／貼邊／關聯字字體全部跟而家見緊嗰組（見 [padGroup]）。要喺
         // setCandidates 之前做 —— 條 bar 幾高、啲 chip 幾大都係跟呢個組行
         bars.padGroup = padGroup
         bars.refreshFontScale()
@@ -1101,8 +1101,8 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
         // 大細／貼邊分咗兩組存，粒「靠左／靠右」掣要拉、要著返邊個樣，
         // 都係跟而家見緊嗰組（見 [padGroup]）
         bars.refreshAlignLabel()
-        // 條 bar 高度淨係跟候選字嘅字體行（見 [OptionBarsView.barHeightFor]），
-        // 唔會因為有冇候選字、而家喺邊一段而跳高跳低
+        // 條 bar 高度淨係跟關聯字嘅字體行（見 [OptionBarsView.barHeightFor]），
+        // 唔會因為有冇關聯字、而家喺邊一段而跳高跳低
         bars.visibility = if (effective == BarMode.OFF) View.GONE else View.VISIBLE
     }
 
@@ -1139,7 +1139,7 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
     }
 
     /**
-     * 打咗 1~2 個碼（未夠碼出候選字）嗰陣，條 bar 出「以呢個碼開頭最常用嗰九隻字」，
+     * 打咗 1~2 個碼（未夠碼出關聯字）嗰陣，條 bar 出「以呢個碼開頭最常用嗰九隻字」，
      * 撳落去即刻出字，唔使打齊三個碼（見 [TTDb.topByCodePrefix]）。
      * 同一個碼查一次就夠 —— 每撳一下鍵 [refreshBars] 都會行到呢度。
      */
@@ -1161,11 +1161,11 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
 
     /**
      * 中文本體靠咗一邊、又窄過螢幕嘅 [Prefs.SIDE_PANEL_MAX_RATIO]（六成）嗰陣，
-     * 空出嚟嗰四成幾位夠曬擺功能掣同一大版候選字，冇理由再喺上面霸多條 bar。
+     * 空出嚟嗰四成幾位夠曬擺功能掣同一大版關聯字，冇理由再喺上面霸多條 bar。
      *
      * 回傳 true = 而家用緊側邊欄（call 嗰邊要自己收埋 [bars]）。
      * [geom] 由 [refreshBars] 計（null = 唔夠窄／條 bar 關咗／有 overlay 蓋住）——
-     * 佢自己都要用「而家出唔出側邊欄」呢個答案去決定使唔使查候選字，所以計一次就夠。
+     * 佢自己都要用「而家出唔出側邊欄」呢個答案去決定使唔使查關聯字，所以計一次就夠。
      *
      * 只限中文九宮格：英文／符號／純數字係一行行鋪滿成行嘅，冇位空出嚟；
      * 剪貼簿嗰個 overlay 又會蓋住成個 padHolder（連側邊欄都遮埋，就撳唔返粒 ✖）。
@@ -1182,8 +1182,8 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
         }
         // 高度**寫死做中文九宮格嗰個高度**，唔可以用 MATCH_PARENT。
         // padHolder 係 wrap_content 嘅 FrameLayout：MATCH_PARENT 嘅仔會攞到
-        // AT_MOST(成個可用高度)，入面又有個食 weight 嘅候選字 ScrollView，
-        // 結果候選字一多就撐大咗 padHolder，成個鍵盤跟住拉高（打橫尤其明顯）。
+        // AT_MOST(成個可用高度)，入面又有個食 weight 嘅關聯字 ScrollView，
+        // 結果關聯字一多就撐大咗 padHolder，成個鍵盤跟住拉高（打橫尤其明顯）。
         val lp = FrameLayout.LayoutParams(geom.slackPx, geom.heightPx).apply {
             // 「靠右」= 內容貼右、左邊留白 → 側邊欄擺左邊，反之亦然
             gravity = if (geom.atStart) Gravity.START else Gravity.END
@@ -1366,7 +1366,7 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
     }
 
     /**
-     * 候選字 bar 拉大／縮返：拉大嗰陣攞 `bars.expandedView` 蓋喺 padHolder 度（向下遮），
+     * 關聯字 bar 拉大／縮返：拉大嗰陣攞 `bars.expandedView` 蓋喺 padHolder 度（向下遮），
      * **唔會**加高成個 root，同 emoji／clipboard 個 overlay 一樣攞 `padHeightPx` 做高度。
      */
     override fun onExpandChanged(expanded: Boolean) {

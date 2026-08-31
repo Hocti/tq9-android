@@ -9,7 +9,7 @@ import java.util.concurrent.atomic.AtomicBoolean
  * bigram（上一個字 → 下一個字統計，見 assets/en_bigram.txt）做主，
  * 冇 context 或者 bigram 揾唔到就跌落 [EnTrie] 嘅全域常用字。
  *
- * 用戶開始打緊下一個字（有 prefix）嗰陣，bigram 入面夾 prefix 嘅候選字擺前面，
+ * 用戶開始打緊下一個字（有 prefix）嗰陣，bigram 入面夾 prefix 嘅關聯字擺前面，
  * 唔夠再用 trie 嘅 prefix completion 補位 —— 即係話提示會跟住 context 走，
  * 唔淨係跟緊打緊嗰幾個字母。
  */

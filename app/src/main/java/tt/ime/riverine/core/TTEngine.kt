@@ -20,7 +20,7 @@ data class PadKey(
  *
  * 打字流程：
  *  - 首頁按 1~9 → 顯示第二碼提示圖；再按一個 → 顯示「選字」提示圖
- *  - 夠三碼、或者中途按 0 收尾 → 查 mapped_table 出候選字
+ *  - 夠三碼、或者中途按 0 收尾 → 查 mapped_table 出關聯字
  *  - 首頁直接按 0 → 標點；按 1~9 之後按 0 → 姓氏表
  */
 class TTEngine(val db: TTDb) {
@@ -244,7 +244,7 @@ class TTEngine(val db: TTDb) {
         return true
     }
 
-    /** 上面條 bar 冇候選字嗰陣會出速選字，撳咗就當揀咗佢（會行返同音／關聯字嗰套） */
+    /** 上面條 bar 冇關聯字嗰陣會出速選字，撳咗就當揀咗佢（會行返同音／關聯字嗰套） */
     fun pickQuick(word: String) {
         if (word.isEmpty() || word == PLACEHOLDER) return
         startSelectWord(listOf(word))

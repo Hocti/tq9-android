@@ -96,7 +96,7 @@ class ChinesePadView(context: Context, private val engine: TTEngine) : KeyboardB
 
         // 左欄（最上嗰粒短撳／長撳做乜，設定頁揀得）
         add(topLeftKey(), 0f, 0)
-        // 短撳永遠都係開關同音，長撳做乜就設定頁揀（預設「候選字」）——
+        // 短撳永遠都係開關同音，長撳做乜就設定頁揀（預設「關聯字」）——
         // 左上角細字＝長撳做乜，左下角嗰段即時提示（搵緊邊隻字嘅同音／個字正路
         // 點打）喺 drawFunction 度問 engine 攞
         add(funcLongKey(Key(KeyAction.HOMO, label = "同音"), Prefs.homoLong(context)), 0f, 1)
@@ -148,7 +148,7 @@ class ChinesePadView(context: Context, private val engine: TTEngine) : KeyboardB
 
     /**
      * 右上角嗰粒。平時係 `☰`＝開／關成條 bar；**條 bar 常駐**
-     * （[Prefs.barPinned]）就冇嘢好開關，改咗做 `⇄`＝候選字 ⇄ 工具，
+     * （[Prefs.barPinned]）就冇嘢好開關，改咗做 `⇄`＝關聯字 ⇄ 工具，
      * 而條 bar 自己最左嗰粒 `⇄` 就收埋（見 `OptionBarsView.setSwitchVisible`）。
      */
     private fun optionKey(): Key =
@@ -317,7 +317,7 @@ class ChinesePadView(context: Context, private val engine: TTEngine) : KeyboardB
         }
         drawFace(canvas, box, color)
         // 功能鍵成粒都行 [funcFontScale]：設定頁條字體 slider 係為咗睇清楚啲**字**
-        // （下面啲候選字）而拉，「同音」「取消」「Eng」呢啲跟住一齊大就逼爆粒鍵
+        // （下面啲關聯字）而拉，「同音」「取消」「Eng」呢啲跟住一齊大就逼爆粒鍵
         drawLabel(
             canvas, box, labelOf(k),
             sizeRatio = if (k.action == KeyAction.CANCEL) 0.36f else 0.40f,

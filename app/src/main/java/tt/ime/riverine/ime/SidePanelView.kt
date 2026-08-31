@@ -23,14 +23,14 @@ import kotlin.math.roundToInt
  * 用嘅側邊欄。
  *
  * 呢個情況下空出嚟嗰四成幾位本來係吉住嘅，同時上面又要再霸一條 bar 去擺功能掣同
- * 候選字 —— 好嘥。所以一夠窄就**收起上面條 [OptionBarsView]**，成條 bar 嘅內容
+ * 關聯字 —— 好嘥。所以一夠窄就**收起上面條 [OptionBarsView]**，成條 bar 嘅內容
  * 搬晒落嚟呢邊：
  *
  *  - 上面一行（或者兩行，唔夠闊會自動摺）：功能掣（大細位置、貼上、錄音、
  *    emoji、AI），同工具 bar 嗰幾粒一模一樣
- *  - 下面成塊位：候選字，可以直接向下 scroll，唔使再撳 ▼ 拉大
+ *  - 下面成塊位：關聯字，可以直接向下 scroll，唔使再撳 ▼ 拉大
  *
- * 兩樣嘢一次過見晒，亦都唔使再喺候選字／工具之間切（[OptionBarsView] 個 ⇄ 喺呢度
+ * 兩樣嘢一次過見晒，亦都唔使再喺關聯字／工具之間切（[OptionBarsView] 個 ⇄ 喺呢度
  * 用唔著，所以冇擺）。
  */
 @SuppressLint("ViewConstructor")
@@ -57,7 +57,7 @@ class SidePanelView(context: Context) : LinearLayout(context) {
     private var aiReady = false
     private var sttActive = false
 
-    /** 候選字而家幾大（sp），見 [Prefs.candTextSp]。側邊欄淨係中文，所以永遠 CJK 嗰組 */
+    /** 關聯字而家幾大（sp），見 [Prefs.candTextSp]。側邊欄淨係中文，所以永遠 CJK 嗰組 */
     private var candSp = Prefs.candTextSp(context)
 
     /** chip 上下 padding（**特登唔對稱**，點解見 [CandChip]），同上面條 bar 一模一樣 */
@@ -119,7 +119,7 @@ class SidePanelView(context: Context) : LinearLayout(context) {
             ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
 
         addView(toolFlow, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
-        // 淨低幾多位就俾候選字食晒（weight = 1），咁樣拉極都唔會撐爆個鍵盤
+        // 淨低幾多位就俾關聯字食晒（weight = 1），咁樣拉極都唔會撐爆個鍵盤
         addView(candScroll, LayoutParams(LayoutParams.MATCH_PARENT, 0, 1f))
 
         applyTheme(theme)
@@ -219,7 +219,7 @@ class SidePanelView(context: Context) : LinearLayout(context) {
     }
 
     /**
-     * 側邊欄係闊 screen 自動彈出嚟嗰版候選字，冇 ▼ 都要睇得晒 ——
+     * 側邊欄係闊 screen 自動彈出嚟嗰版關聯字，冇 ▼ 都要睇得晒 ——
      * 所以**唔剪尾**，成千隻字都照畀 [CandFlowView]，佢自己識得 recycle
      * （淨係為見得到嗰幾行起 view，見該 class）。
      */

@@ -6,7 +6,7 @@ enum class KeyAction {
     SHORTCUT,     // 速選字
     SC_TOGGLE,    // 簡體輸出開關
     HOMO,         // 同音 toggle（長撳做乜由設定頁話事，預設 [RELATE]）
-    RELATE,       // 游標前面嗰隻字嘅候選字（TTCmd.RELATE）
+    RELATE,       // 游標前面嗰隻字嘅關聯字（TTCmd.RELATE）
     PREV_PAGE,    // 選字上一頁（淨係選字模式、夠兩頁先出現喺 0 隔籬）
     TO_CHINESE,
     TO_LATIN,
@@ -18,7 +18,7 @@ enum class KeyAction {
     IME_SWITCH,   // 地球：直接跳去下一個輸入法
     IME_PICKER,   // 彈出系統嘅輸入法選單（長撳 Eng 揀得，見 [tt.ime.riverine.core.EngLongPress]）
     STT,          // 語音輸入
-    OPTION,       // 上面條 bar：關 → 候選字 → 工具
+    OPTION,       // 上面條 bar：關 → 關聯字 → 工具
     BACKSPACE,
     SPACE,
     ENTER,

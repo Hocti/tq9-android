@@ -6,11 +6,11 @@ import kotlin.math.max
 
 /**
  * 英文 swipe 認字：唔再逐格判斷「撳咗邊粒鍵」（嗰套 dwell/轉角 heuristic 已經放棄），
- * 改為 AOSP 手勢輸入嗰套概念嘅 Kotlin 版 —— 成條手指軌跡一次過同候選字嘅
+ * 改為 AOSP 手勢輸入嗰套概念嘅 Kotlin 版 —— 成條手指軌跡一次過同關聯字嘅
  * 「理想路徑」（逐個字母嘅鍵中心連成線，重疊嘅字母收埋做一格）比對形狀＋位置，
  * 揀路徑夾得最貼、又夠常用嘅字（shape-writing / SHARK2 嗰個原理）。
  *
- * 候選字用「首尾字母」分桶做粗篩（同舊 [EnDict] 嘅設計一樣，「首尾字母一定準」），
+ * 關聯字用「首尾字母」分桶做粗篩（同舊 [EnDict] 嘅設計一樣，「首尾字母一定準」），
  * 夾唔到就放寬做淨係信第一個字母嘅 fallback。
  */
 class GestureDecoder(private val dict: EnDict) {

@@ -36,10 +36,10 @@ enum class PadAlign(val label: String) {
     SPLIT("左右拆開")
 }
 
-/** 上面條 bar 嘅三段：關 → 候選字 → 工具 */
+/** 上面條 bar 嘅三段：關 → 關聯字 → 工具 */
 enum class BarMode(val label: String) {
     OFF("關閉"),
-    CANDIDATES("候選字"),
+    CANDIDATES("關聯字"),
     TOOLS("工具");
 
     fun next(): BarMode = entries[(ordinal + 1) % entries.size]
@@ -81,8 +81,8 @@ enum class EngLongPress(val label: String) {
 enum class PadFunc(val label: String, val icon: String) {
     SHORTCUT("速選字", "速選"),
     SC_TOGGLE("簡體開關", "简"),
-    /** 游標前面嗰隻字嘅候選字（`TTCmd.RELATE`）—— 同音鍵長撳預設就係佢 */
-    RELATE("候選字", "候選字"),
+    /** 游標前面嗰隻字嘅關聯字（`TTCmd.RELATE`）—— 同音鍵長撳預設就係佢 */
+    RELATE("關聯字", "關聯字"),
     EMOJI("表情符號", "表情"),
     PASTE("貼上", "貼上"),
     STT("語音輸入", "錄音"),
@@ -311,7 +311,7 @@ object Prefs {
      * **功能鍵**（同音、Eng、中、⌫、⏎、␣、?123…）鍵面用嘅倍數 ——
      * 固定係 100%，**唔跟設定頁條 slider**（2026-08-29 user 要求）。
      *
-     * 條 slider 係為咗睇清楚**啲字**（九宮格出嘅候選字、英文字母、符號）而拉嘅；
+     * 條 slider 係為咗睇清楚**啲字**（九宮格出嘅關聯字、英文字母、符號）而拉嘅；
      * 功能鍵寫住嗰兩三隻中文字跟住一齊大就會逼爆粒鍵，而且粒鍵做乜早就記熟咗，
      * 根本唔使睇得咁清。英文組照樣乘 [LATIN_FONT_BOOST]，所以條 slider 停喺 100%
      * 嗰陣個樣同以前一模一樣。
@@ -319,11 +319,11 @@ object Prefs {
     fun funcFontScale(g: PadGroup = PadGroup.CJK): Float =
         if (g == PadGroup.LATIN) LATIN_FONT_BOOST else 1f
 
-    /** 上面條 bar／側邊欄嘅候選字，倍數 100% 嗰陣幾大（sp） */
+    /** 上面條 bar／側邊欄嘅關聯字，倍數 100% 嗰陣幾大（sp） */
     const val CAND_TEXT_SP = 20f
 
     /**
-     * 候選字幾大（sp）。跟 [fontScalePref]（**唔乘** [LATIN_FONT_BOOST] ——
+     * 關聯字幾大（sp）。跟 [fontScalePref]（**唔乘** [LATIN_FONT_BOOST] ——
      * 嗰個倍數係為咗補返鍵面咁窄，條 bar 唔關事），條 bar 高度亦都跟住佢大
      * （見 `OptionBarsView.barHeightFor`）。
      */
@@ -359,7 +359,7 @@ object Prefs {
 
     /**
      * 中文本體窄到淨低咁多位（佔螢幕嘅比例以下）就唔好再喺上面擺條 bar ——
-     * 空出嚟嗰邊夠位擺得晒功能掣同候選字，見 `TTInputMethodService.sidePanelActive`。
+     * 空出嚟嗰邊夠位擺得晒功能掣同關聯字，見 `TTInputMethodService.sidePanelActive`。
      */
     const val SIDE_PANEL_MAX_RATIO = 0.60f
 
@@ -449,7 +449,7 @@ object Prefs {
         runCatching { PadFunc.valueOf(sp(ctx).getString(key, def.name)!!) }.getOrDefault(def)
 
     /**
-     * 候選字要唔要按打過幾多次推前（見 `TTEngine.reorderByUsage`）。
+     * 關聯字要唔要按打過幾多次推前（見 `TTEngine.reorderByUsage`）。
      * 預設開住；熄咗就完全跟返字碼表本身嘅次序，但 `UsageStats` 照樣繼續記數。
      */
     fun usageReorder(ctx: Context) = sp(ctx).getBoolean(KEY_USAGE_REORDER, true)
@@ -515,7 +515,7 @@ object Prefs {
 
     /**
      * 上面條 bar 常駐：關唔熄得。中文九宮格右上角嗰粒本來係「開／關成條 bar」，
-     * 常駐之後冇嘢好開關，改咗做**候選字 ⇄ 工具**嘅切換掣，而條 bar 自己最左
+     * 常駐之後冇嘢好開關，改咗做**關聯字 ⇄ 工具**嘅切換掣，而條 bar 自己最左
      * 嗰粒 `⇄` 就收埋（兩粒做同一件事冇意思）。見
      * `TTInputMethodService.toggleBar` 同 `ChinesePadView.optionKey`。
      */

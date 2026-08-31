@@ -7,7 +7,7 @@
 
 ## 一句講晒
 
-使用已過期專利 HK1035043 嘅 numpad 中文輸入法。撳 2~3 個碼查 `mapped_table` 出候選字，
+使用已過期專利 HK1035043 嘅 numpad 中文輸入法。撳 2~3 個碼查 `mapped_table` 出關聯字，
 字碼表／關聯字／同音字／繁簡表全部喺一個 sqlite 檔案入面，user 可以喺設定頁換走。
 
 ## 環境
@@ -168,7 +168,7 @@ user 可以喺設定頁換走個字碼表，夾硬覆蓋就會刪咗人哋自己
 | `1000`~`1009` | 速選字表（⭐；首頁 = 1000，撳咗 1~9 之後 = 1001~1009） |
 | `1010` | 候選欄嘅預設字（游標前面吉住／唔係中文嗰陣出，見「候選欄出乜」） |
 
-打碼邏輯（`TTEngine.press`）：夠三碼、或者中途撳 0 收尾，就查表出候選字。
+打碼邏輯（`TTEngine.press`）：夠三碼、或者中途撳 0 收尾，就查表出關聯字。
 
 ### `characters` 入面嘅 `*` 係佔位符，唔係一隻字
 
@@ -272,7 +272,7 @@ core/   TTDb       sqlite 存取、assets 安裝、換 db、weight prefix 統計
         Prefs      全部設定
 swipe/  GestureKeyTracker   中文九宮格滑動中間鍵判定（純 Kotlin，有 unit test）
         GestureDecoder      英文 swipe 認字：AOSP 手勢輸入嗰套概念嘅 Kotlin 版
-                   （軌跡 vs 候選字理想路徑做形狀比對，唔係逐格判斷撳咗邊粒鍵）
+                   （軌跡 vs 關聯字理想路徑做形狀比對，唔係逐格判斷撳咗邊粒鍵）
 ime/    TTInputMethodService   IME 主體，所有 view 嘅 host
         KeyboardBaseView        排版／畫鍵／掂觸／畫線／長撳 popup／長撳 ␣ 郁 caret
         KeyPopup                浮喺鍵盤外面嗰啲窗（長撳變體行、滑動 hover 提示）
@@ -282,7 +282,7 @@ ime/    TTInputMethodService   IME 主體，所有 view 嘅 host
         EmojiPadView            emoji grid（ViewGroup，唔係 KeyboardBaseView）
         ClipboardListView       長撳「貼上」之後蓋喺 padHolder 上面嘅 overlay
         PadMetrics              尺寸同顯示方式計算
-        OptionBarsView          上面條 bar（三段：關／候選字／工具）
+        OptionBarsView          上面條 bar（三段：關／關聯字／工具）
 ui/     SettingsActivity / MicPermissionActivity
 ```
 
@@ -309,7 +309,7 @@ ui/     SettingsActivity / MicPermissionActivity
 `TTEngine.status` 仲計緊，但係冇人畫。要出 message 就用 `toast()`，
 唔好再喺條 bar 上面加行。
 
-高度**唔再係寫死 42dp**（2026-08-29 user 要求）：由 `CandChip` 度候選字實際
+高度**唔再係寫死 42dp**（2026-08-29 user 要求）：由 `CandChip` 度關聯字實際
 要幾高，再加上下 3dp margin，最矮 42dp。100% 之下實測 47dp。
 **三段共用同一個高度**，轉段一樣唔會跳。
 
@@ -318,7 +318,7 @@ ui/     SettingsActivity / MicPermissionActivity
 側邊欄嗰邊係 `SidePanelView.refreshFontScale()`：**唔可以靠 `setCandidates`**，
 佢見個 list 冇變就唔會重砌啲 chip，改完字體返嚟仲係舊 size。
 
-### 候選字 chip 嘅高度／padding 一定要行 `CandChip`
+### 關聯字 chip 嘅高度／padding 一定要行 `CandChip`
 
 大細全部喺 `CandChip` 度計，`OptionBarsView` 同 `SidePanelView` 兩份 `makeChip()`
 共用。裡面有兩個踩過嘅坑（2026-08-29 user 影實機相踩到「上面 padding 多過下面」），
@@ -342,8 +342,8 @@ ui/     SettingsActivity / MicPermissionActivity
 ### 字體大細：條 slider 淨係郁得到「字」，郁唔到功能鍵
 
 設定頁兩條字體 slider（`Prefs.KEY_FONT_SCALE` / `..._LATIN`）**淨係**放大
-真係打得出嚟嗰啲字符：九宮格嘅候選字同筆形提示、英文字母、符號、數字，
-加埋上面條 bar 同側邊欄嘅候選字（`Prefs.candTextSp`）。
+真係打得出嚟嗰啲字符：九宮格嘅關聯字同筆形提示、英文字母、符號、數字，
+加埋上面條 bar 同側邊欄嘅關聯字（`Prefs.candTextSp`）。
 
 **功能鍵（同音、取消、Eng、中、⌫、⏎、␣、?123、€£¥…）唔跟**
 （2026-08-29 user 要求）：行 `Prefs.funcFontScale()`，永遠當 100%
@@ -356,7 +356,7 @@ ui/     SettingsActivity / MicPermissionActivity
 `Eng` 個 🌐，全部都要傳 `scale =` 落 `KeyboardBaseView` 嗰幾個 `draw*` helper，
 唔好淨係改個 label。工具 bar 嗰啲圖案（`ICON_DP`）同一個道理，一樣唔跟。
 
-### 粒 `▼`（拉大候選字）淨係喺真係捲得到嗰陣先出
+### 粒 `▼`（拉大關聯字）淨係喺真係捲得到嗰陣先出
 
 `OptionBarsView.wantExpandBtn()`：**比 `strip.width`（啲字實際幾闊）同 `swap.width`
 （成行嘅闊度）**，唔夠位擺先至 `VISIBLE`，否則 `GONE`（唔係 `INVISIBLE` ——
@@ -373,20 +373,20 @@ ui/     SettingsActivity / MicPermissionActivity
 `Prefs.SIDE_PANEL_MAX_RATIO`（六成）就照舊用上面條 `OptionBarsView`；
 **窄過六成**就 `bars.visibility = GONE`，成條 bar 嘅內容搬去 `SidePanelView`
 （加落 `padHolder` 度，`FrameLayout.LayoutParams` 闊度 = 空出嚟嗰邊，
-gravity 跟 `PadAlign` 反過嚟擺）：上面一（兩）行功能掣，下面成塊可 scroll 嘅候選字。
+gravity 跟 `PadAlign` 反過嚟擺）：上面一（兩）行功能掣，下面成塊可 scroll 嘅關聯字。
 
 入口係 `refreshBars()` 開頭嗰句 `if (refreshSidePanel(cands)) { … return }`。
 
 **個高度一定要寫死做 `PadMetrics.totalHeight`（＝中文九宮格幾高），
 唔可以用 `MATCH_PARENT`。** `padHolder` 係 `wrap_content` 嘅 `FrameLayout`：
 `MATCH_PARENT` 嘅仔會攞到 `AT_MOST(成個可用高度)`，而 `SidePanelView` 入面
-個候選字 `ScrollView` 又食住 `weight = 1`，結果候選字一多就撐大咗 `padHolder`，
+個關聯字 `ScrollView` 又食住 `weight = 1`，結果關聯字一多就撐大咗 `padHolder`，
 成個鍵盤跟住拉高（**打橫特別明顯**，因為打橫一定入側邊欄模式）。
 只限**中文九宮格** —— 英文／符號／純數字係鋪滿成行，冇位空出嚟；
 剪貼簿個 overlay 又會蓋住成個 `padHolder`（連側邊欄都遮埋就撳唔返粒 ✖），
 所以 `overlay != null` 嗰陣一定要退返去用上面條 bar。
 
-側邊欄冇 `⇄`（候選字同工具一次過見晒，唔使切）。`switchMode()` 個
+側邊欄冇 `⇄`（關聯字同工具一次過見晒，唔使切）。`switchMode()` 個
 `padHolder.removeAllViews()` 會順手 detach 咗佢，最後嗰句 `refreshBars()` 會加返。
 
 ### 鍵盤永遠貼實底
@@ -582,8 +582,8 @@ emoji 表／剪貼簿跟 `forcedHeightPx`，唔喺呢度計（`as? KeyboardBaseV
 
 | | 粒鍵 | 條 bar 最左 |
 | --- | --- | --- |
-| 熄咗 | `☰`＝開／關成條 bar | `⇄`＝候選字 ⇄ 工具 |
-| 常駐（預設） | `⇄`＝候選字 ⇄ 工具 | **冇咗**（`setSwitchVisible(false)`） |
+| 熄咗 | `☰`＝開／關成條 bar | `⇄`＝關聯字 ⇄ 工具 |
+| 常駐（預設） | `⇄`＝關聯字 ⇄ 工具 | **冇咗**（`setSwitchVisible(false)`） |
 
 三處要一齊夾：
 
@@ -893,7 +893,7 @@ app 入面所有 user 見到嘅字（設定頁、toast、鍵面、空狀態提�
 
 | 位 | 擺乜 | 邊句 code |
 |---|---|---|
-| 左上 | `Key.hint` ＝長撳嗰個 `PadFunc.icon`（預設「候選字」）| `ChinesePadView.funcLongKey` |
+| 左上 | `Key.hint` ＝長撳嗰個 `PadFunc.icon`（預設「關聯字」）| `ChinesePadView.funcLongKey` |
 | 左下 | 即時提示（`homoWord` / `homoCodeHint`）| `drawCornerHintBottom` |
 
 同一條規矩之下順手補返：`?123` 左上角寫 `123`（長撳直入 numpad；2026-08-29 起
@@ -948,8 +948,8 @@ app 入面所有 user 見到嘅字（設定頁、toast、鍵面、空狀態提�
 ## 搵 emoji 唔會真係入字落個欄，但會 set 做 composing text
 
 `emojiSearch` 開住嗰陣，`typeChar()` 同 `TTEngine.Host.commitText()` 兩邊
-都會攔住啲字入條 `emojiQuery`，結果出喺候選字條 bar，**唔會** `commitText`。
-但為咗等 user 見到自己打緊乜（唔係就淨係得個候選字 bar，睇唔到個 input），
+都會攔住啲字入條 `emojiQuery`，結果出喺關聯字條 bar，**唔會** `commitText`。
+但為咗等 user 見到自己打緊乜（唔係就淨係得個關聯字 bar，睇唔到個 input），
 每次 `emojiQuery` 一變就會 `syncEmojiComposing()` set 做 composing text，
 揀咗 emoji 或者打多個字都會自然取代／清走（`commitText` 蓋咗 composing 區），
 `endEmojiSearch()` 見到仲有殘留就 `commitText("", 1)` 清走。
@@ -1119,7 +1119,7 @@ user 報過滑 `7→9→0` 出到字之後，最尾嗰個 `0` 走咗去揭第二
 `tracker.points`（原始軌跡，`GestureKeyTracker` 一樣有 buffer，淨係唔理佢個
 per-key 判斷）連埋 `keyCenter` 拋畀 IME service，放手之後**由 IME service**
 （唔係 `LatinPadView`）用 `GestureDecoder` 查詞庫 —— 因為要連 caret 前後啲
-字母一齊計，亦要成條軌跡一次過同候選字比對，唔係逐格判斷。
+字母一齊計，亦要成條軌跡一次過同關聯字比對，唔係逐格判斷。
 
 ### 長撳 = 連撳（九宮格）
 
@@ -1263,7 +1263,7 @@ URL／email／密碼／`TYPE_TEXT_FLAG_NO_SUGGESTIONS` 嘅欄再加多重保險�
 ### 英文 swipe 認字：`GestureDecoder`（AOSP 手勢輸入嗰套概念）
 
 唔再逐格判斷「撳咗邊粒鍵」（`GestureKeyTracker` 嗰套 dwell/轉角 heuristic 只有
-中文九宮格仲用緊）。改成成條手指軌跡（`tracker.points`）一次過同候選字嘅
+中文九宮格仲用緊）。改成成條手指軌跡（`tracker.points`）一次過同關聯字嘅
 「理想路徑」（逐個字母嘅鍵中心連成線，連續重複字母收埋做一格）比對形狀＋位置：
 
 1. 首尾字母分桶粗篩候選（`byFirstLast`），夾唔到就放寬做淨係信第一個字母

@@ -54,7 +54,7 @@ class OptionBarsView(context: Context) : LinearLayout(context) {
          */
         fun onMaxWidth()
         /**
-         * 候選字 bar 拉大／縮返：**唔係**喺呢個 view 度自己攞位擴闊，
+         * 關聯字 bar 拉大／縮返：**唔係**喺呢個 view 度自己攞位擴闊，
          * 交返俾 host（[expandedView]）覆蓋喺個鍵盤本身度，成個 UI 高度先唔會跳
          */
         fun onExpandChanged(expanded: Boolean)
@@ -71,7 +71,7 @@ class OptionBarsView(context: Context) : LinearLayout(context) {
         fun onSttHoldEnd()
         /** ✖：由 emoji 表／剪貼簿返去普通鍵盤 */
         fun onCloseSpecialPad()
-        /** 最左嗰粒切換掣：喺候選字／工具兩個 view 之間切 */
+        /** 最左嗰粒切換掣：喺關聯字／工具兩個 view 之間切 */
         fun onSwitchView()
     }
 
@@ -127,12 +127,12 @@ class OptionBarsView(context: Context) : LinearLayout(context) {
     private fun dp(v: Float) =
         TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, v, resources.displayMetrics)
 
-    /** 候選字而家幾大（sp）。跟 [padGroup] 嗰組嘅字體設定，見 [Prefs.candTextSp] */
+    /** 關聯字而家幾大（sp）。跟 [padGroup] 嗰組嘅字體設定，見 [Prefs.candTextSp] */
     private var candSp = 0f
 
     /**
      * chip 而家幾高、上下 padding 各幾多（見 [CandChip]）。條 bar 嘅高度就係
-     * 由佢嚟 —— **三段（關／候選字／工具）共用同一個高度**，工具嗰行冇候選字
+     * 由佢嚟 —— **三段（關／關聯字／工具）共用同一個高度**，工具嗰行冇關聯字
      * 都一樣要跟，唔係轉一轉段個鍵盤就跳高跳低。
      */
     private var chip = CandChip.measure(context, Prefs.candTextSp(context), PadGroup.CJK)
@@ -184,7 +184,7 @@ class OptionBarsView(context: Context) : LinearLayout(context) {
             visibility = View.GONE
             setOnClickListener { listener?.onCloseSpecialPad() }
         }
-        // 最左永遠有粒切換掣：候選字／工具兩個 view 之間切。emoji 表／剪貼簿開住嗰陣
+        // 最左永遠有粒切換掣：關聯字／工具兩個 view 之間切。emoji 表／剪貼簿開住嗰陣
         // 冇位俾佢（要留返俾 ✖ 返去普通鍵盤），兩粒共用同一個位，一次淨係得一粒見到
         switchBtn.apply {
             text = "⇄"
@@ -199,7 +199,12 @@ class OptionBarsView(context: Context) : LinearLayout(context) {
         scroller.addView(strip, LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.MATCH_PARENT))
 
         flow.setPadding(dp(4f).toInt(), dp(4f).toInt(), dp(4f).toInt(), dp(4f).toInt())
-        flow.onPick = { listener?.onPickCandidate(it) }
+        // 攤開嗰版揀完一隻就即刻收返埋 —— 出咗字之後成版關聯字已經換晒，
+        // 冇理由仲霸住成個鍵盤等 user 自己撳多次 ▲ 先見返啲鍵
+        flow.onPick = { i ->
+            if (expanded) setExpanded(false)
+            listener?.onPickCandidate(i)
+        }
         expandedScroll.addView(flow, ViewGroup.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
         // 唔加入 `this` —— 拉大嗰陣係 host 攞 expandedView 去蓋喺鍵盤度（向下遮），
@@ -218,7 +223,7 @@ class OptionBarsView(context: Context) : LinearLayout(context) {
         }
         toolRow.visibility = View.GONE
 
-        // ✖ 擺喺成條 bar 最左，兩段（候選字／工具）都見到，
+        // ✖ 擺喺成條 bar 最左，兩段（關聯字／工具）都見到，
         // emoji 表同剪貼簿一定要有得返去普通鍵盤
         swap.addView(candRow, FrameLayout.LayoutParams(
             FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT))
@@ -274,7 +279,7 @@ class OptionBarsView(context: Context) : LinearLayout(context) {
         rebuildChips()
     }
 
-    /** 拉大候選字嗰陣，host 攞呢個 view 去蓋喺鍵盤本身度（見 [Listener.onExpandChanged]） */
+    /** 拉大關聯字嗰陣，host 攞呢個 view 去蓋喺鍵盤本身度（見 [Listener.onExpandChanged]） */
     val expandedView: View get() = expandedScroll
 
     /** 轉緊 pad（中／英／符號…）之前一定要叫，唔係 host 個 padHolder 會清埋覆蓋緊嘅 expandedView */
@@ -303,7 +308,7 @@ class OptionBarsView(context: Context) : LinearLayout(context) {
     }
 
     /**
-     * 條 bar 常駐（[Prefs.barPinned]）而家又見緊中文九宮格嗰陣：切換候選字／工具
+     * 條 bar 常駐（[Prefs.barPinned]）而家又見緊中文九宮格嗰陣：切換關聯字／工具
      * 已經由九宮格右上角嗰粒 `⇄` 負責，呢度就唔使再擺多粒做同一件事。
      * 英文／符號頁冇嗰粒鍵，所以嗰陣一定要留返呢粒，唔係就入唔到工具列。
      */
@@ -359,8 +364,8 @@ class OptionBarsView(context: Context) : LinearLayout(context) {
     }
 
     /**
-     * 粒 `▼` 淨係喺**啲候選字真係一行擺唔晒**（要左右捲）嗰陣先出現，
-     * 否則成粒消失（`GONE`，唔會剩返個空底色霸住個位，其餘候選字順手攤開多一格位）。
+     * 粒 `▼` 淨係喺**啲關聯字真係一行擺唔晒**（要左右捲）嗰陣先出現，
+     * 否則成粒消失（`GONE`，唔會剩返個空底色霸住個位，其餘關聯字順手攤開多一格位）。
      *
      * 比嘅係 `strip`（啲字實際闊度）同 [swap]（成行嘅闊度，即係**冇**粒 `▼` 嗰陣
      * 用得晒嘅位）—— 唔可以攞 `scroller` 嘅闊度嚟比，因為粒掣一出現就會食咗
@@ -407,7 +412,7 @@ class OptionBarsView(context: Context) : LinearLayout(context) {
     }
 
     /**
-     * 設定頁校完字體、或者轉咗組（中↔英）之後重新計啲候選字幾大、條 bar 幾高。
+     * 設定頁校完字體、或者轉咗組（中↔英）之後重新計啲關聯字幾大、條 bar 幾高。
      *
      * `refreshBars()` 每撳一粒鍵都會行一次，所以**冇變就即刻返轉頭** ——
      * 唔係就次次都 `requestLayout` 成條 bar。
@@ -546,7 +551,7 @@ class OptionBarsView(context: Context) : LinearLayout(context) {
         /**
          * 冚咗（未撳 ▼）嗰陣，`strip` 最多起幾多個 chip。選字碼太多頁（例如
          * 一個碼夠成百頁）嗰陣 [candidates] 可以成千個，一次過起晒啲 `TextView`
-         * 會令成個候選字 bar 卡一卡先出到嚟 —— 反正冇拉大嗰陣本來就淨係見到
+         * 會令成個關聯字 bar 卡一卡先出到嚟 —— 反正冇拉大嗰陣本來就淨係見到
          * 頭幾個，起多都係白起。
          */
         const val COLLAPSED_CHIP_LIMIT = 20

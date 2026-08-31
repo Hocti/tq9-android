@@ -434,7 +434,7 @@ class SettingsActivity : AppCompatActivity() {
             }
         }
         note("選了「靠左」或「靠右」而中文鍵盤只佔螢幕六成或以下時，" +
-            "上方工具列會自動收起，功能鍵與候選字改為顯示在空出來的一側。")
+            "上方工具列會自動收起，功能鍵與關聯字改為顯示在空出來的一側。")
         note("英文與符號鍵盤在螢幕闊過 ${Prefs.SPLIT_MIN_WIDTH_DP}dp 時，" +
             "「靠左」「靠右」會換成「左右拆開」：每行鍵分成兩半各貼一邊，中間留空，" +
             "橫向雙手持機時兩隻拇指各顧一邊。")
@@ -490,7 +490,7 @@ class SettingsActivity : AppCompatActivity() {
      */
     private fun buildPagerSection() {
         header("選字翻頁")
-        note("候選字多於一頁時，底行兩格闊的 0 鍵會變成翻頁鍵。")
+        note("關聯字多於一頁時，底行兩格闊的 0 鍵會變成翻頁鍵。")
         val options = PagerLayout.entries.toList()
         enumPicker("翻頁鍵排法", options.map { it.label },
             options.indexOf(Prefs.pagerLayout(this))) { i ->
@@ -763,7 +763,7 @@ class SettingsActivity : AppCompatActivity() {
      *
      * 呢個檔同字碼庫（`dataset.db`）**分開存**，換字碼表唔會累到佢。呢度可以
      * 匯出備份、匯入還原、或者成個清走（等於換返一張新表），
-     * 亦都可以熄咗「常用字排前」—— 熄咗照樣繼續記數，淨係唔攞嚟排候選字。
+     * 亦都可以熄咗「常用字排前」—— 熄咗照樣繼續記數，淨係唔攞嚟排關聯字。
      * （「常用字排前」淨係郁第 10 位起嗰橛，第一頁永遠唔郁，見 `TTEngine.reorderByUsage`。）
      */
     private fun buildUsageSection() {
@@ -828,8 +828,8 @@ class SettingsActivity : AppCompatActivity() {
         switch("輸出簡體字", Prefs.KEY_SC_OUTPUT, false)
         switch("工具列常駐", Prefs.KEY_BAR_PINNED, true)
         note("開啟（預設）：工具列固定顯示，九宮格右上角那顆鍵變成 ⇄，" +
-            "負責候選字與工具（大小位置、貼上、語音、表情符號、AI）的切換。")
-        note("關閉：右上角的 ☰ 改為開關整條工具列，切換候選字與工具改按工具列最左的 ⇄。")
+            "負責關聯字與工具（大小位置、貼上、語音、表情符號、AI）的切換。")
+        note("關閉：右上角的 ☰ 改為開關整條工具列，切換關聯字與工具改按工具列最左的 ⇄。")
         slider("按鍵震動", 0, Prefs.MAX_VIBRATE_LEVEL, Prefs.vibrateLevel(this), "",
             format = { Prefs.vibrateLevelLabel(it) }) { v ->
             Prefs.setVibrateLevel(this, v)

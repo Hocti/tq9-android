@@ -20,7 +20,7 @@ import kotlin.math.max
 import kotlin.math.roundToInt
 
 /**
- * 一大版候選字（自動摺行），**只起見得到嗰幾個 `TextView`**。
+ * 一大版關聯字（自動摺行），**只起見得到嗰幾個 `TextView`**。
  *
  * 兩個地方用：撳 ▼ 拉大嗰個表（[OptionBarsView.expandedView]），同埋闊 screen
  * 自動彈出嚟嗰個側邊欄（[SidePanelView]）—— 兩邊都係擺喺 `ScrollView` 入面
@@ -320,7 +320,7 @@ class CandFlowView(context: Context) : ViewGroup(context) {
 
     companion object {
         /**
-         * 一粒候選字 chip 個樣。條 bar 收埋嗰行（[OptionBarsView] 個 `strip`）同
+         * 一粒關聯字 chip 個樣。條 bar 收埋嗰行（[OptionBarsView] 個 `strip`）同
          * 呢度攤開嗰版一模一樣，所以擺喺呢度寫一次兩邊共用。
          */
         fun styleChip(v: TextView, textSp: Float, chip: CandChip, textColor: Int, faceColor: Int) {
