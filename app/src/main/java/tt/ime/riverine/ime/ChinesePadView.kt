@@ -97,8 +97,8 @@ class ChinesePadView(context: Context, private val engine: TTEngine) : KeyboardB
         // 左欄（最上嗰粒短撳／長撳做乜，設定頁揀得）
         add(topLeftKey(), 0f, 0)
         // 短撳永遠都係開關同音，長撳做乜就設定頁揀（預設「關聯字」）——
-        // 左上角細字＝長撳做乜，左下角嗰段即時提示（搵緊邊隻字嘅同音／個字正路
-        // 點打）喺 drawFunction 度問 engine 攞
+        // 左上角細字＝長撳做乜，左下角嗰段即時提示（打緊嘅碼／搵緊邊隻字嘅同音／
+        // 個字正路點打）喺 drawFunction 度問 engine 攞
         add(funcLongKey(Key(KeyAction.HOMO, label = "同音"), Prefs.homoLong(context)), 0f, 1)
         // 長撳 ?123 唔使經符號頁，直接跳去純數字 keypad（英文鍵盤嗰粒一樣）。
         // 左上角寫住「123」＝長撳做乜，同其餘啲鍵一致
@@ -329,10 +329,20 @@ class ChinesePadView(context: Context, private val engine: TTEngine) : KeyboardB
         // 左上角跟返成個 app 嘅規矩：**一律寫「長撳做乜」**
         if (k.hint.isNotEmpty()) drawCornerHint(canvas, box, k.hint, hintColor, funcFontScale)
         if (k.action == KeyAction.HOMO) {
-            // 同音鍵嘅即時提示喺**左下角**（左上角個位讓咗俾長撳）：攤開緊同音字表
-            // 就寫住而家搵緊邊隻字嘅同音（成頁都係同音字，冇個字擺喺度就唔知搵緊
-            // 邊隻）；揀完就換做嗰個字正路點打嘅字碼
-            val tip = engine.homoWord.ifEmpty { engine.homoCodeHint }
+            // 同音鍵嘅即時提示喺**左下角**（左上角個位讓咗俾長撳）。三樣嘢輪住用
+            // 呢個位，排住嘅次序就係優先次序：
+            //  1. 攤開緊同音字表：寫住而家搵緊邊隻字嘅同音（成頁都係同音字，
+            //     冇個字擺喺度就唔知搵緊邊隻）
+            //  2. 打緊嘅碼（`1` → `12` → `123`，[Prefs.showCurrCode] 熄得）——
+            //     打夠三碼入咗選字模式都仲寫住，因為第三個碼一撳落就入選字，
+            //     唔留住就永遠見唔到自己撳咗嘅第三個碼（見 `TTEngine.startSelectWord`
+            //     嘅 `keepCode`）
+            //  3. 揀完之後：嗰個字正路點打嘅字碼
+            // 頭兩個實際上唔會撞（同音字表嗰條路唔留碼），2 同 3 就會 ——
+            // 「打完同音字，跟住打緊下一個字」嗰下打緊嗰個碼行先，即時狀態緊要過
+            // 返轉頭提你上一個字點打
+            val code = if (Prefs.showCurrCode(context)) engine.currCode else ""
+            val tip = engine.homoWord.ifEmpty { code.ifEmpty { engine.homoCodeHint } }
             if (tip.isNotEmpty()) drawCornerHintBottom(canvas, box, tip, hintColor, funcFontScale)
         }
         // `Eng` 長撳 = 轉輸入法，所以左上角擺個地球（獨立嗰粒 🌐 收埋咗，

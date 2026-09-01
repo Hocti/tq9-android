@@ -5,6 +5,70 @@
 
 ---
 
+## [2.0.4] — 2026-08-31
+
+### 打夠三碼入咗選字模式，個碼照樣寫住
+
+`TTEngine.startSelectWord()` 一入選字模式就 `currCode = ""`，所以同音鍵左下角
+嗰個「目前已輸入碼」永遠只見到頭兩個碼 —— 第三個碼一撳落就即刻入選字模式，
+未嚟得切見過就冇咗。而家加咗個 `keepCode`，**淨係打夠碼嗰條路**
+（`processResult()`）留住個碼，揀完字／取消照樣由 `cancel()` 清走。
+
+淨係影響顯示：選字模式下每個讀 `currCode` 嘅位（`press`、`cmd`、`backspace`、
+`plausibility`、`shortcutDigit`、`ChinesePadView.instantKey`、
+`TTInputMethodService` 條 bar）都係先睇 `selectMode`，行唔到落去。其餘入口
+（速選字、關聯字、同音字表、成對標點）照舊清 —— 嗰啲表根本唔係由手頭上個碼
+查出嚟。同音鍵左下角三段提示嘅優先次序亦都調返做「同音字表 → 打緊嘅碼 →
+上一個同音字點打」。
+
+### 新增：打字過程 logcat 記錄 + `scripts/debug-input.sh`
+
+查「明明撳咗 793，點解出咗第二隻字」用。開咗之後逐行寫低：
+
+- **手指**：撳落邊粒鍵、坐標、有冇貼邊補正（撳中隙位）、係咪撳落即出、
+  放手嗰下出唔出、長撳／連撳
+- **滑動**：每格嘅停留時間、有冇「減速再加速」、轉角幾多度／門檻幾多、
+  幾何分、字碼表加減分、總分同門檻，最後算唔算撳咗
+- **engine**：碼一路點變（`"" → "7" → "79" → "793"`）、開表幾多個字、
+  揀咗邊格（第幾頁排第幾）、出咗邊隻字
+
+兩個開關任開一個都出（預設兩個都熄，因為條 log 寫住打緊乜）：
+設定頁「其他 → 記錄輸入過程 (logcat)」，或者
+`adb shell setprop log.tag.TTInput DEBUG`。
+
+電腦嗰邊行 `./scripts/debug-input.sh`（`--install` 順手 build 埋、
+`--raw` 唔上色、`--off` 熄返）就會 `adb logcat -s TTInput` 兼且上色分段。
+
+順帶：`app/build.gradle.kts` 開咗 `testOptions.unitTests.isReturnDefaultValues`——
+`InputLog` 問 `android.util.Log.isLoggable` 使唔使出 log，而 JVM unit test
+入面 `android.*` 係冇實作嘅 stub，唔 stub 返預設值 `GestureKeyTrackerTest`
+成批會掟「not mocked」。
+
+---
+
+## [2.0.3] — 2026-08-31
+
+### 同音鍵左下角寫住而家打咗嘅碼
+
+打碼途中「同音」鍵左下角即時寫住已經撳咗嘅碼（`1` → `12` → `123`），
+打到一半唔記得撳過乜就望粒鍵。設定頁「按鍵功能」加咗個開關
+**「顯示目前已輸入碼」**（`Prefs.KEY_SHOW_CURR_CODE`，預設開）熄得。
+
+左下角本來嗰兩段提示（`TTEngine.homoWord` = 搵緊邊隻字嘅同音、
+`homoCodeHint` = 嗰隻字正路點打）**一句都冇郁**。三樣共用一個位，
+但好少會撞：攤開緊同音字表嗰陣 `startSelectWord()` 已經清咗 `currCode`，
+冇碼打緊。真係撞到（用同音字打完，跟住打緊下一個字）就讓咗個位俾打緊嗰個碼 ——
+即時狀態緊要過返轉頭提你上一個字點打。
+
+### 滑動輸入嘅「停留」同「轉角」擺返出嚟
+
+兩條 slider 2026-08-29 收埋過（一般人唔需要調到咁細），而家應要求擺返出嚟
+做 debug 測試用，唔再受 `SHOW_HIDDEN_OPTIONS` 管。兩個 pref
+（`KEY_SWIPE_DWELL` / `KEY_SWIPE_ANGLE`）同 `GestureKeyTracker` 收埋嗰排都一路照讀，
+所以純粹係設定頁見唔見到嘅分別。
+
+---
+
 ## [2.0.1] — 2026-08-31
 
 ### 系統輸入法清單淨係出一行「三三輸入法」

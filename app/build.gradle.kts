@@ -33,8 +33,8 @@ android {
         applicationId = "tt.ime.riverine"
         minSdk = 26
         targetSdk = 36
-        versionCode = 45
-        versionName = "2.0.2"
+        versionCode = 48
+        versionName = "2.0.4"
     }
 
     signingConfigs {
@@ -69,6 +69,14 @@ android {
 
     buildFeatures {
         viewBinding = false
+    }
+
+    // JVM unit test 入面 `android.*` 全部係冇實作嘅 stub，撞到就掟
+    // 「not mocked」。`core/InputLog` 會問 `android.util.Log.isLoggable`
+    // 使唔使出 log，而 `GestureKeyTracker` 嗰批純邏輯 test 行過嗰句，
+    // 所以要 stub 回預設值（`isLoggable` → false ＝ 熄咗，啱晒 test）。
+    testOptions {
+        unitTests.isReturnDefaultValues = true
     }
 
     compileOptions {

@@ -76,12 +76,13 @@ enum class EngLongPress(val label: String) {
  * 但係鍵面其餘全部單色，一粒彩色 emoji 好突兀，而且好多機嘅 emoji 字型
  * 會畫到成粒鍵咁大。
  *
- * 設定頁用 spinner 揀 —— 四個位（[Prefs.FUNC_SLOTS]）唔准做同一件事。
+ * 設定頁用 spinner 揀 —— 四個位（[Prefs.FUNC_SLOTS]）**可以揀同一件事**，
+ * 揀重複咗設定頁會有紅框同提示字，但唔會擋（見 `SettingsActivity.FuncPicker`）。
  */
 enum class PadFunc(val label: String, val icon: String) {
     SHORTCUT("速選字", "速選"),
     SC_TOGGLE("簡體開關", "简"),
-    /** 游標前面嗰隻字嘅關聯字（`TTCmd.RELATE`）—— 同音鍵長撳預設就係佢 */
+    /** 游標前面嗰隻字嘅關聯字（`TTCmd.RELATE`）—— 左上角短撳預設就係佢 */
     RELATE("關聯字", "關聯字"),
     EMOJI("表情符號", "表情"),
     PASTE("貼上", "貼上"),
@@ -126,6 +127,10 @@ object Prefs {
     const val KEY_LONG_PRESS_MS = "long_press_ms"
     /** 未打過碼嗰陣長撳 1~9 開速選字表（預設熄，唔係就搶咗「長撳 = 連撳」） */
     const val KEY_LONG_PRESS_SHORTCUT = "long_press_shortcut"
+    /** 同音鍵左下角寫住而家打咗嘅碼（見 [showCurrCode]） */
+    const val KEY_SHOW_CURR_CODE = "show_curr_code"
+    /** 打字過程寫落 logcat（見 [InputLog]，預設熄） */
+    const val KEY_INPUT_LOG = "input_log"
     const val KEY_STT_LOCALE = "stt_locale"
     const val KEY_DB_LABEL = "db_label"
     const val KEY_DB_CUSTOM = "db_custom"
@@ -141,9 +146,9 @@ object Prefs {
     // 揀得功能嗰四個位（見 [FUNC_SLOTS]）
     const val KEY_TL_TAP = "topleft_tap"
     const val KEY_TL_LONG = "topleft_long"
-    /** 同音鍵長撳（預設 [PadFunc.RELATE]） */
+    /** 同音鍵長撳（預設 [PadFunc.SHORTCUT]） */
     const val KEY_HOMO_LONG = "homo_long"
-    /** 右上角嗰粒（☰／⇄）長撳（預設 [PadFunc.NONE]） */
+    /** 右上角嗰粒（☰／⇄）長撳（預設 [PadFunc.STT]） */
     const val KEY_TR_LONG = "topright_long"
 
     // AI
@@ -403,36 +408,30 @@ object Prefs {
      * 中文九宮格上面**四個揀得功能嘅位**，排住嘅次序就係優先次序：
      * 左上短撳 → 左上長撳 → 同音長撳 → 右上長撳。
      *
-     * 四個位唔准做同一件事（做同一件事等於嘥咗一格），[PadFunc.NONE] 例外 ——
-     * 四個位全部停用都得。設定頁本身已經唔會俾你揀走已經有人用嗰啲
-     * （見 `SettingsActivity.availableFuncs`），所以正常情況下唔會撞；
-     * [funcSlot] 嗰段讓位嘅 code 係防住舊版留低嘅 pref。
+     * 四個位**可以揀同一件事**——設定頁唔會因為第二個位揀咗就喺選單度
+     * 收埋嗰個選項，撞咗淨係喺該位出紅框同提示字（見
+     * `SettingsActivity.availableFuncs` / `FuncPicker`），四個位照樣各自生效。
      */
     val FUNC_SLOTS = listOf(KEY_TL_TAP, KEY_TL_LONG, KEY_HOMO_LONG, KEY_TR_LONG)
 
     private fun funcDefault(key: String): PadFunc = when (key) {
-        KEY_TL_TAP -> PadFunc.SHORTCUT
-        KEY_TL_LONG -> PadFunc.SC_TOGGLE
-        KEY_HOMO_LONG -> PadFunc.RELATE
+        KEY_TL_TAP -> PadFunc.RELATE
+        KEY_TL_LONG -> PadFunc.PASTE
+        KEY_HOMO_LONG -> PadFunc.SHORTCUT
+        KEY_TR_LONG -> PadFunc.STT
         else -> PadFunc.NONE
     }
 
     /**
      * [FUNC_SLOTS] 其中一個位而家做緊乜。
      *
-     * 撞咗**排喺前面**嗰個位就讓出嚟（回 [PadFunc.NONE]），所以排最尾嗰個
-     * （右上長撳）最易被讓。左上短撳係唯一唔准 [PadFunc.NONE] 嗰個 ——
-     * 粒掣撳落去乜都唔做冇道理。
+     * 左上短撳係唯一唔准 [PadFunc.NONE] 嗰個（粒掣撳落去乜都唔做冇道理），
+     * 跌返做預設嘅 [PadFunc.RELATE]。其餘三個位冇任何「同其他位撞咗就讓位」
+     * 嘅邏輯——重複係俾用嘅（見 [FUNC_SLOTS]）。
      */
     fun funcSlot(ctx: Context, key: String): PadFunc {
-        var f = func(ctx, key, funcDefault(key))
-        if (key == KEY_TL_TAP && f == PadFunc.NONE) f = PadFunc.SHORTCUT
-        if (f == PadFunc.NONE) return f
-        for (k in FUNC_SLOTS) {
-            if (k == key) break
-            if (funcSlot(ctx, k) == f) return PadFunc.NONE
-        }
-        return f
+        val f = func(ctx, key, funcDefault(key))
+        return if (key == KEY_TL_TAP && f == PadFunc.NONE) funcDefault(key) else f
     }
 
     fun topLeftTap(ctx: Context): PadFunc = funcSlot(ctx, KEY_TL_TAP)
@@ -456,7 +455,7 @@ object Prefs {
 
     fun swipeEnabled(ctx: Context) = sp(ctx).getBoolean(KEY_SWIPE, true)
     fun swipeDwellMs(ctx: Context) = sp(ctx).getInt(KEY_SWIPE_DWELL, 150).toLong()
-    fun swipeAngleDeg(ctx: Context) = sp(ctx).getInt(KEY_SWIPE_ANGLE, 55).toFloat()
+    fun swipeAngleDeg(ctx: Context) = sp(ctx).getInt(KEY_SWIPE_ANGLE, 45).toFloat()
 
     /**
      * 震動強度 0～3：0 = 完全冇震，1 = 以前唯一嗰個力度（最細），2／3 逐級大力啲。
@@ -504,6 +503,23 @@ object Prefs {
      * 打 `77x` 呢啲碼嘅人會覺得撳極都唔出，所以要 user 自己喺設定頁開。
      */
     fun longPressShortcut(ctx: Context) = sp(ctx).getBoolean(KEY_LONG_PRESS_SHORTCUT, false)
+
+    /**
+     * 同音鍵左下角要唔要寫住**而家已經打咗嘅碼**（`1` → `12` → `123`）。
+     *
+     * 預設開住 —— 打到一半唔記得撳咗乜，望粒鍵就見返。左下角本來嗰段提示
+     * （搵緊邊隻字嘅同音／個字正路點打，見 `TTEngine.homoWord` /
+     * `TTEngine.homoCodeHint`）唔會為咗呢個而消失：兩者本來就少有撞埋
+     * （攤開緊同音字表嗰陣冇碼可打），真係撞到就讓咗個位俾打緊嗰個碼，
+     * 因為即時狀態緊要過返轉頭嗰個提示（見 `ChinesePadView.drawFunction`）。
+     */
+    fun showCurrCode(ctx: Context) = sp(ctx).getBoolean(KEY_SHOW_CURR_CODE, true)
+
+    /**
+     * 打字過程逐粒鍵寫落 logcat（`adb logcat -s TTInput`，見 [InputLog] 同
+     * `scripts/debug-input.sh`）。**預設熄**：啲 log 寫住打緊乜，唔應該平時都出。
+     */
+    fun inputLog(ctx: Context) = sp(ctx).getBoolean(KEY_INPUT_LOG, false)
 
     /** 選字揭頁嗰兩粒點排（見 [PagerLayout]） */
     fun pagerLayout(ctx: Context): PagerLayout =

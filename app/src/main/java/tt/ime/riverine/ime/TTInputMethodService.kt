@@ -42,6 +42,7 @@ import tt.ime.riverine.core.BarMode
 import tt.ime.riverine.core.ClipHistory
 import tt.ime.riverine.core.EmojiDict
 import tt.ime.riverine.core.EnDict
+import tt.ime.riverine.core.InputLog
 import tt.ime.riverine.core.NextWordModel
 import tt.ime.riverine.core.PadAlign
 import tt.ime.riverine.core.PadGroup
@@ -189,6 +190,7 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
         engine.host = this
         engine.scOutput = Prefs.scOutput(this)
         engine.usageReorder = Prefs.usageReorder(this)
+        InputLog.pref = Prefs.inputLog(this)
         barMode = Prefs.barMode(this)
         // 好舊嘅 dataset.db 冇 id 1010（亦都冇 word_meta.freq / .code）。升級而家會
         // 自動換返新嗰份內置表，但係 user 自己揀過 sqlite 嗰啲就唔會踩親（見
@@ -271,6 +273,7 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
         engine.scOutput = Prefs.scOutput(this)
         // 設定頁改完個開關唔會 restart 個 service，所以每次入欄都要重新讀
         engine.usageReorder = Prefs.usageReorder(this)
+        InputLog.pref = Prefs.inputLog(this)
         barMode = Prefs.barMode(this)
         latinComposing.setLength(0)
         latinSuggestions = emptyList()

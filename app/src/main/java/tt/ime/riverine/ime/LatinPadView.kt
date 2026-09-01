@@ -88,7 +88,7 @@ fun digitKey(d: String, weight: Float = 1f, bigLabel: Boolean = false): Key {
     )
 }
 
-/** 英文 QWERTY，支援 Swype 畫線 */
+/** 英文 QWERTY，支援 Swipe 畫線 */
 class LatinPadView(context: Context) : RowsPadView(context) {
 
     interface LatinHost {

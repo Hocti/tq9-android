@@ -135,9 +135,12 @@ class TTEngine(val db: TTDb) {
 
     fun press(digit: Int) {
         if (selectMode) {
+            InputLog.log { "撳 $digit（選字模式，碼 \"$currCode\"）" }
             if (digit == 0) cmd(TTCmd.NEXT) else selectWord(digit)
         } else {
+            val before = currCode
             currCode += digit
+            InputLog.log { "撳 $digit：碼 \"$before\" → \"$currCode\"" }
             statusPrefix = currCode
             statusText = ""
             when {
@@ -151,6 +154,7 @@ class TTEngine(val db: TTDb) {
     }
 
     fun cmd(command: TTCmd) {
+        InputLog.log { "指令 $command（碼 \"$currCode\"，選字模式 $selectMode）" }
         when (command) {
             TTCmd.CANCEL -> cancel()
 
@@ -275,7 +279,9 @@ class TTEngine(val db: TTDb) {
     fun backspace(): Boolean {
         if (selectMode) { cancel(); changed(); return true }
         if (currCode.isNotEmpty()) {
+            val before = currCode
             currCode = currCode.dropLast(1)
+            InputLog.log { "退格：碼 \"$before\" → \"$currCode\"" }
             statusPrefix = currCode
             when (currCode.length) {
                 0 -> setPadImages(0)
@@ -314,8 +320,9 @@ class TTEngine(val db: TTDb) {
     // ---- 內部 -------------------------------------------------------------
 
     private fun processResult(words: List<String>) {
-        if (words.isEmpty()) { cancel(); return }
-        startSelectWord(reorderByUsage(words))
+        if (words.isEmpty()) { InputLog.log { "碼 \"$currCode\" 查唔到字，取消" }; cancel(); return }
+        // 唯一一條「個表真係由手頭上個碼查出嚟」嘅路 —— 留住個碼畀同音鍵左下角寫
+        startSelectWord(reorderByUsage(words), keepCode = true)
     }
 
     /**
@@ -331,8 +338,27 @@ class TTEngine(val db: TTDb) {
         return reorderByUsage(words) { w -> h.bigramCount(prev + w) }
     }
 
-    private fun startSelectWord(words: List<String>) {
+    /**
+     * 攤開一個字表入選字模式。
+     *
+     * [keepCode] = 留住 [currCode]（**淨係打夠碼嗰條路**，見 [processResult]）——
+     * 打第三個碼嗰下一撳落就入咗選字模式，如果照舊清空，同音鍵左下角嗰個
+     * 「而家打咗乜碼」（見 `Prefs.showCurrCode`）就永遠只見到頭兩個碼，
+     * 第三個碼一撳就冇咗，睇唔到自己到底撳咗乜。留住個碼淨係影響顯示：
+     * 選字模式下每個讀 [currCode] 嘅位（[press]、[cmd]、[backspace]、
+     * [plausibility]、[shortcutDigit]、`ChinesePadView.instantKey`、
+     * `TTInputMethodService` 條 bar）都係**先睇 [selectMode]**，行唔到落去。
+     * 揀完字／取消嗰陣 [cancel] 照樣清走。
+     *
+     * 其餘入口（速選字、關聯字、同音字表、成對標點）一律唔留 —— 嗰啲表根本
+     * 唔係由手頭上個碼查出嚟，留住個碼就變咗指住個唔關事嘅碼。
+     */
+    private fun startSelectWord(words: List<String>, keepCode: Boolean = false) {
         if (words.isEmpty()) return
+        InputLog.log {
+            "開表：${words.size} 個字（${ceil(words.size / 9.0).toInt()} 頁），" +
+                "第一頁 ${words.take(9).joinToString("")}"
+        }
         // 字碼表入面嘅 `*` 淨係**佔住個位**（後面嗰啲字先至坐得返啱格，例如
         // `mapped_table` 169 = `********教`，「教」一定要坐第 9 格），本身唔係
         // 隻打得嘅字。喺呢度一次過變吉 —— 揀字（[selectWord]）／條 bar／
@@ -340,7 +366,7 @@ class TTEngine(val db: TTDb) {
         selectWords = words.map { if (it == PLACEHOLDER) "" else it }
         totalPage = ceil(words.size / 9.0).toInt()
         selectMode = true
-        currCode = ""
+        if (!keepCode) currCode = ""
         showPage(0)
         cancelLabel = "取消"
         key0Label = if (totalPage > 1) "下頁" else ""
@@ -379,7 +405,11 @@ class TTEngine(val db: TTDb) {
         if (key >= selectWords.size) return
         val typeWord = selectWords[key]
         // 吉位（表尾未排滿、或者字碼表嗰個 `*` 佔位符）撳極都唔會出字
-        if (typeWord.isEmpty()) return
+        if (typeWord.isEmpty()) { InputLog.log { "揀格 $slot：吉位，唔出字" }; return }
+        InputLog.log {
+            "揀格 $slot = 第 ${currPage + 1} 頁排第 ${rank + 1}（全表第 ${key + 1}）" +
+                "「$typeWord」，碼 \"$currCode\""
+        }
 
         if (homo) {
             homo = false
@@ -393,6 +423,7 @@ class TTEngine(val db: TTDb) {
         }
         if (openclose) {
             openclose = false
+            InputLog.log { "出成對標點「${out(typeWord)}」" }
             host?.commitPair(out(typeWord))
             bigramPrev = "" // 標點打斷咗連續兩個中文字嘅組合
             cancel()
@@ -400,6 +431,7 @@ class TTEngine(val db: TTDb) {
             return
         }
 
+        InputLog.log { "出字「${out(typeWord)}」" }
         host?.commitText(out(typeWord))
 
         // 連續兩個中文字（唔計標點、唔計揀咗嘅多字詞）就算一個 bigram，記落使用次數
@@ -439,6 +471,11 @@ class TTEngine(val db: TTDb) {
     private fun out(s: String): String = if (scOutput) db.tcsc(s) else s
 
     fun cancel(clearPad: Boolean = true) {
+        // 冇嘢好清嗰陣唔出聲 —— `cancel()` 每次出完字、每次入輸入框都行一次，
+        // 全部照寫個 log 就會浸死真係想睇嗰幾行
+        if (selectMode || currCode.isNotEmpty()) {
+            InputLog.log { "清狀態（碼 \"$currCode\"，選字模式 $selectMode）" }
+        }
         selectMode = false
         homo = false
         afterHomo = false

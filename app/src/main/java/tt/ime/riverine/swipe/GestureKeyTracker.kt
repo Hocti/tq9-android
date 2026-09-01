@@ -1,5 +1,6 @@
 package tt.ime.riverine.swipe
 
+import tt.ime.riverine.core.InputLog
 import kotlin.math.abs
 import kotlin.math.atan2
 import kotlin.math.hypot
@@ -7,7 +8,7 @@ import kotlin.math.max
 import kotlin.math.min
 
 /**
- * Swype 式滑動：除咗起點同終點之外，靠「軌跡」推斷中途撳過邊幾個鍵。
+ * Swipe 式滑動：除咗起點同終點之外，靠「軌跡」推斷中途撳過邊幾個鍵。
  *
  * 兩個線索（同 spec 一樣）：
  *  1. 喺某鍵停得耐 / 明顯減速再加速走
@@ -175,8 +176,14 @@ class GestureKeyTracker(
         val v = cur
         if (v != null) {
             v.lastX = x; v.lastY = y; v.lastT = t
-            if (!(isFirst && startEmitted)) emit(v.key)
-            if (holdRepeatMs > 0 && t - v.enterT >= holdRepeatMs) emit(v.key)
+            if (!(isFirst && startEmitted)) {
+                InputLog.log { "滑動 格${v.key}：放手嗰格，一定計" }
+                emit(v.key)
+            }
+            if (holdRepeatMs > 0 && t - v.enterT >= holdRepeatMs) {
+                InputLog.log { "滑動 格${v.key}：停咗 ${t - v.enterT}ms ≥ ${holdRepeatMs}ms，再出多一次" }
+                emit(v.key)
+            }
         }
         active = false
         cur = null
@@ -196,7 +203,11 @@ class GestureKeyTracker(
 
     private fun decideAndEmit(v: Visit, exitX: Float, exitY: Float, exitT: Long) {
         // 起點永遠計 —— 除非 caller 喺 ACTION_DOWN 已經出咗佢（[startEmitted]）
-        if (isFirst) { if (!startEmitted) emit(v.key); return }
+        if (isFirst) {
+            InputLog.log { "滑動 格${v.key}：起點，一定計" + if (startEmitted) "（撳落嗰陣出咗）" else "" }
+            if (!startEmitted) emit(v.key)
+            return
+        }
 
         val dwell = max(0L, exitT - v.enterT)
         val elapsed = max(1L, exitT - startT)
@@ -217,9 +228,10 @@ class GestureKeyTracker(
 
         // 2) 轉角：比較「入格嘅即時方向」同「離格嘅即時方向」
         val travelled = v.pathLen + hypot(exitX - v.lastX, exitY - v.lastY)
+        var ang = -1f      // -1 = 根本冇行夠 [minSegPx]，角度冇得計
         if (travelled >= minSegPx) {
             val (outDx, outDy) = dirBack(exitT)
-            val ang = angleBetween(v.inDx, v.inDy, outDx, outDy)
+            ang = angleBetween(v.inDx, v.inDy, outDx, outDy)
             if (ang >= angleDeg) {
                 val extra = ((ang - angleDeg) / (180f - angleDeg)).coerceIn(0f, 1f)
                 geo = max(geo, 0.6f + 0.4f * extra)
@@ -229,6 +241,15 @@ class GestureKeyTracker(
         // 3) 字碼表 weight 幫手拆歧義
         val bias = delegate?.plausibility(v.key) ?: 0f
         val score = geo + WEIGHT_INFLUENCE * bias
+        // 條式每個部件都寫出嚟 —— 「明明冇撳過嗰格點解出咗」／「明明滑過點解唔算」
+        // 就係喺呢行度睇邊個線索畀錯／畀唔夠分（見 `scripts/debug-input.sh`）
+        InputLog.log {
+            "滑動 格${v.key}：停 ${dwell}ms" +
+                "（減速 $dipped、再加速 $reaccel）" +
+                "，轉角 " + (if (ang < 0f) "唔夠長冇計" else "%.0f°/門檻 %.0f°".format(ang, angleDeg)) +
+                "，幾何 %.2f，字碼表 %+.2f → 總分 %.2f（要 %.2f）%s"
+                    .format(geo, bias, score, ACCEPT, if (score >= ACCEPT) "算撳咗" else "當冇撳過")
+        }
         if (score >= ACCEPT) emit(v.key)
     }
 

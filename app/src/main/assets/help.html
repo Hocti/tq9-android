@@ -3,221 +3,131 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>三三輸入法 說明</title>
+<title>三三輸入法說明</title>
 <style>
-  :root {
-    color-scheme: light dark;
-    --bg: #ffffff;
-    --fg: #1a1d21;
-    --sub: #55606b;
-    --card: #f4f6f8;
-    --border: #dde2e7;
-    --accent: #2f6fed;
-    --key-bg: #eef1f5;
-    --key-fg: #1a1d21;
-  }
-  @media (prefers-color-scheme: dark) {
-    :root {
-      --bg: #14171c;
-      --fg: #e8ebef;
-      --sub: #9aa5b1;
-      --card: #1d2228;
-      --border: #2b323a;
-      --accent: #6ea1ff;
-      --key-bg: #262c34;
-      --key-fg: #e8ebef;
-    }
-  }
+  :root { color-scheme: light dark; --bg:#fff; --fg:#1a1d21; --sub:#55606b; --card:#f4f6f8; --border:#dde2e7; --accent:#2f6fed; --key-bg:#eef1f5; --key-fg:#1a1d21; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#14171c; --fg:#e8ebef; --sub:#9aa5b1; --card:#1d2228; --border:#2b323a; --accent:#6ea1ff; --key-bg:#262c34; --key-fg:#e8ebef; } }
   * { box-sizing: border-box; }
-  body {
-    margin: 0;
-    padding: 20px 18px 40px;
-    background: var(--bg);
-    color: var(--fg);
-    font-family: -apple-system, "Noto Sans TC", "PingFang HK", "Microsoft JhengHei", sans-serif;
-    line-height: 1.65;
-    font-size: 15px;
-  }
-  h1 {
-    font-size: 20px;
-    margin: 0 0 4px;
-  }
-  .sub {
-    color: var(--sub);
-    font-size: 13px;
-    margin: 0 0 22px;
-  }
-  h2 {
-    font-size: 16px;
-    margin: 30px 0 10px;
-    padding-top: 10px;
-    border-top: 1px solid var(--border);
-  }
-  h2:first-of-type { border-top: none; padding-top: 0; margin-top: 0; }
-  p { margin: 8px 0; }
-  ul { margin: 8px 0; padding-left: 20px; }
-  li { margin: 6px 0; }
-  .card {
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 12px 14px;
-    margin: 10px 0;
-  }
-  .key {
-    display: inline-block;
-    background: var(--key-bg);
-    color: var(--key-fg);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    padding: 1px 7px;
-    font-size: 13px;
-    font-weight: 600;
-    white-space: nowrap;
-  }
-  .note {
-    color: var(--sub);
-    font-size: 13px;
-  }
-  code {
-    background: var(--key-bg);
-    border-radius: 4px;
-    padding: 1px 5px;
-    font-size: 13px;
-  }
-  .accent { color: var(--accent); font-weight: 600; }
+  body { margin:0; padding:20px 18px 40px; background:var(--bg); color:var(--fg); font-family:-apple-system,"Noto Sans TC","PingFang HK","Microsoft JhengHei",sans-serif; line-height:1.65; font-size:15px; }
+  h1 { font-size:20px; margin:0 0 4px; }
+  .sub { color:var(--sub); font-size:13px; margin:0 0 22px; }
+  h2 { font-size:16px; margin:30px 0 10px; padding-top:10px; border-top:1px solid var(--border); }
+  h2:first-of-type { border-top:none; padding-top:0; margin-top:0; }
+  p { margin:8px 0; } ul { margin:8px 0; padding-left:20px; } li { margin:6px 0; }
+  .card { background:var(--card); border:1px solid var(--border); border-radius:10px; padding:12px 14px; margin:10px 0; }
+  .key { display:inline-block; background:var(--key-bg); color:var(--key-fg); border:1px solid var(--border); border-radius:6px; padding:1px 7px; font-size:13px; font-weight:600; white-space:nowrap; }
+  .note { color:var(--sub); font-size:13px; }
+  code { background:var(--key-bg); border-radius:4px; padding:1px 5px; font-size:13px; }
+  .accent { color:var(--accent); font-weight:600; }
 </style>
 </head>
 <body>
 
-<h1>三三輸入法 使用說明</h1>
-<p class="sub">使用已過期專利 HK1035043 的 numpad 中文輸入法，配合滑動、AI 改寫等功能。</p>
+<h1>三三輸入法使用說明</h1>
+<p class="sub">以數字鍵盤輸入正體中文，並支援滑動輸入、語音輸入及 AI 改寫。</p>
 
 <h2>啟用輸入法</h2>
-<p>去「一般」分頁按<strong>「啟用 / 停用輸入法」</strong>，在系統設定中打開「三三」；
-之後按<strong>「切換至三三」</strong>即可叫出輸入法選單揀選。</p>
+<p>在「一般」分頁按<strong>「啟用 / 停用輸入法」</strong>，然後在系統設定啟用「三三」。再按<strong>「切換至三三」</strong>，便可從系統選單選用。</p>
 
-<h2>中文輸入基本操作</h2>
+<h2>中文輸入</h2>
 <ul>
-  <li>按 <span class="key">1</span>～<span class="key">9</span> 揀碼，逐步縮小關聯字範圍；關聯字會即時顯示喺格內。</li>
-  <li>按 <span class="key">0</span> 開關成對標點「」，並將游標移到中間方便輸入。</li>
-  <li>關聯字夠兩頁嗰陣，底行兩格闊嗰粒 <span class="key">0</span> 會變成翻頁鍵。排法有三種，可以喺「一般」分頁嘅<strong>「選字翻頁」</strong>揀：
-    <ul>
-      <li><strong>大格「下頁」</strong>（預設）：成兩格都係「下頁」，容易撳中；<strong>長按</strong>呢粒就係「上頁」。
-          呢個狀態下長按 <span class="key">0</span> 嘅成對標點「」會暫時失效，個位改為喺左上角細字寫住「上頁」，頁數（例如 <span class="key">1/10</span>）就搬去右上角。</li>
-      <li><strong>拆兩粒：上頁、下頁</strong> 或 <strong>下頁、上頁</strong>：拆成兩粒正常闊嘅鍵，左右次序照你揀。
-          「下頁」左上角寫住而家第幾頁／總共幾頁（例如 <span class="key">1/10</span>）。</li>
-    </ul>
-  </li>
-  <li>攤開同音字表嗰陣，「同音」鍵左上角會寫住而家搵緊邊隻字嘅同音；揀完就會變成嗰隻字正路嘅字碼。</li>
-  <li>字碼、關聯字、同音字、繁簡對照表全部收錄喺同一個 sqlite 資料庫，可以喺「一般」分頁換走；
-      撳「檢視目前 sqlite…」會另存一份出嚟，用你自己嘅程式開嚟睇（筆形提示圖一樣）。</li>
+  <li>按 <span class="key">1</span>～<span class="key">9</span> 輸入字碼。九宮格依數字鍵盤排列：<span class="key">7 8 9</span> 在最上方。</li>
+  <li>輸入滿三碼，或以 <span class="key">0</span> 結束輸入後，便可選字。</li>
+  <li>選字時，按空白鍵可選取第一個字；按刪除鍵可取消。</li>
+  <li>長按 <span class="key">0</span> 可開啟或關閉成對標點。輸入成對標點後，游標會移至中間。</li>
+  <li>「同音」鍵左下角會顯示當前字碼、正在查詢同音的字，或該字的正確字碼。當前字碼可在設定中隱藏。</li>
 </ul>
 
-<h2>左上角按鍵</h2>
-<p>左上角按鍵嘅<strong>短按</strong>與<strong>長按</strong>功能可以喺「一般」分頁自訂，
-預設係短按「速選字」、長按「簡體開關」。可選功能包括速選字、簡體開關、表情符號、貼上、語音輸入、AI 改寫。</p>
-
-<h2>滑動輸入 (Swype)</h2>
 <div class="card">
-  <p>喺九宮格上滑過幾個數字鍵，等同順序逐個按下：例如滑過 <span class="key">7</span>→<span class="key">9</span>→<span class="key">3</span>
-  就等於按咗三下 <span class="key">7</span><span class="key">9</span><span class="key">3</span>，每滑到一個新格即時出碼、即時更新關聯字。</p>
-  <p class="note">中間經過嘅格會按停留幾耐、轉幾多度，再夾埋字碼表嘅使用頻率一齊判斷。</p>
+  <p><strong>選字翻頁</strong></p>
+  <p>候選字多於一頁時，底行的 <span class="key">0</span> 會變成翻頁鍵。可在「一般 → 選字翻頁」選擇排法：</p>
+  <ul>
+    <li><strong>大格「下頁」</strong>（預設）：按下前往下一頁，長按返回上一頁。</li>
+    <li><strong>雙鍵</strong>：將「上頁」和「下頁」分開顯示，並可選擇左右次序。</li>
+  </ul>
+  <p class="note">頁碼以 <span class="key">1/10</span> 形式顯示。使用大格「下頁」時，長按 <span class="key">0</span> 的成對標點功能會在選字期間暫停。</p>
 </div>
 
-<h2>英文與符號鍵盤</h2>
+<h2>按鍵與長按</h2>
 <ul>
-  <li>英文鍵盤上方固定有一行數字；長按數字鍵可輸入對應符號（同實體鍵盤 Shift 一樣，例如 <span class="key">1</span> → <span class="key">!</span>），
-      長按 <span class="key">4</span> 可揀各國貨幣符號。</li>
-  <li>長按字母鍵可揀大小寫及各地重音寫法。</li>
-  <li>長按 <span class="key">,</span> <span class="key">.</span> <span class="key">/</span> 三鍵可揀其餘標點（左上角小字係長按時嘅預設項）。</li>
-  <li>長按 <span class="key">?123</span> 可以直接跳去純數字鍵盤，唔使經符號頁。</li>
-  <li>純數字鍵盤最左一欄係 <span class="key">+</span> <span class="key">-</span> <span class="key">*</span> <span class="key">/</span>，
-      <span class="key">0</span> 右邊仲有粒 <span class="key">000</span>（一次過打三個 0）。闊度同左右擺位跟返中文九宮格。</li>
+  <li>左上角按鍵的短按和長按功能均可自訂，包括速選字、簡體開關、表情符號、貼上、語音輸入及 AI 改寫。</li>
+  <li>長按「同音」鍵可顯示關聯字；長按 <span class="key">📋</span> 可開啟剪貼簿記錄。</li>
+  <li>九宮格 <span class="key">1</span>～<span class="key">9</span> 長按等於連按兩下。純數字鍵盤不支援長按。</li>
+  <li>長按空白鍵 <span class="key">␣</span> 並拖動，可上下左右移動游標。</li>
+  <li>長按中文鍵盤的 <span class="key">Eng</span> 鍵可切換輸入法。</li>
+</ul>
+
+<h2>滑動輸入</h2>
+<div class="card">
+  <p>在九宮格上滑過多個數字鍵，等於依序按下這些鍵。例如滑過 <span class="key">7</span>→<span class="key">9</span>→<span class="key">3</span>，就會輸入 <span class="key">793</span>。每確認一碼，候選字都會即時更新。</p>
+  <p class="note">中間鍵會綜合停留時間、轉向角度及字碼使用頻率判斷。相關門檻可在「一般」分頁調整，一般無須更改。</p>
+</div>
+
+<h2>英文、符號與數字</h2>
+<ul>
+  <li>英文鍵盤固定顯示數字行。長按數字鍵可輸入對應符號；長按 <span class="key">4</span> 還可選擇貨幣符號。</li>
+  <li>長按字母鍵可選擇大小寫及重音字母。</li>
+  <li>長按 <span class="key">,</span>、<span class="key">.</span> 或 <span class="key">/</span> 可選擇其他標點。</li>
+  <li>長按 <span class="key">?123</span> 可直接切換至純數字鍵盤。</li>
+  <li>純數字鍵盤左欄為 <span class="key">+</span> <span class="key">-</span> <span class="key">*</span> <span class="key">/</span>；<span class="key">000</span> 可一次輸入三個 0。</li>
+</ul>
+
+<h2>工具列與鍵盤大小</h2>
+<p>工具列提供關聯字、剪貼簿、語音輸入、表情符號及 AI 功能。工具列常駐時，九宮格右上角顯示 <span class="key">⇄</span>；關閉常駐後，則以 <span class="key">☰</span> 開啟或關閉工具列。</p>
+<ul>
+  <li>按一下大小位置鍵，可切換拉寬、靠左或靠右。</li>
+  <li>上下拖動調整鍵盤高度；左右拖動調整鍵盤寬度。</li>
+  <li>長按但不拖動，可將鍵盤拉至最寬。</li>
 </ul>
 
 <h2>表情符號</h2>
-<ul>
-  <li>喺表情符號表撳左上角嘅搵字鍵 <span class="key">⌕</span> 就可以打字搵：打嘅字唔會入落輸入框，淨係用嚟篩，夾到嘅表情會出喺上面條候選欄。</li>
-  <li>搵緊嗰陣底行淨係得<strong>「退出表情搜尋」</strong>同空白鍵兩粒；撳「退出表情搜尋」就返去表情符號表。</li>
-</ul>
-
-<h2>游標與切換輸入法</h2>
-<p>長按空白鍵 <span class="key">␣</span> 唔好放手，上下左右拖動即可移動游標；
-切換輸入法改為長按中文鍵盤嘅 <span class="key">Eng</span> 鍵。</p>
-
-<h2>工具列</h2>
-<p>右上角 <span class="key">☰</span> 負責開關整條工具列，開啟後會先進入關聯字畫面；
-之後按工具列最左嘅 <span class="key">⇄</span> 可以喺關聯字與工具（大小位置、貼上、語音、表情符號、AI）之間切換。
-英文與符號頁一律強制顯示工具列。</p>
-
-<h2>長按快捷</h2>
-<ul>
-  <li>長按「同音」= 顯示關聯字。</li>
-  <li>長按 <span class="key">📋</span> = 顯示剪貼簿記錄。</li>
-  <li>九宮格 <span class="key">1</span>～<span class="key">9</span> 長按 = 連按兩下（例如長按 <span class="key">7</span> 再拖到 <span class="key">0</span> 放手 = 770）；
-      滑到最後一格停留夠耐先放手，效果一樣。</li>
-  <li>純數字鍵盤全頁冇長按功能。</li>
-</ul>
+<p>按表情符號表左上角的 <span class="key">⌕</span> 可以文字搜尋。搜尋文字不會寫入輸入欄，只會用於篩選結果。完成後，按<strong>「退出表情搜尋」</strong>返回表情符號表。</p>
 
 <h2>AI 改寫</h2>
 <div class="card">
-  <p>喺任何 app 入面，揀咗一段文字之後按工具列嘅 <span class="accent">✨</span> 即可用 AI 改寫：
-  有揀嘢就淨係改揀咗嗰部分，冇揀就改寫成個輸入框嘅內容。
-  未輸入 API key、或者喺「AI 改寫」嗰類熄咗個總開關，✨ 按鍵都唔會出現。</p>
-  <p>「AI」分頁分做<strong>語音輸入 (STT)</strong>、<strong>AI 改寫</strong>、<strong>AI 設定</strong>三大類，
-  撳個標題就可以收埋／攤開。頭兩類各自有總開關（<strong>熄咗「AI 改寫」，工具列就唔會出粒 ✨</strong>），
-  API key 同模型名稱兩邊共用，放喺「AI 設定」：</p>
+  <p>選取文字後按 <span class="accent">✨</span>，可改寫選取的部分；如未選取文字，則改寫整個輸入欄。未設定 API key 或未啟用「AI 改寫」時，按鍵不會顯示。</p>
   <ul>
-    <li><strong>API key</strong>：貼上／刪除／顯示，一律經剪貼簿操作。</li>
-    <li><strong>模型名稱</strong> 同 <strong>Prompt</strong>：Prompt 入面嘅 <code>%text%</code> 會換成要改寫嗰段字。</li>
-    <li>預設用 <strong>Gemini</strong>；開啟「使用自訂 API」之後可以打任何接受 JSON 嘅 HTTP POST API
-        （例如 OpenAI、Groq、DeepSeek、OpenRouter、自架 Ollama），要設定 <strong>Request URL</strong>、
-        <strong>Request Headers</strong>、<strong>Request Body 範本</strong>、
-        以及喺回應 JSON 入面搵結果嘅<strong>回應內容路徑</strong>（例如 <code>choices.0.message.content</code>）。
-        範本入面 <code>%key%</code>／<code>%model%</code>／<code>%prompt%</code> 會自動代入。</li>
-    <li>成套 AI 設定（provider、key、model、prompt、自訂範本）可以用
-        <strong>「另存新檔」／「載入」／「刪除」</strong>存做唔同 profile，方便喺幾個 API 之間切換。</li>
+    <li><strong>Prompt</strong> 中的 <code>%text%</code> 會替換為待改寫文字。</li>
+    <li>預設使用 <strong>Gemini</strong>。如啟用自訂 API，須設定 URL、headers、JSON body 範本及回應內容路徑。</li>
+    <li><code>%key%</code>、<code>%model%</code> 和 <code>%prompt%</code> 會在送出前自動替換。</li>
+    <li>可將整套 AI 設定儲存為 Profile，方便切換不同服務。</li>
   </ul>
 </div>
 
 <h2>語音輸入</h2>
-<p>工具列或左上角按鍵設做「語音輸入」，撳落去即可用麥克風輸入文字（首次使用會要求麥克風權限）。</p>
+<p>按 🎤 可使用系統語音輸入。首次使用時，系統會要求麥克風權限。</p>
 <div class="card">
-  <p><strong>AI 語音輸入</strong>：喺「AI」分頁嘅<strong>「語音輸入 (STT)」</strong>開咗之後，
-  粒 <span class="accent">🎤</span> 就會由系統內置嘅語音輸入改為交俾 AI 辨識。</p>
+  <p><strong>AI 語音輸入</strong>啟用後，🎤 會改用 Gemini 辨識錄音。</p>
   <ul>
-    <li><strong>撳一下開始錄音，再撳一次（或者輕觸畫面）停止</strong>；<strong>撳住 🎤 唔放手</strong>就一路錄，放手即停。</li>
-    <li>錄音同埋等緊結果嗰陣，成個鍵盤會變灰兼撳唔到：錄音時中間顯示計時器，等緊結果時顯示載入動畫。</li>
-    <li>開始錄音、錄音完結、成功、失敗會分別發出<strong>四種唔同嘅提示音</strong>。</li>
-    <li>送上去嘅唔淨止係段錄音，仲有輸入框而家嘅內容做上下文（純粹畀 AI 知個語境，唔會重複輸出）。</li>
-    <li>呢個功能<strong>淨係 Gemini 做得到</strong>（要送成段錄音上去），開咗「使用自訂 API」就用唔到。</li>
+    <li>按一下開始錄音，再按一下或輕觸畫面停止。按住 🎤 時，放手即停止。</li>
+    <li>錄音及等待結果期間，鍵盤會變灰並暫停操作。</li>
+    <li>太短或沒有人聲的錄音不會上傳；最長錄音時間為 90 秒。</li>
+    <li>輸入欄的現有內容會作為辨識上下文，不會重複輸出。</li>
+    <li>這項功能只支援 Gemini；啟用自訂 API 時無法使用。</li>
+  </ul>
+</div>
+
+<h2>字碼資料庫與筆形圖</h2>
+<p>字碼、關聯字、同音字及繁簡對照表均儲存在 sqlite 資料庫中，可在「一般」分頁更換或還原內置版本。「檢視目前」會將當前檔案另存，供其他應用程式開啟。</p>
+
+<h2>使用習慣統計</h2>
+<div class="card">
+  <p><code>usage_stats.db</code> 會記錄每個字的輸入次數，以及相鄰兩個中文字的組合次數。此資料庫與字碼資料庫分開儲存。</p>
+  <ul>
+    <li><strong>常用字排前</strong>：第一頁的 9 個字始終保持字碼表次序；從第 10 個字起，才會依與前一個字的組合次數調整。</li>
+    <li>關閉排序後仍會繼續記錄使用次數。</li>
+    <li>可匯出、匯入或清除記錄。匯入會覆蓋現有記錄；清除後無法復原。</li>
   </ul>
 </div>
 
 <h2>其他設定</h2>
 <ul>
-  <li><strong>輸出簡體字</strong>：開啟後輸入直接出簡體。</li>
-  <li><strong>按鍵震動</strong>：分 0～3 級 —— 0 = 完全關閉，1 最輕（舊版唯一嗰個力度），數字越大震得越明顯。放手嗰陣會震一下畀你試。部分機款唔支援自訂震幅，嗰啲機淨係感覺到震動時間長短嘅分別。</li>
-  <li><strong>按鍵聲音</strong>：可以開關。</li>
-  <li><strong>長按時間</strong>：決定幾耐算長按，逐 10ms 一格。</li>
-  <li><strong>字體大細 / 邊框粗幼</strong>：字體中文一條、英文一條分開校（英文嗰條去到 200%）。</li>
-  <li><strong>鍵盤高度與闊度</strong>：直接喺鍵盤上拖動工具列最左嘅按鍵調整（上下拖 = 高度，左右拖 = 闊度）；
-      <strong>長按</strong>同一粒按鍵（撳實唔好拉）就會即刻拉到最闊。中文鍵盤最窄都會保持 320dp 闊。</li>
-  <li><strong>版本</strong>：「一般」分頁最底寫住而家用緊邊個版本（回報問題嗰陣用得着）。</li>
+  <li><strong>輸出簡體字</strong>：將輸入結果轉為簡體字。</li>
+  <li><strong>按鍵震動</strong>：共 0～3 級，0 為關閉。</li>
+  <li><strong>長按時間</strong>：調整長按的觸發時間。</li>
+  <li><strong>字體大小</strong>：中文與英文鍵盤分別調整。</li>
+  <li><strong>版本資訊</strong>：顯示在「一般」分頁底部，方便回報問題。</li>
 </ul>
-
-<h2>使用習慣統計</h2>
-<div class="card">
-  <p>每隻字打過幾多次、以及連續兩個字嘅組合，都會記錄喺 <code>usage_stats.db</code>，
-  同字碼資料庫分開存放（換字碼資料庫唔會影響呢啲記錄）。</p>
-  <ul>
-    <li><strong>常用字排前</strong>（預設開）：關聯字第一頁會依「同前一個字嘅組合」打過幾多次推前，第九個之後就依該字本身打過幾多次推前。
-        熄咗就完全依字碼表原本次序，但仍然會繼續記錄次數。</li>
-    <li><strong>匯出 / 匯入</strong>：可以備份或者喺另一部機還原（匯入會覆蓋現有記錄）。</li>
-    <li><strong>清除記錄</strong>：全部刪走並重設為新嘅空白記錄，無法復原。</li>
-  </ul>
-</div>
 
 </body>
 </html>

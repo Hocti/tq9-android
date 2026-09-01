@@ -13,6 +13,7 @@ import android.os.SystemClock
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewConfiguration
+import tt.ime.riverine.core.InputLog
 import tt.ime.riverine.core.PadGroup
 import tt.ime.riverine.core.Prefs
 import tt.ime.riverine.swipe.GestureKeyTracker
@@ -142,6 +143,7 @@ abstract class KeyboardBaseView(context: Context) : View(context) {
             host?.feedback(b.key)
             invalidate()
         } else if (host?.onLongPress(b.key) == true) {
+            InputLog.log { "長撳 ${keyDesc(b.key)} → host 收咗" }
             longFired = true
             longKey = b.key
             host?.feedback(b.key)
@@ -325,6 +327,13 @@ abstract class KeyboardBaseView(context: Context) : View(context) {
                 cursorMode = false
                 val instant = instantKey(b.key)
                 instantFired = instant
+                InputLog.log {
+                    val exact = boxAt(x, y)
+                    "撳落 ${keyDesc(b.key)} @(${x.roundToInt()},${y.roundToInt()})" +
+                        (if (exact == null) "（撳中隙位，貼咗去最近嗰粒）"
+                         else if (exact !== b) "（貼邊補正）" else "") +
+                        (if (instant) "，撳落即出" else "")
+                }
                 host?.feedback(b.key)
                 if (allowLongPress(b.key)) {
                     handler.postDelayed(longPressRunnable, Prefs.longPressMs(context))
@@ -411,7 +420,15 @@ abstract class KeyboardBaseView(context: Context) : View(context) {
                     tracker.cancel()
                     val b = pressed
                     // instantFired = ACTION_DOWN 嗰下已經出咗，放手唔可以再出多次
-                    if (b != null && !longFired && !instantFired) host?.onKey(b.key)
+                    if (b != null && !longFired && !instantFired) {
+                        InputLog.log { "放手 ${keyDesc(b.key)} → 出" }
+                        host?.onKey(b.key)
+                    } else if (b != null) {
+                        InputLog.log {
+                            "放手 ${keyDesc(b.key)} → 唔再出" +
+                                (if (longFired) "（長撳已經食咗）" else "（撳落嗰陣已經出咗）")
+                        }
+                    }
                 }
                 pressed = null
                 invalidate()
@@ -510,12 +527,21 @@ abstract class KeyboardBaseView(context: Context) : View(context) {
         val r = object : Runnable {
             override fun run() {
                 if (pressed !== b) return
+                InputLog.log { "連撳 ${keyDesc(b.key)}（撳實唔放）" }
                 host?.onKey(b.key)
                 handler.postDelayed(this, 55)
             }
         }
         repeatRunnable = r
         handler.postDelayed(r, 420)
+    }
+
+    /** 一粒鍵喺 log 度點寫（見 [InputLog]）—— 數字鍵寫個數字，其餘寫個動作＋鍵面 */
+    protected fun keyDesc(k: Key): String = when {
+        k.action == KeyAction.DIGIT -> "「${k.digit}」"
+        k.label.isNotEmpty() -> "${k.action}「${k.label}」"
+        k.text.isNotEmpty() -> "${k.action}「${k.text}」"
+        else -> k.action.toString()
     }
 
     protected fun boxAt(x: Float, y: Float): KeyBox? = boxes.firstOrNull { it.contains(x, y) }
@@ -565,7 +591,11 @@ abstract class KeyboardBaseView(context: Context) : View(context) {
         override fun keyAt(x: Float, y: Float) = swipeKeyAt(x, y)
         override fun plausibility(key: Int) = gesturePlausibility(key)
         override fun onGestureKey(key: Int) {
-            if (swipeAborted) return
+            if (swipeAborted) {
+                InputLog.log { "滑過 $key → 唔算（中途已經叫咗停）" }
+                return
+            }
+            InputLog.log { "滑過 $key → 當撳咗" }
             this@KeyboardBaseView.onGestureKey(key)
         }
     }
