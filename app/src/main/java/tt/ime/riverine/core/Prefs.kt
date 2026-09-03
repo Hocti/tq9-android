@@ -501,8 +501,14 @@ object Prefs {
      *
      * **預設熄**：呢個功能會食咗「長撳 = 連撳」（長撳 7 = 77）嘅頭一下，
      * 打 `77x` 呢啲碼嘅人會覺得撳極都唔出，所以要 user 自己喺設定頁開。
+     *
+     * **開住 [swipeEnabled] 就當熄咗**（設定頁嗰個掣一齊收埋，見
+     * `SettingsActivity.refreshLongPressShortcut`）：滑動輸入要「撳落即出碼」
+     * （`ChinesePadView.instantKey`）先至滑得順，而呢個功能一開就要等放手先出碼，
+     * 兩者本質上衝突。呢度唔清個 pref —— 熄返滑動就攞返 user 上次揀嘅嘢。
      */
-    fun longPressShortcut(ctx: Context) = sp(ctx).getBoolean(KEY_LONG_PRESS_SHORTCUT, false)
+    fun longPressShortcut(ctx: Context) =
+        !swipeEnabled(ctx) && sp(ctx).getBoolean(KEY_LONG_PRESS_SHORTCUT, false)
 
     /**
      * 同音鍵左下角要唔要寫住**而家已經打咗嘅碼**（`1` → `12` → `123`）。

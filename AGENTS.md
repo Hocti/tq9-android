@@ -1356,13 +1356,16 @@ UI 就上模擬器影相看。
 | side-load（dl 的 `threethree-v<N>.apk`、GitHub release） | `~/.android/debug.keystore` | `./gradlew assembleRelease`（預設） |
 | 上架 Google Play | `~/.android/tt-release.keystore` | `./gradlew bundleRelease -Ptt.upload` |
 
-正式那條 key（2026-08-25 使用者自己 `keytool -genkeypair` 出來）**不在 repo 內**，
-密碼也不會入 git：
+正式那條 key（2026-09-02 生成：PKCS12、alias `upload`、RSA 4096、有效期 10000 日，
+密碼是隨機 32 字）**不在 repo 內**，密碼也不會入 git：
 
 ```
 ~/.android/tt-release.keystore
-~/.android/tt-release.properties   # storePassword / keyAlias / keyPassword
+~/.android/tt-release.properties   # storePassword / keyAlias / keyPassword（權限 600）
 ```
+
+（2026-08-25 那個 `~/.android/tq9-release.keystore` 是改名前的舊物，密碼沒有記下，
+不再使用 —— `applicationId` 已改為 `tt.ime.riverine`，Play 那邊本來就是全新 listing。）
 
 `app/build.gradle.kts` 見到 `-Ptt.upload` 才砌 `upload` 這個 `signingConfig`，
 兩個檔案有一個不見就立即 fail（不會無聲地回退至 debug key）。**沒有加 `-Ptt.upload`
@@ -1372,6 +1375,9 @@ UI 就上模擬器影相看。
 
 Play 收 `.aab` 不收 `.apk`（新 app），所以上架那個是 `bundleRelease`；
 想自己裝來試就 `assembleRelease -Ptt.upload`（與 debug key 那個無法與 debug key 版本同時安裝在同一裝置上）。
+
+個人開發者帳號要先做封閉測試（12 個 tester × 連續 14 日）才批得 production，
+整個流程寫在 `docs/closed-testing-guide.html`（`docs/` 不入 git）。
 
 ## 版本號：每次改完自動加一
 

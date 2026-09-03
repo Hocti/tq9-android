@@ -5,6 +5,48 @@
 
 ---
 
+## [2.0.5] — 2026-09-02
+
+### 「長按 1~9 開速選字表」同滑動輸入唔會再撞
+
+呢個選項而家**淨係喺熄咗滑動輸入嗰陣先見到**（設定頁「其他」嗰節），
+開住滑動輸入就連粒掣帶說明一齊收埋，功能本身亦強制當熄咗
+（`Prefs.longPressShortcut` 直接夾埋 `swipeEnabled` 一齊睇）。
+
+兩者本質上衝突：滑動輸入要 1~9「撳落即出碼」（`ChinesePadView.instantKey`）
+先至滑得順，而長撳開速選字表一定要等放手先知係咪長撳 —— 一開就將成組數字鍵
+變成放手先出碼，滑動即刻變得遲鈍，兼且食埋「長撳 = 連撳」（打唔到 77、88）。
+兩個掣同喺「一般」頁，撳滑動嗰個掣即刻見到下面嗰個出現／消失
+（`SettingsActivity.refreshLongPressShortcut`）。
+
+收埋嗰陣**唔會清個 pref**：熄返滑動輸入，粒掣會帶返你上次揀嘅嘢再出現。
+
+### 設定頁：鍵盤唔會再蓋住底部嘅輸入框
+
+AI 頁最底嗰幾格（「模型名稱」、自訂 API 嗰幾格範本）一撳落去，
+鍵盤就成塊蓋住個框，打緊乜都見唔到。
+
+**唔關鍵盤事** —— 換 Gboard 一樣咁。係 app 自己嘅問題：targetSdk 35 起
+Android 強制 edge-to-edge，`SettingsActivity` 嗰句
+`WindowCompat.setDecorFitsSystemWindows(window, true)` 已經係 no-op，
+decor 唔會再幫個 window inset，連帶 `adjustResize` 都唔會再縮細個 window
+（`dumpsys window` 見到 IME frame 頂喺 y=1522，但 app 個 frame 一路都係
+`[0,0][1080,2400]`，個 EditText 就喺 y=2119 完全喺鍵盤下面）。
+
+而家喺 API 35+ 自己讀返 insets 加 padding（`applyWindowInsets`）：上／左／右
+避系統列同 cutout，下面就攞「導覽列 vs 鍵盤」較大嗰個。鍵盤一彈出 `pages`
+（weight = 1）連 ScrollView 一齊變矮，ScrollView 收到 `onSizeChanged`
+就會自動捲到 focus 嗰格 —— 實測「模型名稱」由 y=2104 移到 y=1404~1522，
+啱啱好貼喺鍵盤上面。多行嗰個 Prompt 框一樣。
+
+順手執埋同一個成因嘅兩處：個標題本來畫喺狀態列下面（頂部俾狀態列切走咗），
+內容亦一路伸到螢幕最底通埋導覽列。Manifest 亦加返
+`android:windowSoftInputMode="adjustResize"`，唔好留返俾系統自己喺 pan／resize
+之間揀（舊機亦係靠呢個屬性）。API 35 以下唔改行為 —— 嗰啲機 decor 仍然自己
+inset，再加多次 padding 反而會多一截。
+
+---
+
 ## [2.0.4] — 2026-08-31
 
 ### 打夠三碼入咗選字模式，個碼照樣寫住

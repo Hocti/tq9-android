@@ -39,7 +39,9 @@ import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
 import com.google.android.material.tabs.TabLayout
 import tt.ime.riverine.core.AiStt
 import tt.ime.riverine.core.BarMode
@@ -102,6 +104,9 @@ class SettingsActivity : AppCompatActivity() {
     private var aiKeyShown = false
     private var usageLabel: TextView? = null
     private var pagerNote: TextView? = null
+    /** 「長按 1~9 開速選字表」那個掣連它的說明 —— 開了滑動輸入就整組收起，
+        見 [refreshLongPressShortcut] */
+    private var longPressShortcutViews: List<View> = emptyList()
 
     /** AI 頁三大類別的展開狀態（不寫入 pref，重開應用程式後全部展開） */
     private var aiOpenStt = true
@@ -145,12 +150,16 @@ class SettingsActivity : AppCompatActivity() {
         // targetSdk 36 預設啟用 edge-to-edge，使 ActionBar 容器浮在 content 上方
         // （遮蓋新增的 TabLayout）。單純停用 edge-to-edge 仍不足以解決，
         // 因此隱藏 ActionBar，改由 TextView 顯示標題，確保兩者不會重疊。
+        //
+        // 注意：Android 15（API 35）起 edge-to-edge 是強制的，這一行在 API 35+ 已經
+        // 沒有作用（見下面 applyWindowInsets 的說明），只對舊機有效。
         WindowCompat.setDecorFitsSystemWindows(window, true)
         TTDb.ensureInstalled(this)
         title = "三三輸入法"
         supportActionBar?.hide()
 
         val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        applyWindowInsets(root)
 
         root.addView(TextView(this).apply {
             text = "三三輸入法"
@@ -220,6 +229,32 @@ class SettingsActivity : AppCompatActivity() {
             override fun onTabUnselected(tab: TabLayout.Tab) {}
             override fun onTabReselected(tab: TabLayout.Tab) {}
         })
+    }
+
+    /**
+     * Android 15（API 35）起 edge-to-edge 是強制的：decor 不再幫我們避開狀態列／導覽列，
+     * `windowSoftInputMode=adjustResize` 也不會再縮細 app 的 window
+     * （window frame 一直維持全螢幕，只是鍵盤疊在上面）。結果是 AI 頁最底幾格
+     * 輸入框（例如「模型名稱」）一按下去就整格被鍵盤蓋住，看不到自己打甚麼。
+     *
+     * 所以在 API 35+ 自己讀 insets 補回 padding：
+     *
+     *  - 上／左／右：系統列與 display cutout，讓標題不再被狀態列切走
+     *  - 下：導覽列與**鍵盤**取較大者 —— 鍵盤一彈出，[root] 底部就縮短，
+     *    `pages`（weight = 1）連帶 ScrollView 一起變矮，ScrollView 收到
+     *    `onSizeChanged` 便會自動捲到目前 focus 那格，鍵盤與輸入框同時看得見。
+     *
+     * API 35 以下不做任何事：那些機的 decor 仍會自行 inset，重複加 padding 反而會多一截。
+     */
+    private fun applyWindowInsets(root: View) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.VANILLA_ICE_CREAM) return
+        ViewCompat.setOnApplyWindowInsetsListener(root) { v, insets ->
+            val bars = insets.getInsets(
+                WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout())
+            val ime = insets.getInsets(WindowInsetsCompat.Type.ime()).bottom
+            v.setPadding(bars.left, bars.top, bars.right, maxOf(bars.bottom, ime))
+            insets
+        }
     }
 
     override fun onResume() {
@@ -476,7 +511,7 @@ class SettingsActivity : AppCompatActivity() {
             "輸入法多於兩個時，「彈出選單」較易找到想要的那個。")
 
         note("九宮格 1~9 按下即出碼，不必等放開手指，長按等於連按兩下。" +
-            "選字狀態、以及開了「長按 1~9 開速選字表」而未輸入字碼時例外，" +
+            "選字狀態、以及關閉滑動輸入後開了「長按 1~9 開速選字表」而未輸入字碼時例外，" +
             "那兩種情況要放開手指才出碼。")
 
         if (SHOW_HIDDEN_OPTIONS) {
@@ -748,9 +783,12 @@ class SettingsActivity : AppCompatActivity() {
 
     private fun buildSwipeSection() {
         header("滑動輸入 (Swipe)")
-        switch("啟用滑動輸入", Prefs.KEY_SWIPE, true)
+        // 「其他」那節的「長按 1~9 開速選字表」與這個掣互斥，開關要即時反映
+        // （兩節同在「一般」頁，改完不會重建畫面），見 [refreshLongPressShortcut]
+        switch("啟用滑動輸入", Prefs.KEY_SWIPE, true) { refreshLongPressShortcut() }
         note("中文滑動即時出碼：滑過 7→9→3 等與順序按了三下。" +
             "中間經過的格子會依停留時間、轉向角度與字碼表的使用頻率一併判斷。")
+        note("開啟滑動輸入時，「長按 1~9 開速選字表」不能同時使用（該選項會收起）。")
         // 「停留」與「轉角」2026-08-29 隱藏過（一般人不需要進行如此細緻的調整），
         // 2026-08-31 應 使用者要求重新顯示做 debug 測試用
         slider("停留多久當作按下", 60, 400, Prefs.swipeDwellMs(this).toInt(), "ms") { v ->
@@ -847,9 +885,13 @@ class SettingsActivity : AppCompatActivity() {
         }
         note("長按 0 = 成對標點（「」之類）；長按「同音」= 關聯字；" +
             "長按工具列的「貼上」= 剪貼簿記錄；長按 1~9 = 連按兩下。純數字鍵盤沒有長按。")
-        switch("長按 1~9 開速選字表", Prefs.KEY_LONG_PRESS_SHORTCUT, false)
-        note("開啟後，未輸入字碼時長按 1~9 直接打開該格的速選字表，" +
-            "代價是打不到 77、88 這類要連按兩下的字碼。已輸入字碼後不受影響。")
+        longPressShortcutViews = listOf(
+            switch("長按 1~9 開速選字表", Prefs.KEY_LONG_PRESS_SHORTCUT, false),
+            note("開啟後，未輸入字碼時長按 1~9 直接打開該格的速選字表，" +
+                "代價是打不到 77、88 這類要連按兩下的字碼。已輸入字碼後不受影響。" +
+                "只在關閉滑動輸入時才有這個選項。")
+        )
+        refreshLongPressShortcut()
 
         // 查「明明按了 793，為何出現了第二字」用的 —— 見 `core/InputLog`
         // 與 `scripts/debug-input.sh`
@@ -864,6 +906,21 @@ class SettingsActivity : AppCompatActivity() {
         note("紀錄內含你正在輸入的字碼與文字，查完問題請關閉。")
 
         buildVersionFooter()
+    }
+
+    /**
+     * 「長按 1~9 開速選字表」只在**關閉滑動輸入**時才出現。
+     *
+     * 兩者本質上衝突：滑動輸入靠 1~9「按下即出碼」（`ChinesePadView.instantKey`）
+     * 才滑得順，而長按開速選字表必須等放開手指才知道是不是長按，一開就把整組
+     * 數字鍵改成放手才出碼，滑動立刻變得遲鈍。所以開了滑動就把這個掣連說明一起
+     * 收起，功能本身也一定關閉（[Prefs.longPressShortcut] 那邊擋住）。
+     *
+     * 收起時**不動那個 pref**：關掉滑動輸入後掣會帶著使用者上次的選擇再出現。
+     */
+    private fun refreshLongPressShortcut() {
+        val vis = if (Prefs.swipeEnabled(this)) View.GONE else View.VISIBLE
+        longPressShortcutViews.forEach { it.visibility = vis }
     }
 
     /** 放在「一般」頁最底，以小字顯示目前是哪一個版本（回報問題時有用） */
@@ -1257,10 +1314,14 @@ class SettingsActivity : AppCompatActivity() {
         content.addView(bar)
     }
 
-    /** [enabled] = false：按保持不變（目前不允許開啟的項目，例如自訂 API 之下的 AI 語音輸入） */
+    /**
+     * [enabled] = false：按保持不變（目前不允許開啟的項目，例如自訂 API 之下的 AI 語音輸入）
+     *
+     * 回傳那個 `Switch`，需要事後收起／改動它的（見 [refreshLongPressShortcut]）才用得著。
+     */
     @Suppress("DEPRECATION")
     private fun switch(label: String, key: String, def: Boolean, enabled: Boolean = true,
-                       onChange: ((Boolean) -> Unit)? = null) {
+                       onChange: ((Boolean) -> Unit)? = null): Switch {
         val s = Switch(this).apply {
             text = label
             textSize = 15f
@@ -1278,6 +1339,7 @@ class SettingsActivity : AppCompatActivity() {
         }
         content.addView(s, LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+        return s
     }
 
     /** 一格文字設定，輸入後自動儲存（不用再按「儲存」）。多行欄位會畫個圓角外框。 */
