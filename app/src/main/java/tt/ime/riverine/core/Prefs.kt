@@ -70,6 +70,14 @@ enum class EngLongPress(val label: String) {
     PICKER("彈出輸入法選單");
 }
 
+/** 手指按住按鍵時的視覺效果；「變光」是既有版本的效果。 */
+enum class KeyPressEffect(val label: String) {
+    NONE("無效果"),
+    LIGHTEN("變光"),
+    DARKEN("變暗"),
+    ENLARGE("略為放大");
+}
+
 /**
  * 可以喺設定度換走嘅鍵功能（左上角短撳／長撳、同音鍵長撳、右上角長撳）。
  * 粒面**全部寫中文**，一個 icon 都冇 —— [EMOJI] 本來寫住個 😀，
@@ -124,6 +132,7 @@ object Prefs {
     /** 震動強度 0～3（0 = 冇震）。舊版嗰個 boolean [KEY_VIBRATE] 照留返做 migration */
     const val KEY_VIBRATE_LEVEL = "vibrate_level"
     const val KEY_SOUND = "sound"
+    const val KEY_PRESS_EFFECT = "key_press_effect"
     const val KEY_LONG_PRESS_MS = "long_press_ms"
     /** 未打過碼嗰陣長撳 1~9 開速選字表（預設熄，唔係就搶咗「長撳 = 連撳」） */
     const val KEY_LONG_PRESS_SHORTCUT = "long_press_shortcut"
@@ -494,6 +503,17 @@ object Prefs {
         arrayOf("關閉", "1（最輕）", "2（中）", "3（最強）")[level.coerceIn(0, MAX_VIBRATE_LEVEL)]
 
     fun sound(ctx: Context) = sp(ctx).getBoolean(KEY_SOUND, false)
+
+    /** 舊版本一律使用 [KeyPressEffect.LIGHTEN]，新選項的預設值保持相同。 */
+    fun keyPressEffect(ctx: Context): KeyPressEffect = runCatching {
+        KeyPressEffect.valueOf(
+            sp(ctx).getString(KEY_PRESS_EFFECT, KeyPressEffect.LIGHTEN.name)!!
+        )
+    }.getOrDefault(KeyPressEffect.LIGHTEN)
+
+    fun setKeyPressEffect(ctx: Context, effect: KeyPressEffect) =
+        sp(ctx).edit().putString(KEY_PRESS_EFFECT, effect.name).apply()
+
     fun longPressMs(ctx: Context) = sp(ctx).getInt(KEY_LONG_PRESS_MS, 380).toLong()
 
     /**

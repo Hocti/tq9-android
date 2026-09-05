@@ -14,6 +14,7 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.ViewConfiguration
 import tt.ime.riverine.core.InputLog
+import tt.ime.riverine.core.KeyPressEffect
 import tt.ime.riverine.core.PadGroup
 import tt.ime.riverine.core.Prefs
 import tt.ime.riverine.swipe.GestureKeyTracker
@@ -30,6 +31,8 @@ abstract class KeyboardBaseView(context: Context) : View(context) {
     companion object {
         /** 撳落鍵同鍵之間（或者最邊）幾多 dp 之內都當撳咗最近嗰粒 */
         private const val SNAP_DP = 14f
+        private const val PRESS_SCALE = 1.06f
+        private const val DARKEN_RATIO = 0.76f
     }
 
     interface Host {
@@ -223,8 +226,23 @@ abstract class KeyboardBaseView(context: Context) : View(context) {
     override fun onDraw(canvas: Canvas) {
         bg.color = theme.background
         canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), bg)
-        val down = pressed
-        for (b in boxes) drawKey(canvas, b, b === down && !swiping)
+        // ACTION_DOWN 可能即時出碼並觸發 relayout，那時 pressed 還指著舊 KeyBox；
+        // 只繪製仍屬於目前排版的按鍵，避免將舊按鍵叠在新排版上。
+        val down = if (swiping) null else pressed?.takeIf { candidate ->
+            boxes.any { it === candidate }
+        }
+        // 放大後的按鍵要最後繪製，否則會被排在它後面的相鄰按鍵蓋住。
+        for (b in boxes) if (b !== down) drawKey(canvas, b, false)
+        if (down != null) {
+            if (Prefs.keyPressEffect(context) == KeyPressEffect.ENLARGE) {
+                val checkpoint = canvas.save()
+                canvas.scale(PRESS_SCALE, PRESS_SCALE, down.cx, down.cy)
+                drawKey(canvas, down, true)
+                canvas.restoreToCount(checkpoint)
+            } else {
+                drawKey(canvas, down, true)
+            }
+        }
         drawTrail(canvas)
     }
 
@@ -611,11 +629,25 @@ abstract class KeyboardBaseView(context: Context) : View(context) {
         canvas.drawRoundRect(rect, radius, radius, bg)
     }
 
-    protected fun faceColor(box: KeyBox, isDown: Boolean, enabled: Boolean = true): Int = when {
-        !enabled -> theme.keyDisabled
-        isDown -> theme.keyFaceDown
-        box.key.accent -> theme.keyAccent
-        else -> theme.keyFace
+    protected fun faceColor(box: KeyBox, isDown: Boolean, enabled: Boolean = true): Int =
+        if (!enabled) theme.keyDisabled
+        else pressedFaceColor(if (box.key.accent) theme.keyAccent else theme.keyFace, isDown)
+
+    /**
+     * 將按下效果套用到按鍵原本的底色。[KeyPressEffect.LIGHTEN] 直接沿用
+     * 舊版本的 [Theme.keyFaceDown]；放大由 [onDraw] 處理，這裡保留原色。
+     */
+    protected fun pressedFaceColor(normal: Int, isDown: Boolean): Int {
+        if (!isDown) return normal
+        return when (Prefs.keyPressEffect(context)) {
+            KeyPressEffect.NONE, KeyPressEffect.ENLARGE -> normal
+            KeyPressEffect.LIGHTEN -> theme.keyFaceDown
+            KeyPressEffect.DARKEN -> Color.rgb(
+                (Color.red(normal) * DARKEN_RATIO).roundToInt(),
+                (Color.green(normal) * DARKEN_RATIO).roundToInt(),
+                (Color.blue(normal) * DARKEN_RATIO).roundToInt()
+            )
+        }
     }
 
     /**

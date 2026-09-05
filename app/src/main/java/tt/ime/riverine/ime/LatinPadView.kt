@@ -8,6 +8,15 @@ import kotlin.math.max
 enum class ShiftState { OFF, ON, LOCK }
 
 /**
+ * 輸入欄的性質，決定底行怎樣排（見 [LatinPadView.rows]）。
+ * 由 `TTInputMethodService.onStartInputView` 看 `inputType` 決定。
+ *
+ * 四款都保留 `中`：URL 欄／密碼欄一樣可能要打中文（Chrome 的網址欄就是
+ * `textUri`，在那裏搜尋中文非常普遍），收起了就整個欄位都打不到中文。
+ */
+enum class LatinField { NORMAL, EMAIL, URI, PASSWORD }
+
+/**
  * 長撳字母彈出嘅變體：淨係各國重音寫法。
  *
  * 數字同符號**唔會**擺喺呢度 —— 開咗數字行嗰陣長撳字母唔應該再出數字（會撞），
@@ -105,8 +114,8 @@ class LatinPadView(context: Context) : RowsPadView(context) {
     var shift: ShiftState = ShiftState.OFF
         set(v) { field = v; invalidate() }
 
-    /** email 欄位先出 @ 同 .com */
-    var emailMode: Boolean = false
+    /** 輸入欄的性質（email／URL／密碼），底行跟着換（見 [LatinField]） */
+    var fieldKind: LatinField = LatinField.NORMAL
         set(v) { if (field != v) { field = v; rebuild() } }
 
     /** 搵 emoji 嗰陣：打嘅字唔入去，而係篩上面條 bar 嘅 emoji */
@@ -188,29 +197,51 @@ class LatinPadView(context: Context) : RowsPadView(context) {
         // 中文九宮格嗰粒地方鬆啲，個 hint 照留。
         r3.add(Key(KeyAction.TO_SYMBOL, label = "?123", weight = 1.3f,
             longAction = KeyAction.TO_NUMBER))
-        if (emailMode) {
-            // 長撳 @：可以揀常用信箱域名，第一個照舊係 @ 本身
-            r3.add(Key(
-                KeyAction.CHAR, label = "@", text = "@", weight = 1f,
-                variants = listOf("@", "@gmail.com", "@hotmail.com")
-            ))
-            r3.add(Key(KeyAction.SPACE, label = "␣", weight = 2.2f))
-            // 長撳 .com：.com.hk、.net 呢啲常用尾巴，第一個照舊係 .com 本身
-            r3.add(Key(
-                KeyAction.CHAR, label = ".com", text = ".com", weight = 1.5f,
-                variants = listOf(".com", ".com.hk", ".net", ".org", ".edu", ".gov")
-            ))
-            r3.add(punct("/"))
-        } else {
-            r3.add(Key(KeyAction.SPACE, label = "␣", weight = 3.4f))
-            // space 右邊順住排 `, . /` 三粒，三粒都有長撳 popup
-            r3.add(punct(","))
-            r3.add(punct("."))
-            r3.add(punct("/"))
+        when (fieldKind) {
+            LatinField.EMAIL -> {
+                // 長撳 @：可以揀常用信箱域名，第一個照舊係 @ 本身
+                r3.add(Key(
+                    KeyAction.CHAR, label = "@", text = "@", weight = 1f,
+                    variants = listOf("@", "@gmail.com", "@hotmail.com")
+                ))
+                r3.add(Key(KeyAction.SPACE, label = "␣", weight = 2.2f))
+                r3.add(domainKey())
+                r3.add(punct("/"))
+            }
+            // URL 欄：`,` 在網址中幾乎用不着，收起了讓 `/` 與 `.com` 上來。
+            // `.` 與 `/` 仍是 [punct]，長撳有 `: - _ ~ = ?` 這些網址常用符號。
+            LatinField.URI -> {
+                r3.add(punct("/"))
+                r3.add(Key(KeyAction.SPACE, label = "␣", weight = 2.2f))
+                r3.add(punct("."))
+                r3.add(domainKey())
+            }
+            // 密碼欄：`,` `/` 收起（密碼很少用），換上 `-` `_` 兩粒最常見的符號。
+            // 長撳 `.` 仍有 `; ' " : ~` 一堆。這一頁亦不准滑動、不出提示（見
+            // [canSwipe] 與 `TTInputMethodService.latinTypingSuggestions`）。
+            LatinField.PASSWORD -> {
+                r3.add(Key(KeyAction.SPACE, label = "␣", weight = 2.6f))
+                r3.add(punct("."))
+                r3.add(Key(KeyAction.CHAR, label = "-", text = "-"))
+                r3.add(Key(KeyAction.CHAR, label = "_", text = "_"))
+            }
+            LatinField.NORMAL -> {
+                r3.add(Key(KeyAction.SPACE, label = "␣", weight = 3.4f))
+                // space 右邊順住排 `, . /` 三粒，三粒都有長撳 popup
+                r3.add(punct(","))
+                r3.add(punct("."))
+                r3.add(punct("/"))
+            }
         }
         r3.add(Key(KeyAction.ENTER, label = "⏎", weight = 1.7f, accent = true))
         return if (numRow) listOf(digits, r0, r1, r2, r3) else listOf(r0, r1, r2, r3)
     }
+
+    /** 長撳 .com：`.com.hk`、`.net` 這些常用尾巴，第一個照舊是 `.com` 本身 */
+    private fun domainKey() = Key(
+        KeyAction.CHAR, label = ".com", text = ".com", weight = 1.5f,
+        variants = listOf(".com", ".com.hk", ".hk", ".net", ".org", ".edu", ".gov")
+    )
 
     private fun shiftLabel() = when (shift) {
         ShiftState.OFF -> "⇧"
@@ -226,7 +257,9 @@ class LatinPadView(context: Context) : RowsPadView(context) {
 
     // ---- 滑動 -------------------------------------------------------------
 
-    override fun canSwipe(key: Key) = key.swipeable && Prefs.swipeEnabled(context)
+    /** 密碼欄不准滑動：滑出來的一定是詞庫中的字，對密碼沒有用，還會經候選欄現形 */
+    override fun canSwipe(key: Key) =
+        key.swipeable && fieldKind != LatinField.PASSWORD && Prefs.swipeEnabled(context)
 
     /**
      * 英文要**行過成粒鍵**先當滑動，唔係一過 touch slop 就算。

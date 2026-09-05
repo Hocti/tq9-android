@@ -310,12 +310,11 @@ class ChinesePadView(context: Context, private val engine: TTEngine) : KeyboardB
         }
         val color = when {
             !usable -> theme.keyDisabled
-            isDown -> theme.keyFaceDown
             on -> theme.keyAccent
             k.accent -> theme.keyAccent
             else -> theme.keyFaceAlt
         }
-        drawFace(canvas, box, color)
+        drawFace(canvas, box, pressedFaceColor(color, isDown && usable))
         // 功能鍵成粒都行 [funcFontScale]：設定頁條字體 slider 係為咗睇清楚啲**字**
         // （下面啲關聯字）而拉，「同音」「取消」「Eng」呢啲跟住一齊大就逼爆粒鍵
         drawLabel(

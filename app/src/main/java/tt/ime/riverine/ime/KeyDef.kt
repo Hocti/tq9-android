@@ -66,18 +66,28 @@ data class Key(
 )
 
 /**
- * 「搜尋」個樣：**單色符號**，唔用彩色 emoji 🔍。
+ * 鍵面符號一律**單色**，不用彩色 emoji（🔍 那些）—— 其餘鍵面全部單色，
+ * 夾一粒彩色 emoji 進去很突兀，而且很多機的 emoji 字型會畫到整顆鍵那麼大。
  *
- * 搜尋欄嘅 `⏎`（見 `TTInputMethodService.enterLabelFor`）同 emoji 表嗰粒搵字掣
- * 兩處都用呢個 —— 鍵面其餘全部都係單色，一粒彩色 emoji 夾埋一齊好突兀，
- * 而且好多機嘅 emoji 字型會畫到成粒鍵咁大。
- *
- * `⌕`（U+2315）唔係每個字型都有，冇就會出一格豆腐，所以開頭問一問
- * [android.graphics.Paint.hasGlyph]，真係冇先寫返「搜尋」兩隻字。
+ * 這些符號不是每個字型都有，缺了就會出一格豆腐，所以先問一問
+ * [android.graphics.Paint.hasGlyph]，真的沒有才寫回中文字。
  */
-val SEARCH_GLYPH: String by lazy {
-    if (android.graphics.Paint().hasGlyph("⌕")) "⌕" else "搜尋"
-}
+private fun glyphOr(glyph: String, fallback: String): String =
+    if (android.graphics.Paint().hasGlyph(glyph)) glyph else fallback
+
+/** 「搜尋」個樣（`⌕` U+2315）：搜尋欄的 `⏎` 與 emoji 表那粒搵字掣兩處都用它 */
+val SEARCH_GLYPH: String by lazy { glyphOr("⌕", "搜尋") }
+
+/**
+ * `⏎` 跟 `imeOptions` 換樣（見 `TTInputMethodService.enterLabelFor`）。
+ * 六個動作各有自己的符號，`actionUnspecified` / `actionNone` /
+ * `IME_FLAG_NO_ENTER_ACTION` 就照出 `⏎`。
+ */
+val DONE_GLYPH: String by lazy { glyphOr("✓", "完成") }
+val SEND_GLYPH: String by lazy { glyphOr("➤", "傳送") }
+val GO_GLYPH: String by lazy { glyphOr("→", "前往") }
+val NEXT_GLYPH: String by lazy { glyphOr("⇥", "下一") }
+val PREV_GLYPH: String by lazy { glyphOr("⇤", "上一") }
 
 /** 一格空位（英文第二行兩頭）。淨係佔 [weight] 咁多闊，唔畫亦都撳唔到。 */
 fun spacerKey(weight: Float) = Key(KeyAction.NOOP, weight = weight, spacer = true)

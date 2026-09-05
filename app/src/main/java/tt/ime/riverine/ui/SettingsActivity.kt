@@ -47,6 +47,7 @@ import tt.ime.riverine.core.AiStt
 import tt.ime.riverine.core.BarMode
 import tt.ime.riverine.core.EngLongPress
 import tt.ime.riverine.core.InputLog
+import tt.ime.riverine.core.KeyPressEffect
 import tt.ime.riverine.core.PadFunc
 import tt.ime.riverine.core.PadGroup
 import tt.ime.riverine.core.PagerLayout
@@ -873,6 +874,12 @@ class SettingsActivity : AppCompatActivity() {
         note("開啟（預設）：工具列固定顯示，九宮格右上角該按鍵變成 ⇄，" +
             "負責關聯字與工具（大小位置、貼上、語音、表情符號、AI）的切換。")
         note("關閉：右上角的 ☰ 改為開關整條工具列，切換關聯字與工具改按工具列最左的 ⇄。")
+        val pressEffects = KeyPressEffect.entries.toList()
+        enumPicker("按鍵按下時的效果", pressEffects.map { it.label },
+            pressEffects.indexOf(Prefs.keyPressEffect(this))) { i ->
+            Prefs.setKeyPressEffect(this, pressEffects[i])
+            rebuildPreview()
+        }
         slider("按鍵震動", 0, Prefs.MAX_VIBRATE_LEVEL, Prefs.vibrateLevel(this), "",
             format = { Prefs.vibrateLevelLabel(it) }) { v ->
             Prefs.setVibrateLevel(this, v)
@@ -978,15 +985,33 @@ class SettingsActivity : AppCompatActivity() {
         runCatching { v.vibrate(VibrationEffect.createOneShot(Prefs.vibrateDurationMs(level), amp)) }
     }
 
+    /**
+     * 每種特別欄位一個，用來試「跟輸入欄類型換排位」與「⏎ 跟 imeOptions 換樣」
+     * 兩套邏輯（見 AGENTS.md）。整段預設隱藏（[SHOW_DEBUG_SECTIONS]）。
+     */
     private fun buildTryBox() {
         header("試打")
-        note("email 欄會自動顯示 @ 與 .com；密碼數字欄會自動切換純數字鍵盤；" +
-            "搜尋欄的 ⏎ 會變成放大鏡（單色符號，非彩色表情）。")
-        tryField("在這裡試打", InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE)
+        note("每種欄位的鍵盤排位都不同：email 出 @ 與 .com、網址出 / 與 .com、" +
+            "密碼收起 , 與 / 改為 - 與 _、電話出 ( ) + #、數字欄只在 signed／decimal " +
+            "才出 - 與 .。⏎ 亦會跟 imeOptions 換符號。")
+        tryField("普通欄（句首會自動大階）",
+            InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE)
         tryField("email 欄", InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS)
+        tryField("網址欄", InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI)
+        tryField("密碼欄", InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD)
         tryField("PIN 欄", InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_VARIATION_PASSWORD)
-        tryField("搜尋欄（⏎ 會變放大鏡）", InputType.TYPE_CLASS_TEXT,
-            EditorInfo.IME_ACTION_SEARCH)
+        tryField("電話欄", InputType.TYPE_CLASS_PHONE)
+        tryField("數字欄（純 number）", InputType.TYPE_CLASS_NUMBER)
+        tryField("金額欄（signed + decimal）", InputType.TYPE_CLASS_NUMBER or
+            InputType.TYPE_NUMBER_FLAG_SIGNED or InputType.TYPE_NUMBER_FLAG_DECIMAL)
+        tryField("日期欄", InputType.TYPE_CLASS_DATETIME or InputType.TYPE_DATETIME_VARIATION_DATE)
+        tryField("時間欄", InputType.TYPE_CLASS_DATETIME or InputType.TYPE_DATETIME_VARIATION_TIME)
+        tryField("搜尋（⏎ = ⌕）", InputType.TYPE_CLASS_TEXT, EditorInfo.IME_ACTION_SEARCH)
+        tryField("完成（⏎ = ✓）", InputType.TYPE_CLASS_TEXT, EditorInfo.IME_ACTION_DONE)
+        tryField("傳送（⏎ = ➤）", InputType.TYPE_CLASS_TEXT, EditorInfo.IME_ACTION_SEND)
+        tryField("前往（⏎ = →）", InputType.TYPE_CLASS_TEXT, EditorInfo.IME_ACTION_GO)
+        tryField("下一個（⏎ = ⇥）", InputType.TYPE_CLASS_TEXT, EditorInfo.IME_ACTION_NEXT)
+        tryField("上一個（⏎ = ⇤）", InputType.TYPE_CLASS_TEXT, EditorInfo.IME_ACTION_PREVIOUS)
     }
 
     private fun tryField(hintText: String, type: Int, imeAction: Int = 0) {

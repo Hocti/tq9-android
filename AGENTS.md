@@ -56,11 +56,12 @@ adb shell run-as tt.ime.riverine cat shared_prefs/tq9_settings.xml
    工具列五個（padding 4dp、每顆 margin 3dp）—— 而且要工具列 在「工具」那段
    （`bar_mode`）先按得到。按一下 = 轉顯示方式，拖 = 拉大小。
 
-設定頁最底本來有「試打」四欄位（普通／email／PIN／搜尋）以及實時預覽，
+設定頁最底本來有「試打」欄位以及實時預覽，
 **目前已隱藏**（`SettingsActivity.SHOW_DEBUG_SECTIONS = false`，使用者不想見到）。
 `buildTryBox()` / `buildPreview()` 一行都沒有刪 —— 想 debug 排位就改回 `true`，
-無須開啟第三方 app。搜尋那欄是用來看 `⏎` 有沒有變 `🔍`
-（`enterLabelFor()` 看 `IME_ACTION_SEARCH`）。
+無須開啟第三方 app。裏面每種特別欄位各有一欄（email／網址／密碼／PIN／電話／
+數字／金額／日期／時間），加上六款 `imeOptions`，就是用來一次過看勻
+「跟輸入欄類型換排位」與「`⏎` 跟 `imeOptions` 換樣」兩套邏輯。
 
 ### 查「明明按了 793，為何出現了第二字」：`scripts/debug-input.sh`
 
@@ -161,6 +162,82 @@ log 由 `core/InputLog` 出，**兩個開關任選其一**（預設兩個都關�
   **英文那顆沒有左上角提示字**（2026-08-29 使用者要求）：鍵面本身已經四文字符，
   底行每顆都窄，再擠壓個 `123` 落左上角就擠在一起。中文九宮格那顆空間較寬鬆，
   個 `hint` 照留 —— 兩處不一致是特意的。
+
+### 英文句首自動大階（2026-09-05 加）
+
+英文鍵盤在句首會自動開 `ShiftState.ON`（`TTInputMethodService.updateAutoCaps`），
+**不是** 看欄位有沒有寫 `textCapSentences` —— 一律自己判斷。判斷條件全部在
+`core/AutoCaps.atSentenceStart()`（純 Kotlin，有 `AutoCapsTest`），只收游標前面
+12 個字元：欄位開頭、換行、`! ?`（連全形 `！？。`）、`.` 之後。
+
+- **`.` 一定要跟着至少一個空格才算句尾**，`! ?` 就不用。因為「句號 + 新句」與
+  網址／小數／檔名／縮寫在打字的一刻分不開（`google.` 與 `Hello.` 前面那截
+  一模一樣），不跟空格就會打出 `google.Com`。這與 `autoSpaceAfterPunct` 特意
+  不理會 `.` 是同一個道理，AOSP 的 `TextUtils.getCapsMode` 亦是這樣。
+  全形 `。！？` 不會在網址中出現，所以不用跟空格。
+- 前面隔着收結引號／括號（`他說「好。」`）照樣算句首。
+
+**一定要按得熄。** 使用者自己按過 ⇧（或長按 capslock）就 `shiftManual = true`，
+之後 `onUpdateSelection` 再來都不會強行改回大階；一打到落字（打字、`␣`、
+`⌫`、`⏎`）就當這個手動決定用完，下一句照舊自動大階。`ShiftState.LOCK`
+永遠不會被這裏動到。
+
+呼叫點：`onStartInputView`、`switchMode`、`typeChar`、`space`、`backspace`、
+`enter`、`onPickCandidate`、`onUpdateSelection`。每次會問輸入框拿一次
+`getTextBeforeCursor`（IPC），所以 `mode != LATIN`、正在打一個字的中間
+（`latinComposing` 不是空）、capslock、`shiftManual` 都會先擋住不查。
+
+URL／email／密碼／篩選欄（`textFilter`）不會自動大階（`autoCapsField`）——
+在那些欄位打大階等於直接打錯東西。**沒有另開設定開關**：使用者要熄就按 ⇧。
+
+### 跟輸入欄類型（`inputType`）換排位（2026-09-05 加）
+
+`onStartInputView` 看 `inputType` 之後，英文鍵盤走 `LatinField`、純數字鍵盤走
+`NumField`。原則：**該欄位收不到的字元不要留在鍵面上** —— 那些鍵會被輸入框
+自己的 `KeyListener` 濾走，按極都沒有反應，比沒有還差；收得的分隔符就補回去。
+
+| 欄位 | 頁 | 底行／最左一欄 |
+| --- | --- | --- |
+| 普通文字 | 中文九宮格 | （不變） |
+| `textEmailAddress` | 英文 | `@`、`.com`（長按有 `.com.hk` 等） |
+| `textUri` | 英文 | 收起 `,`，改為 `/` `.` `.com` |
+| `textPassword`（連 `webPassword` / `visiblePassword`） | 英文 | 收起 `,` `/`，改為 `.` `-` `_` |
+| `phone` | 純數字 | `( ) - +` 與 `*` `#`（撥號串常用） |
+| `numberPassword` | 純數字 PIN（三欄） | 本來那顆用不着的 `-` 改為 `⏎` |
+| `number` | 純數字 | `+ * /` 全部收起；`-` 只在 `numberSigned`、`.` 只在 `numberDecimal` 才出 |
+| `date` / `time` / `datetime` | 純數字 | `date` 出 `. - /`、`time` 出 `:`、沒寫變體就四顆都出 |
+| 由符號頁按 `123` 入來 | 純數字 | `+ - * /`（`NumField.CALC`，即以前那套） |
+
+**四款英文排位都保留 `中`。** URL 欄（Chrome 的網址欄就是 `textUri`）與密碼欄
+一樣可能要打中文，收起了就整個欄位都打不到中文，只能去換輸入法。
+
+**純數字頁不夠鍵就留空位，不可以縮成四欄。** 用不着的位置放 `spacerKey(1f)`，
+數字永遠坐同一格，中英切換時不會左右彈（見上面「寬度與貼邊不可以再自己計」）。
+空位不會入 `boxes`，按下去會 `boxNear()` snap 去旁邊那顆，不是死位。
+
+密碼欄還有兩件事**不是排位**：不准滑動輸入（`LatinPadView.canSwipe`）、
+不出打字提示與下一個字預測（`latinTypingSuggestions` / `nextWordSuggestions`）
+—— 正在打的密碼不應該在候選欄逐個字現形，而且滑出來的一定是詞庫中的字，
+對密碼根本沒有用。
+
+### `⏎` 跟 `imeOptions` 換樣（2026-09-05 起七款）
+
+`TTInputMethodService.enterLabelFor()` 按 `IME_MASK_ACTION` 出不同符號，
+全部**單色**（見 `KeyDef.kt` 的 `glyphOr()`，字型沒有該字就寫回中文字）：
+
+| `imeOptions` | 鍵面 | 沒有字型時 |
+| --- | --- | --- |
+| `actionDone` | `✓` | 完成 |
+| `actionSearch` | `⌕` | 搜尋 |
+| `actionSend` | `➤` | 傳送 |
+| `actionGo` | `→` | 前往 |
+| `actionNext` | `⇥` | 下一 |
+| `actionPrevious` | `⇤` | 上一 |
+| `actionUnspecified` / `actionNone` | `⏎` | — |
+
+`IME_FLAG_NO_ENTER_ACTION`（多行欄位框架自己會加）一律出 `⏎` —— 那些欄位按下去
+是真的換行，不要扮成「按了就走」。**這裏的條件要與 `enter()` 那邊一模一樣**，
+不然會出現「鍵面寫住 ✓、按下去卻只是換行」。
 
 ### 純數字頁：成頁不得長按
 
@@ -707,6 +784,15 @@ fire 不 fire）是看 layout 時序，擋錯了就會攔截了 使用者真正�
 （震幅也由 110／200 加到 170／255）。要再調就繼續加時間 —— 好多機的震幅
 是封了頂的，真正感覺到「大力了」的是震耐了。**0 與 1 不得移動。**
 
+## 按鍵按下效果
+
+設定頁「一般 → 其他 → 按鍵按下時的效果」有四種：無效果、變光、變暗、
+略為放大（`KeyPressEffect`）。**預設是變光**，並且直接使用既有的
+`Theme.keyFaceDown`，所以舊裝置升級後的外觀不變。
+
+這項套用於所有 `KeyboardBaseView`（中文、英文、符號、純數字）。「略為放大」
+是將底色、字與角落提示整顆一起放大，並在相鄰按鍵後繪製，否則擴大的部分會被蓋住。
+
 ## 設定頁的 `slider()` 有 step 與 format
 
 `SettingsActivity.slider()` 收多兩個 optional 參數：`step`（拖一格跳多少，
@@ -1014,7 +1100,9 @@ app 內所有 使用者見到的字（設定頁、toast、鍵面、空狀態提�
 
 搜尋個「放大鏡」一律用**單色** `⌕`（`KeyDef.kt` 的 `SEARCH_GLYPH`），
 不用彩色 emoji 🔍 —— 搜尋欄的 `⏎`（`enterLabelFor`）與 emoji 表那顆找字按鍵兩處都是。
-字型沒有 `⌕`（`Paint.hasGlyph`）就寫回「搜尋」兩字，不可以出一格豆腐。
+字型沒有 `⌕`（`Paint.hasGlyph`）就寫回「搜尋」兩字，不可以出一格豆腐 ——
+`⏎` 其餘六款 `imeOptions` 的符號走同一個 `glyphOr()`（見上面「`⏎` 跟
+`imeOptions` 換樣」）。
 
 ## 中文使用習慣統計：bigram 與每字次數
 

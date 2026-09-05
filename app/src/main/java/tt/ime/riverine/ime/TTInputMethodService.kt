@@ -38,6 +38,7 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import tt.ime.riverine.core.AiRewrite
 import tt.ime.riverine.core.AiStt
+import tt.ime.riverine.core.AutoCaps
 import tt.ime.riverine.core.BarMode
 import tt.ime.riverine.core.ClipHistory
 import tt.ime.riverine.core.EmojiDict
@@ -95,8 +96,16 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
     private var barMode = BarMode.CANDIDATES
     private var enterLabel = "⏎"
 
-    private var emailField = false
-    private var pinField = false
+    /** 英文鍵盤底行要跟邊套排位（見 [LatinField]） */
+    private var latinField = LatinField.NORMAL
+    /** 密碼欄：唔滑動、唔出打字提示（打緊嘅密碼唔應該喺候選欄現形） */
+    private val passwordField get() = latinField == LatinField.PASSWORD
+    /** 呢個欄準唔準句首自動大階（見 [updateAutoCaps]） */
+    private var autoCapsField = false
+    /** 純數字鍵盤要出邊套排位（見 [NumField]），連埋 `number` 欄收唔收 `-` / `.` */
+    private var numField = NumField.CALC
+    private var numSigned = false
+    private var numDecimal = false
     /** URL／email／密碼／關咗提示嘅欄：唔好自作聰明補空格（見 [autoSpaceAfterPunct]） */
     private var noAutoSpaceField = false
     private var hasSelection = false
@@ -123,6 +132,11 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
     /** 啱啱完成嘅上一個英文字，畀 [tt.ime.riverine.core.NextWordModel] 估下一個字用 */
     private var lastCommittedWord = ""
     private var lastShiftTapAt = 0L
+    /**
+     * user 自己撳過粒 ⇧（開咗或者熄咗），句首自動大階要收手 ——
+     * 一打到落字就清返（見 [updateAutoCaps]）。
+     */
+    private var shiftManual = false
 
     // 搵 emoji：打嘅字唔會入去個欄，淨係用嚟篩
     private var emojiSearch = false
@@ -278,6 +292,7 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
         latinComposing.setLength(0)
         latinSuggestions = emptyList()
         latinWordDone = false
+        shiftManual = false
         latinSwiped = false
         forceCandidates = false
         lastCommittedWord = ""
@@ -291,21 +306,44 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
 
         val cls = info.inputType and InputType.TYPE_MASK_CLASS
         val variation = info.inputType and InputType.TYPE_MASK_VARIATION
-        val isEmail = variation == InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS ||
-            variation == InputType.TYPE_TEXT_VARIATION_WEB_EMAIL_ADDRESS
+        val isText = cls == InputType.TYPE_CLASS_TEXT
+        val isEmail = isText && (variation == InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS ||
+            variation == InputType.TYPE_TEXT_VARIATION_WEB_EMAIL_ADDRESS)
         val isNumberPassword = cls == InputType.TYPE_CLASS_NUMBER &&
             variation == InputType.TYPE_NUMBER_VARIATION_PASSWORD
-        val isUri = variation == InputType.TYPE_TEXT_VARIATION_URI
-        val isPassword = variation == InputType.TYPE_TEXT_VARIATION_PASSWORD ||
+        val isUri = isText && variation == InputType.TYPE_TEXT_VARIATION_URI
+        val isPassword = isText && (variation == InputType.TYPE_TEXT_VARIATION_PASSWORD ||
             variation == InputType.TYPE_TEXT_VARIATION_WEB_PASSWORD ||
-            variation == InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD
+            variation == InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD)
+        val isFilter = isText && variation == InputType.TYPE_TEXT_VARIATION_FILTER
         val noSuggestions = (info.inputType and InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS) != 0
 
-        emailField = isEmail
-        pinField = isNumberPassword
         noAutoSpaceField = isUri || isEmail || isPassword || isNumberPassword || noSuggestions
-        latinPad?.emailMode = isEmail
-        numberPad?.pinMode = isNumberPassword
+        // 句首自動大階：淨係普通文字欄。URL／email／密碼打大階會直接打錯嘢，
+        // 篩選欄（`textFilter`）打一兩個字就篩，自動大階淨係阻住（見 [updateAutoCaps]）
+        autoCapsField = isText && !isEmail && !isUri && !isPassword && !isFilter
+        latinField = when {
+            isEmail -> LatinField.EMAIL
+            isUri -> LatinField.URI
+            isPassword -> LatinField.PASSWORD
+            else -> LatinField.NORMAL
+        }
+        latinPad?.fieldKind = latinField
+        numField = when {
+            isNumberPassword -> NumField.PIN
+            cls == InputType.TYPE_CLASS_PHONE -> NumField.PHONE
+            cls == InputType.TYPE_CLASS_DATETIME -> when (variation) {
+                InputType.TYPE_DATETIME_VARIATION_DATE -> NumField.DATE
+                InputType.TYPE_DATETIME_VARIATION_TIME -> NumField.TIME
+                else -> NumField.DATETIME
+            }
+            cls == InputType.TYPE_CLASS_NUMBER -> NumField.NUMBER
+            // 唔係數字欄（由符號頁撳 `123` 入嚟）就照出計數嗰套
+            else -> NumField.CALC
+        }
+        numSigned = (info.inputType and InputType.TYPE_NUMBER_FLAG_SIGNED) != 0
+        numDecimal = (info.inputType and InputType.TYPE_NUMBER_FLAG_DECIMAL) != 0
+        numberPad?.setField(numField, numSigned, numDecimal)
         hasSelection = currentInputConnection?.getSelectedText(0)?.isNotEmpty() == true
         refreshAiState()
 
@@ -316,6 +354,7 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
             else -> PadMode.CHINESE
         }
         switchMode(want, force = true)
+        updateAutoCaps()
         refreshBars()
         scheduleSizeRecheck()
     }
@@ -362,13 +401,30 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
         // 候選欄係跟住**游標前面嗰隻字**行（見 [contextPicks]），所以游標一郁就要重出。
         // 打緊碼／揀緊字嗰陣個表同游標冇關，唔使嘥呢次 IPC。
         if (mode == PadMode.CHINESE && !engine.busy && !emojiSearch) refreshBars()
+        // caret 郁咗（自己撳、揀字、app 自己改）都要重新計句首自動大階
+        updateAutoCaps()
     }
 
-    /** 搜尋欄要出放大鏡（單色，見 [SEARCH_GLYPH]），唔係就照出 ⏎ */
+    /**
+     * `⏎` 跟欄位嘅 `imeOptions` 換樣（全部單色符號，見 [SEARCH_GLYPH] 嗰段）：
+     * 完成 ✓、搜尋 ⌕、傳送 ➤、前往 →、下一個 ⇥、上一個 ⇤。
+     *
+     * `actionUnspecified` / `actionNone`／ multi-line（框架會加
+     * [EditorInfo.IME_FLAG_NO_ENTER_ACTION]）就照出返 `⏎` —— 嗰啲欄撳落去
+     * 係真係換行，唔好扮到似「撳咗就走」。呢度同 [enter] 嗰邊嘅條件要一模一樣。
+     */
     private fun enterLabelFor(ei: EditorInfo?): String {
-        val action = ei?.imeOptions?.and(EditorInfo.IME_MASK_ACTION) ?: EditorInfo.IME_ACTION_NONE
-        val noEnter = (ei?.imeOptions?.and(EditorInfo.IME_FLAG_NO_ENTER_ACTION) ?: 0) != 0
-        return if (!noEnter && action == EditorInfo.IME_ACTION_SEARCH) SEARCH_GLYPH else "⏎"
+        val opts = ei?.imeOptions ?: 0
+        if ((opts and EditorInfo.IME_FLAG_NO_ENTER_ACTION) != 0) return "⏎"
+        return when (opts and EditorInfo.IME_MASK_ACTION) {
+            EditorInfo.IME_ACTION_DONE -> DONE_GLYPH
+            EditorInfo.IME_ACTION_SEARCH -> SEARCH_GLYPH
+            EditorInfo.IME_ACTION_SEND -> SEND_GLYPH
+            EditorInfo.IME_ACTION_GO -> GO_GLYPH
+            EditorInfo.IME_ACTION_NEXT -> NEXT_GLYPH
+            EditorInfo.IME_ACTION_PREVIOUS -> PREV_GLYPH
+            else -> "⏎"
+        }
     }
 
     // ---- view 切換 --------------------------------------------------------
@@ -407,14 +463,14 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
                 preloadGestureDecoder()
                 (latinPad ?: LatinPadView(this).also {
                     it.host = this; it.latinHost = this; it.applyTheme(theme); latinPad = it
-                }).also { it.emailMode = emailField }
+                }).also { it.fieldKind = latinField }
             }
             PadMode.SYMBOL -> symbolPad ?: SymbolPadView(this).also {
                 it.host = this; it.applyTheme(theme); symbolPad = it
             }
             PadMode.NUMBER -> (numberPad ?: NumberPadView(this).also {
                 it.host = this; it.applyTheme(theme); numberPad = it
-            }).also { it.pinMode = pinField }
+            }).also { it.setField(numField, numSigned, numDecimal) }
             PadMode.EMOJI -> (emojiPad ?: EmojiPadView(this).also {
                 it.emojiHost = this; it.applyTheme(theme); emojiPad = it
             }).also {
@@ -428,6 +484,8 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
         (v as? KeyboardBaseView)?.enterLabel = enterLabel
         (v as? RowsPadView)?.rebuild()
         (v as? ChinesePadView)?.onSettingsChanged()
+        // 啱啱轉去英文（例如中文頁撳 `Eng`）：句首就要即刻著返大階
+        updateAutoCaps()
         refreshBars()
     }
 
@@ -662,6 +720,7 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
             KeyAction.IME_SWITCH -> { showImePicker(); return true }
             KeyAction.SHIFT -> {
                 latinPad?.let { it.shift = ShiftState.LOCK; it.rebuild() }
+                shiftManual = true
                 return true
             }
             KeyAction.CHAR -> if (key.hint.isNotEmpty()) { typeChar(key.hint); return true }
@@ -756,6 +815,8 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
             latinComposing.append(s)
             currentInputConnection?.commitText(s, 1)
             latinSuggestions = latinTypingSuggestions()
+            clearShiftManual()
+            updateAutoCaps()
             refreshBars()
             return
         }
@@ -763,6 +824,9 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
         latinWordDone = false
         currentInputConnection?.commitText(s, 1)
         if (mode == PadMode.CHINESE) engine.cancel().also { onStateChanged() }
+        // 啱啱打咗個標點／符號：`. ` `!` 之後嗰個字母要自動大階
+        clearShiftManual()
+        updateAutoCaps()
     }
 
     /**
@@ -796,8 +860,45 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
             pad.shift == ShiftState.OFF -> ShiftState.ON
             else -> ShiftState.OFF
         }
+        // 自己撳過就當佢話事，唔好俾自動大階即刻改返（見 [updateAutoCaps]）
+        shiftManual = true
         pad.rebuild()
     }
+
+    // ---- 句首自動大階 -----------------------------------------------------
+
+    /**
+     * 英文鍵盤句首自動 shift。判斷條件全部喺 [AutoCaps]（純 Kotlin，有 unit test）：
+     * 欄位開頭、換行、`! ?`（可以隔空格）、`.` + 空格。
+     *
+     * **一定要撳得熄。** user 自己撳過粒 ⇧ 就 [shiftManual] = true，
+     * 之後再郁游標／收到 `onUpdateSelection` 都唔會夾硬校返大階；
+     * 一打到落字（打字、space、backspace、⏎）就當呢個「手動決定」用完，
+     * 下一句照舊自動大階。Capslock 亦都唔會被呢度郁到。
+     *
+     * URL／email／密碼／篩選欄唔會行呢度（見 [autoCapsField]）。
+     */
+    private fun updateAutoCaps() {
+        val pad = latinPad ?: return
+        if (mode != PadMode.LATIN) return
+        if (pad.shift == ShiftState.LOCK || shiftManual) return
+        val want = if (autoCapsWanted()) ShiftState.ON else ShiftState.OFF
+        if (pad.shift == want) return
+        pad.shift = want
+        pad.rebuild()
+    }
+
+    private fun autoCapsWanted(): Boolean {
+        if (!autoCapsField || emojiSearch) return false
+        // 打緊一個字嘅中間（`hel|`）梗係唔會係句首，慳返一次 IPC
+        if (latinComposing.isNotEmpty()) return false
+        val ic = currentInputConnection ?: return false
+        val before = ic.getTextBeforeCursor(AutoCaps.LOOKBACK, 0) ?: return false
+        return AutoCaps.atSentenceStart(before)
+    }
+
+    /** 打到落字就當「手動 shift」用完（見 [updateAutoCaps]） */
+    private fun clearShiftManual() { shiftManual = false }
 
     private fun backspace() {
         // 中文打緊碼就照剷碼先，剷完先至輪到條 emoji query
@@ -823,6 +924,8 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
             latinComposing.setLength(latinComposing.length - 1)
             currentInputConnection?.deleteSurroundingText(1, 0)
             latinSuggestions = if (latinComposing.isEmpty()) emptyList() else latinTypingSuggestions()
+            clearShiftManual()
+            updateAutoCaps()
             refreshBars()
             return
         }
@@ -830,6 +933,9 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
         val sel = ic.getSelectedText(0)
         if (sel != null && sel.isNotEmpty()) ic.commitText("", 1)
         else ic.deleteSurroundingText(1, 0)
+        // 剷返到句尾／欄位開頭就要即刻著返大階
+        clearShiftManual()
+        updateAutoCaps()
     }
 
     private fun space() {
@@ -845,9 +951,11 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
         finishLatinComposing()
         latinWordDone = false
         currentInputConnection?.commitText(" ", 1)
+        clearShiftManual()
+        updateAutoCaps()
         if (mode == PadMode.LATIN && prevWord.isNotEmpty()) {
             lastCommittedWord = prevWord
-            latinSuggestions = NextWordModel.get()?.predictNext(prevWord) ?: emptyList()
+            latinSuggestions = nextWordSuggestions(prevWord)
             refreshBars()
         }
     }
@@ -867,6 +975,9 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
             ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_ENTER))
             ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_ENTER))
         }
+        // 換咗行 = 新一段，下一個字母要自動大階
+        clearShiftManual()
+        updateAutoCaps()
     }
 
     /** emoji query 打緊嘅字：即時 set 做 composing text，等 user 見到打緊乜（唔會真係入落個欄） */
@@ -884,11 +995,18 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
         latinSwiped = false
     }
 
+    /** 打完一個字之後估下一個字。密碼欄一律唔出（同 [latinTypingSuggestions]） */
+    private fun nextWordSuggestions(prev: String): List<String> =
+        if (passwordField) emptyList()
+        else NextWordModel.get()?.predictNext(prev) ?: emptyList()
+
     /**
      * 打緊字嗰陣（[latinComposing] 唔係空）出嘅提示：先用 [lastCommittedWord] 做 context
      * 揾 bigram 夾 prefix 嘅字（AOSP 標準嘅 N-gram 做法），唔夠先用 [EnDict] 補齊。
      */
     private fun latinTypingSuggestions(): List<String> {
+        // 密碼欄唔出提示：打緊嘅密碼唔應該喺候選欄逐個字現形
+        if (passwordField) return emptyList()
         val prefix = latinComposing.toString().lowercase()
         val model = NextWordModel.get()
         if (model != null) return model.suggestWithPrefix(lastCommittedWord, prefix)
@@ -1303,7 +1421,9 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
                 forceCandidates = false
                 if (mode == PadMode.LATIN) {
                     lastCommittedWord = w
-                    latinSuggestions = NextWordModel.get()?.predictNext(w) ?: emptyList()
+                    latinSuggestions = nextWordSuggestions(w)
+                    clearShiftManual()
+                    updateAutoCaps()
                 }
                 refreshBars()
             }

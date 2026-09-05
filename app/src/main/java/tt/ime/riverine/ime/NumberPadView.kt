@@ -4,12 +4,32 @@ import android.content.Context
 import tt.ime.riverine.core.PadGroup
 
 /**
- * 純數字鍵盤。兩種用法：
+ * 純數字鍵盤要出哪一套排位。由 `TTInputMethodService.onStartInputView`
+ * 看 `inputType` 決定，或者由符號頁撳 `123` 入來（[CALC]）。
  *
- *  - [pinMode]：入 PIN／密碼嗰陣自動出，三欄，唔畀轉去其他 view
- *  - 平時：由符號頁撳 `123` 入嚟，五欄 —— 最左一欄係 `+ - * /`
- *    （計數／打算式唔使再走去符號頁），右邊四欄係數字同 `中`／`Eng`／`⌫`／`⏎`。
- *    打完一個數字**唔會**自動彈返去英文頁，可以一個接一個咁打落去。
+ * 全部都是 5 欄 4 行（[PIN] 除外），闊度與擺位跟中文九宮格一樣 —— 最左那一欄
+ * 是「跟着欄位變」的一欄，欄位用不着的就留空（[spacerKey]，撳落去會 snap 去
+ * 隔籬那粒），數字永遠在同一個位置，中英切換時不會左右彈。
+ */
+enum class NumField {
+    /** 由符號頁撳 `123` 入來：最左一欄是 `+ - * /`，計數／打算式用 */
+    CALC,
+    /** `numberPassword`：三欄，不准轉去其他 view */
+    PIN,
+    /** `phone`：`( ) - +` 與 `*` `#`，跟一般撥號鍵盤 */
+    PHONE,
+    /** `number`：`-` 與 `.` 只在 `numberSigned` / `numberDecimal` 才出 */
+    NUMBER,
+    /** `datetime` / `date` / `time`：出該類型收得的分隔符（`. - /` 或 `:`） */
+    DATE, TIME, DATETIME
+}
+
+/**
+ * 純數字鍵盤。排位跟 [NumField]：
+ *
+ *  - 打電話號碼、日期、金額那些欄位，用不着的鍵（`* / +`、`.`、`000`）全部
+ *    收起 —— 那些字元會被輸入框自己的 `KeyListener` 濾走，留着就是撳極都沒有反應的死鍵。
+ *  - 欄位收得的分隔符就補回去（`( ) # *`、`. - /`、`:`）。
  *
  * 闊度同擺位跟返中文九宮格（[PadMetrics]，一樣係 5 欄）—— 兩邊都係 numpad 排法，
  * 中英切換嗰陣啲鍵唔應該左右彈嚟彈去（以前呢頁自己置中，同九宮格對唔上）。
@@ -19,42 +39,109 @@ class NumberPadView(context: Context) : RowsPadView(context) {
     /** 呢頁一律唔准長撳（打號碼撳耐咗就彈 popup 出嚟好煩） */
     override fun allowLongPress(k: Key) = false
 
-    /** true = 密碼／PIN，唔畀轉去其他 view */
-    var pinMode: Boolean = false
-        set(v) { field = v; rebuild() }
+    /** 而家出緊邊套排位（見 [NumField]），連埋 `number` 欄收唔收 `-` / `.` */
+    private var fieldKind: NumField = NumField.CALC
+    private var allowSign = false
+    private var allowDecimal = false
+
+    /** 一次過設定（三個值一齊變，唔好逐個 setter 各自 rebuild 一次） */
+    fun setField(kind: NumField, sign: Boolean = false, decimal: Boolean = false) {
+        if (kind == fieldKind && sign == allowSign && decimal == allowDecimal) return
+        fieldKind = kind
+        allowSign = sign
+        allowDecimal = decimal
+        rebuild()
+    }
 
     private fun num(n: Int) = Key(KeyAction.CHAR, label = n.toString(), text = n.toString(), bigLabel = true)
 
-    /** 四則運算符號（最左一欄）。`-` 由底行搬咗過嚟，讓返個位俾 `000` */
+    /** 符號鍵（最左一欄、`*` `#` 那些）。`-` 由底行搬咗過嚟，讓返個位俾 `000` */
     private fun op(s: String) = Key(KeyAction.CHAR, label = s, text = s, bigLabel = true)
 
-    override fun rows(): List<List<Key>> {
-        if (pinMode) {
-            return listOf(
-                listOf(num(1), num(2), num(3)),
-                listOf(num(4), num(5), num(6)),
-                listOf(num(7), num(8), num(9)),
-                listOf(Key(KeyAction.CHAR, label = "-", text = "-"), num(0),
-                    Key(KeyAction.BACKSPACE, label = "⌫", repeatable = true))
-            )
-        }
-        // 呢頁**冇一粒鍵有長撳效果** —— 打電話號碼／金額嗰陣撳耐咗少少就彈個
-        // 符號 popup 出嚟好煩，所以數字一律用淨得個 label 嘅 [num]，唔用 digitKey。
-        // `中` / `Eng` 喺右上角（唔喺底行），`0` `000` `.` 就喺底行，
-        // ⌫ 照舊喺 ⏎ 上面。`000` = 一次過打三個 0（金額、電話號碼常用）。
+    private fun toChinese() = Key(KeyAction.TO_CHINESE, label = "中", bigLabel = true)
+    private fun toLatin() = Key(KeyAction.TO_LATIN, label = "Eng")
+    private fun backspace() = Key(KeyAction.BACKSPACE, label = "⌫", repeatable = true)
+    private fun enter() = Key(KeyAction.ENTER, label = "⏎", accent = true)
+
+    override fun rows(): List<List<Key>> = when (fieldKind) {
+        NumField.PIN -> pinRows()
+        NumField.PHONE -> phoneRows()
+        NumField.NUMBER -> numberRows()
+        NumField.DATE, NumField.TIME, NumField.DATETIME -> dateRows()
+        NumField.CALC -> calcRows()
+    }
+
+    /**
+     * PIN／密碼：三欄，一粒轉頁掣都冇。底行本來有粒 `-`（PIN 入面完全用唔着），
+     * 換咗做 `⏎` —— 好多 PIN 欄嘅 `imeOptions` 係 `actionDone`（見
+     * `TTInputMethodService.enterLabelFor`，粒鍵會寫住 ✓）。
+     */
+    private fun pinRows() = listOf(
+        listOf(num(1), num(2), num(3)),
+        listOf(num(4), num(5), num(6)),
+        listOf(num(7), num(8), num(9)),
+        listOf(enter(), num(0), backspace())
+    )
+
+    // 呢頁**冇一粒鍵有長撳效果** —— 打電話號碼／金額嗰陣撳耐咗少少就彈個
+    // 符號 popup 出嚟好煩，所以數字一律用淨得個 label 嘅 [num]，唔用 digitKey。
+    // `中` / `Eng` 喺右上角（唔喺底行），`0` `000` `.` 就喺底行，
+    // ⌫ 照舊喺 ⏎ 上面。`000` = 一次過打三個 0（金額、電話號碼常用）。
+    private fun calcRows() = listOf(
+        listOf(op("+"), num(1), num(2), num(3), toChinese()),
+        listOf(op("-"), num(4), num(5), num(6), toLatin()),
+        listOf(op("*"), num(7), num(8), num(9), backspace()),
+        listOf(op("/"), num(0), op("000"), op("."), enter())
+    )
+
+    /**
+     * 電話：`+ - ( )` 同 `*` `#` 都係撥號串常用（`+852`、`(852) 1234-5678`、
+     * 分機 `#`），`* /` 呢啲計數符號就一粒都唔要。
+     */
+    private fun phoneRows() = listOf(
+        listOf(op("("), num(1), num(2), num(3), toChinese()),
+        listOf(op(")"), num(4), num(5), num(6), toLatin()),
+        listOf(op("-"), num(7), num(8), num(9), backspace()),
+        listOf(op("+"), op("*"), num(0), op("#"), enter())
+    )
+
+    /**
+     * `number` 欄：`+ * /` 一律唔要（會俾輸入框濾走），`-` 淨係 `numberSigned`
+     * 先出，`.` 淨係 `numberDecimal` 先出。兩樣都冇（淨係 `number`，例如數量、
+     * 年齡）就係最左一欄留白 + 底行少咗粒 `.`。
+     */
+    private fun numberRows() = listOf(
+        listOf(spacerKey(1f), num(1), num(2), num(3), toChinese()),
+        listOf(spacerKey(1f), num(4), num(5), num(6), toLatin()),
+        listOf(spacerKey(1f), num(7), num(8), num(9), backspace()),
+        listOf(
+            if (allowSign) op("-") else spacerKey(1f),
+            num(0), op("000"),
+            if (allowDecimal) op(".") else spacerKey(1f),
+            enter()
+        )
+    )
+
+    /**
+     * 日期／時間：最左一欄擺分隔符。`date` 收 `. - /`、`time` 收 `:`、
+     * 冇指定變體（`datetime`）就四粒都出 —— 出多咗嗰啲會俾 `DateKeyListener` /
+     * `TimeKeyListener` 濾走，所以要按變體分開。底行嘅 `0` 拉闊三格
+     * （日期唔會打 `000`，讓個位出嚟粒 `0` 大啲）。
+     */
+    private fun dateRows(): List<List<Key>> {
+        val date = fieldKind != NumField.TIME
+        val time = fieldKind != NumField.DATE
+        val col = listOf(
+            if (date) op(".") else spacerKey(1f),
+            if (date) op("-") else spacerKey(1f),
+            if (date) op("/") else spacerKey(1f),
+            if (time) op(":") else spacerKey(1f)
+        )
         return listOf(
-            listOf(op("+"), num(1), num(2), num(3),
-                Key(KeyAction.TO_CHINESE, label = "中", bigLabel = true)),
-            listOf(op("-"), num(4), num(5), num(6), Key(KeyAction.TO_LATIN, label = "Eng")),
-            listOf(op("*"), num(7), num(8), num(9),
-                Key(KeyAction.BACKSPACE, label = "⌫", repeatable = true)),
-            listOf(
-                op("/"),
-                num(0),
-                Key(KeyAction.CHAR, label = "000", text = "000", bigLabel = true),
-                Key(KeyAction.CHAR, label = ".", text = ".", bigLabel = true),
-                Key(KeyAction.ENTER, label = "⏎", accent = true)
-            )
+            listOf(col[0], num(1), num(2), num(3), toChinese()),
+            listOf(col[1], num(4), num(5), num(6), toLatin()),
+            listOf(col[2], num(7), num(8), num(9), backspace()),
+            listOf(col[3], num(0).copy(weight = 3f), enter())
         )
     }
 
