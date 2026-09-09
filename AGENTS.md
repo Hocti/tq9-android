@@ -850,9 +850,10 @@ app 內所有 使用者見到的字（設定頁、toast、鍵面、空狀態提�
 
 ## AI 語音輸入：頂走系統那個 `SpeechRecognizer`
 
-`Prefs.aiSttOn` 開啟且已設定 key 時，顆 🎤 始終不再接觸
-`SpeechRecognizer` —— `toggleStt()` 第一句就分流去 `startAiStt()` / `stopAiStt()`。
-兩條路**完全分開**，`listening` / `recognizer` 那套內容一個都不會 set。
+`Prefs.aiSttOn` 開啟且已設定 key 時，顆 🎤 不再行 `toggleStt()` 那條系統路 ——
+第一句就分流去 `startAiStt()` / `stopAiStt()`，`listening` / `recognizer`
+那套內容一個都不會 set。（`Prefs.aiSttSysSec` 開著時 AI 那條路仍然會自己另外開
+一個 `SpeechRecognizer`，但用的是 `sysStt` 那組獨立欄位，見下面一節。）
 
 - **只 Gemini 做得**：段錄音要用 `inline_data` 這個 Gemini 專用格式送上去，
   設定頁那套自訂 API 範本（URL／headers／body）無法表達。所以
@@ -909,6 +910,40 @@ app 內所有 使用者見到的字（設定頁、toast、鍵面、空狀態提�
 - prompt（`Prefs.DEFAULT_AI_STT_PROMPT`）逐條明確列出禁止模型進行的操作 —— Gemini 很容易
   加句「以下是錄音的轉錄內容：」，也容易擅自潤飾句子。改 prompt 時
   不要已刪除「只輸出結果」與「逐字轉錄不要潤飾」這兩條。
+
+## 短錄音改用系統 STT（`Prefs.aiSttSysSec`，2026-09-09 加）
+
+AI 語音輸入開著時，講一兩句都要等 upload + Gemini 回覆，而系統內置那個
+`SpeechRecognizer` 一秒就出到。所以**兩邊一齊開**：`startAiStt()` 開
+`VoiceRecorder` 的同時叫 `startSysStt()`，未夠 `Prefs.aiSttSysSec` 秒
+（預設 8，設定頁那條 slider 拉到 0 就是關掉，行回以前一律用 AI 的做法）
+就攞系統那句，過了界就 `releaseSysStt()` cancel 掉系統那邊、段錄音照送上 Gemini。
+
+- **`SpeechRecognizer` cancel 得**：`cancel()` + `destroy()`，之後不會再派
+  callback 過來。`sysStt == null` 就是「這招今次收了檔」的旗號，`stopAiStt()`
+  靠它決定行邊條路。過界那下由 `sttTimerTick`（每 100ms）叫。
+- **`releaseSysStt()` 一定要 `ui.post` 出去**：好多時是在它自己個 listener
+  callback 入面叫的（`onResults` → `finishSysStt`），即場 `destroy()` 有些
+  實作會炸。與舊有那個 `releaseRecognizer()` 同一個寫法。
+- **兩個 client 同時開咪是部機話事的**：Android 10 之後那套 audio policy
+  隨時靜了其中一邊 —— 那邊讀到的是一條全零的 PCM，**不會報錯**。所以三邊都有後路：
+
+  | 出事的一邊 | 後路 |
+  | --- | --- |
+  | 系統那邊聽不到／出錯／等足 `SYS_STT_WAIT_MS`（8 秒）都不應 | 段錄音仍在手，`finishSysStt()` 跌回 `startAiTranscribe()` |
+  | 我們自己那條 PCM 被靜（VAD 判 `Silent`） | 有系統 STT 陪住時**不當按錯**，照等系統那句（`stopAiStt()` 那句條件） |
+  | 系統那邊早了 `SYS_STT_TAIL_MS`（1.5 秒）以上自己收工 | 那句一定斬到一半，`sysTailLost` 判掉，照送去 AI |
+
+  只有 `TooShort`（400ms 以下）是兩邊都不問 —— 那個看的是時長，不受靜音影響。
+- **不要讓系統那邊靜了一陣就自己埋單**：`startSysStt()` 落
+  `EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS` /
+  `..._POSSIBLY_COMPLETE_...`（`SYS_STT_SILENCE_MS` = 30 秒），幾時收工由我們
+  `stopListening()` 話事。這兩個 extra **不是每個 recognizer 都認**，所以上面
+  那條 `sysTailLost` 後路一定要留。
+- **`onPartialResults` 那句要記低**：有些 recognizer 收工只派 partial，final
+  那個 bundle 是空的，攞不到 final 就用回最後聽到那句（`sysSttText`）。
+- **`recMs` 要在 `rec.stop()` 之前攞**：`VoiceRecorder.finish()` 會把
+  `startedAt` 清零，`elapsedMs` 之後回 0，`sysTailLost` 就會永遠計錯。
 
 ## 候選欄出甚麼（中文，2026-08-27 重寫）
 

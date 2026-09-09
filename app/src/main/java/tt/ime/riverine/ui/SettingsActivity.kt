@@ -617,6 +617,19 @@ class SettingsActivity : AppCompatActivity() {
             })
             note("錄音最長 " + (AiStt.MAX_RECORD_MS / 1000) + " 秒，屆時自動停止送出。" +
                 "首次使用需授權錄音權限。")
+
+            slider("短錄音改用系統辨識", 0, Prefs.MAX_AI_STT_SYS_SEC, Prefs.aiSttSysSec(this), "秒",
+                format = { if (it == 0) "關閉（一律用 AI）" else "$it 秒以內" }) { v ->
+                Prefs.sp(this).edit().putInt(Prefs.KEY_AI_STT_SYS_SEC, v).apply()
+                rebuildAiSection()
+            }
+            if (Prefs.aiSttSysSec(this) > 0) {
+                note("按下錄音時兩邊同時開始：講夠 " + Prefs.aiSttSysSec(this) +
+                    " 秒之前放手，就用系統內置的語音辨識（快、不耗 API 額度）；" +
+                    "超過就取消系統那邊，整段送去 AI。系統那邊聽不到內容時，仍會自動改用 AI。")
+                note("⚠️ 兩邊同時開麥克風要看裝置是否允許；部分裝置只會讓其中一邊收到聲音。" +
+                    "若短錄音經常失準或變慢，把這裡調成「關閉」即可回到只用 AI。")
+            }
         }
     }
 

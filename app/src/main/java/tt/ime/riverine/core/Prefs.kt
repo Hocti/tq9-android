@@ -208,6 +208,19 @@ object Prefs {
     const val KEY_AI_STT_PROMPT = "ai_stt_prompt"
 
     /**
+     * 短過幾多秒嘅錄音改用系統內置嗰個 `SpeechRecognizer`（快、免費、唔使等
+     * upload），長過就照送上 Gemini。0 = 熄咗呢招，一律用 AI（即係舊有行為）。
+     *
+     * 做法係**兩邊一齊開**：一撳錄音就同時開 `VoiceRecorder` 同系統 recognizer，
+     * 夠鐘就 cancel 系統嗰個，未夠鐘就放手嗰下攞系統嗰個嘅結果。
+     * 見 `TTInputMethodService.startAiStt`。
+     */
+    const val KEY_AI_STT_SYS_SEC = "ai_stt_sys_sec"
+
+    /** [KEY_AI_STT_SYS_SEC] 個 slider 拉得去邊（秒） */
+    const val MAX_AI_STT_SYS_SEC = 30
+
+    /**
      * STT 個 prompt 寫到咁死板係有原因嘅：Gemini 好鍾意喺結果前面加句
      * 「以下是錄音的轉錄內容：」，又鍾意自動幫你執順啲句子。呢兩樣落到輸入框
      * 都係垃圾，所以逐條寫死唔准做乜。`%text%` 會換成輸入框而家嘅內容（上下文）。
@@ -594,6 +607,10 @@ object Prefs {
 
     fun aiSttPrompt(ctx: Context): String =
         sp(ctx).getString(KEY_AI_STT_PROMPT, DEFAULT_AI_STT_PROMPT)!!.ifBlank { DEFAULT_AI_STT_PROMPT }
+
+    /** 見 [KEY_AI_STT_SYS_SEC]。0 = 一律用 AI */
+    fun aiSttSysSec(ctx: Context): Int =
+        sp(ctx).getInt(KEY_AI_STT_SYS_SEC, 8).coerceIn(0, MAX_AI_STT_SYS_SEC)
     fun aiCustomUrl(ctx: Context): String =
         sp(ctx).getString(KEY_AI_URL, DEFAULT_AI_URL)!!.ifBlank { DEFAULT_AI_URL }
     fun aiCustomHeaders(ctx: Context): String =
@@ -667,6 +684,7 @@ object Prefs {
             // 唔用 aiSttOn()：嗰個會俾「自訂 API」壓成 false，存 profile 要存返個原本設定
             put("sttOn", sp(ctx).getBoolean(KEY_AI_STT_ON, false))
             put("sttPrompt", aiSttPrompt(ctx))
+            put("sttSysSec", aiSttSysSec(ctx))
         }
         profiles.put(name, p)
         sp(ctx).edit().putString(KEY_AI_PROFILES, profiles.toString()).apply()
@@ -687,6 +705,7 @@ object Prefs {
             .putBoolean(KEY_AI_REWRITE_ON, p.optBoolean("rewriteOn", true))
             .putBoolean(KEY_AI_STT_ON, p.optBoolean("sttOn", false))
             .putString(KEY_AI_STT_PROMPT, p.optString("sttPrompt", DEFAULT_AI_STT_PROMPT))
+            .putInt(KEY_AI_STT_SYS_SEC, p.optInt("sttSysSec", 8).coerceIn(0, MAX_AI_STT_SYS_SEC))
             .apply()
         return true
     }

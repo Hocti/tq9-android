@@ -177,6 +177,22 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
     private var sttGeneration = 0
     private var sttTimerLabel: TextView? = null
 
+    // ---- 短錄音改用系統 STT（[Prefs.aiSttSysSec]）----------------------------
+    /** 今次錄音陪住一齊開嗰個系統 recognizer。過咗界 cancel 咗就變返 null */
+    private var sysStt: SpeechRecognizer? = null
+    /** 錄到幾多毫秒就唔再靠系統嗰邊（0 = 呢招熄咗，一律用 AI） */
+    private var sysSttDeadlineMs = 0L
+    /** 系統嗰邊而家最好嗰句：有 final 就 final，冇就最後嗰段 partial */
+    private var sysSttText: String? = null
+    /** 系統嗰邊派過 final callback（`onResults`／`onError`），唔使再等 */
+    private var sysSttFinished = false
+    /** 上面嗰下發生嗰陣錄咗幾耐；-1 = 放咗手先發生（正路） */
+    private var sysSttEndedAtMs = -1L
+    /** 放咗手、等緊系統嗰邊交貨；佢一 final 就叫呢個 */
+    private var sysSttPending: ((String?) -> Unit)? = null
+    /** 等到夠鐘就自己埋單嗰個 timeout（[SYS_STT_WAIT_MS]） */
+    private var sysSttTimeout: Runnable? = null
+
     private val clipListener = ClipboardManager.OnPrimaryClipChangedListener {
         runCatching { ClipHistory.current(this) }
     }
@@ -1779,12 +1795,7 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
             override fun onEndOfSpeech() {}
             override fun onError(error: Int) { listening = false; setSttLight(false); releaseRecognizer() }
             override fun onResults(results: Bundle?) {
-                val list = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
-                val text = list?.firstOrNull()
-                if (!text.isNullOrEmpty()) {
-                    val outText = if (engine.scOutput) db?.tcsc(text) ?: text else text
-                    currentInputConnection?.commitText(outText, 1)
-                }
+                sttBest(results)?.let { commitSttText(it) }
                 listening = false
                 setSttLight(false)
                 releaseRecognizer()
@@ -1869,6 +1880,10 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
         sttBusy = true
         setSttLight(true)
         playSttTone(SttTone.START)
+        // 兩邊一齊開：未夠 [Prefs.aiSttSysSec] 秒就放手，攞系統嗰個嘅結果
+        // （快、免費、唔使等 upload）；過咗界就 cancel 咗系統嗰個，淨返 AI
+        val sysMs = Prefs.aiSttSysSec(this) * 1000L
+        sysSttDeadlineMs = if (sysMs > 0 && startSysStt()) sysMs else 0L
         showSttRecording(hold)
     }
 
@@ -1877,16 +1892,30 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
      *
      * `VoiceRecorder.stop()` 自己會篩：太短（撳錯／彈手）同埋由頭到尾冇人講過嘢
      * （[VoiceClip.Silent]）兩種都**唔會**叫 API —— 一個 request 掟幾百 KB 上去
-     * 等足幾秒，出返一句「（沒有聲音）」係好嘥。
+     * 等足幾秒，出返一句「（沒有聲音）」係好嘥。（[VoiceClip.Silent] 嗰個篩喺
+     * 有系統 STT 陪住嗰陣會鬆返，原因見下面。）
      */
     private fun stopAiStt(commit: Boolean) {
         val rec = sttRecorder ?: return
+        val recMs = rec.elapsedMs // 要喺 stop() 之前攞，佢一收工個計時器就清零
         sttRecorder = null
         sttHold = false
         stopSttTimer()
         setSttLight(false)
         val clip = if (commit) rec.stop() else { rec.cancel(); null }
-        if (clip !is VoiceClip.Ready) {
+        // 仲未過界（[sysSttDeadlineMs]）就由系統嗰個 recognizer 交貨。
+        // 但係佢**早咗好耐**就自己收咗工（靜咗一陣當你講完）嘅話唔好信 ——
+        // 佢嗰句實係斬到一半，餘下嗰段淨係我哋自己條錄音先有，照送去 AI。
+        val sysTailLost = sysSttFinished && sysSttEndedAtMs >= 0 &&
+            recMs - sysSttEndedAtMs > SYS_STT_TAIL_MS
+        val useSys = commit && sysStt != null && !sysTailLost
+        // 唔靠系統嗰邊就即刻收咗佢，唔好留住個 recognizer 聽落去（下一次錄音
+        // 會見到 `sysStt` 仲喺度，當咗係今次開嘅）
+        if (!useSys) stopSysSttWait()
+        // 太短（撳錯／彈手）兩邊都唔使問。但係「聽唔到聲」淨係喺冇系統 STT
+        // 嗰陣先當冇嘢錄到 —— 個 VAD 睇嘅係我哋自己錄嗰條 PCM，而兩個 client
+        // 同時開咪係部機話事，靜咗嘅可能係我哋呢邊，系統嗰邊照聽到。
+        if (clip == null || clip is VoiceClip.TooShort || (clip !is VoiceClip.Ready && !useSys)) {
             sttBusy = false
             hideAiLoading()
             if (commit) {
@@ -1897,7 +1926,12 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
         }
         playSttTone(SttTone.STOP)
         showSttWaiting()
+        val ready = clip as? VoiceClip.Ready
+        if (useSys) waitSysStt(ready) else if (ready != null) startAiTranscribe(ready)
+    }
 
+    /** 段錄音送上 Gemini。呢步之前一定已經出咗 [showSttWaiting] */
+    private fun startAiTranscribe(clip: VoiceClip.Ready) {
         val myGen = ++sttGeneration
         val timeout = Runnable {
             if (myGen != sttGeneration) return@Runnable
@@ -1923,8 +1957,7 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
                     return@onSuccess
                 }
                 playSttTone(SttTone.OK)
-                currentInputConnection?.commitText(
-                    if (engine.scOutput) db?.tcsc(text) ?: text else text, 1)
+                commitSttText(text)
             }.onFailure {
                 playSttTone(SttTone.FAIL)
                 toast("語音輸入失敗：" + (it.message ?: "未知錯誤"))
@@ -1990,6 +2023,10 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
         override fun run() {
             val rec = sttRecorder ?: return
             updateSttTimer()
+            // 過咗界就唔再靠系統 STT：cancel 咗佢，段錄音照錄落去，最後送上 AI
+            if (sysStt != null && sysSttDeadlineMs > 0 && rec.elapsedMs >= sysSttDeadlineMs) {
+                releaseSysStt()
+            }
             // 封頂：一 request 掟幾十 MB 上去實 timeout，夠鐘就當 user 撳咗停
             if (rec.elapsedMs >= AiStt.MAX_RECORD_MS) { stopAiStt(commit = true); return }
             ui.postDelayed(this, 100)
@@ -2011,9 +2048,145 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
     private fun cancelAiStt() {
         sttGeneration++ // 遲到嘅回覆當第
         if (sttRecorder != null) stopAiStt(commit = false)
+        stopSysSttWait() // 錄完、等緊系統嗰邊交貨嗰段都要收
         sttBusy = false
         stopSttTimer()
         hideAiLoading()
+    }
+
+    // ---- 短錄音改用系統 STT -------------------------------------------------
+
+    /**
+     * 同 [VoiceRecorder] 一齊開埋系統嗰個 recognizer。回 false = 開唔到
+     * （部機冇語音服務、`createSpeechRecognizer` 失敗），今次就照舊淨係得 AI。
+     *
+     * **兩個 client 同時開咪係部機話事嘅**：Android 10 之後嗰套 audio policy
+     * 隨時會靜咗其中一邊（嗰邊讀到嘅係一條全零嘅 PCM，唔會報錯）。所以兩邊都
+     * 有後路 —— 系統嗰邊空手回就跌返落 AI（見 [finishSysStt]），我哋自己錄嗰條
+     * 錄音就算 VAD 判咗冇聲都唔會即刻當失敗（見 [stopAiStt]）。
+     */
+    private fun startSysStt(): Boolean {
+        if (!SpeechRecognizer.isRecognitionAvailable(this)) return false
+        val r = runCatching { SpeechRecognizer.createSpeechRecognizer(this) }.getOrNull()
+            ?: return false
+        sysStt = r
+        sysSttText = null
+        sysSttFinished = false
+        sysSttEndedAtMs = -1L
+        sysSttPending = null
+        r.setRecognitionListener(object : RecognitionListener {
+            override fun onReadyForSpeech(params: Bundle?) {}
+            override fun onBeginningOfSpeech() {}
+            override fun onRmsChanged(rmsdB: Float) {}
+            override fun onBufferReceived(buffer: ByteArray?) {}
+            override fun onEndOfSpeech() {}
+            override fun onError(error: Int) { onSysSttFinal(null) }
+            override fun onResults(results: Bundle?) { onSysSttFinal(sttBest(results)) }
+            override fun onPartialResults(partialResults: Bundle?) {
+                // 有啲 recognizer 收工淨係派 partial，final 嗰個 bundle 係吉嘅，
+                // 所以逐段記低，攞唔到 final 就用返最後聽到嗰句
+                sttBest(partialResults)?.let { sysSttText = it }
+            }
+            override fun onEvent(eventType: Int, params: Bundle?) {}
+        })
+        val locale = Prefs.sttLocale(this)
+        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE, locale)
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, locale)
+            putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, false)
+            putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
+            putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, packageName)
+            // 幾時收工由我哋話事（放手／過界），唔好靜咗一陣就自己埋單 ——
+            // 唔係講到一半唞啖氣，出返嚟就淨係得半句。呢兩個 extra 唔係每個
+            // recognizer 都認，所以認唔認都要有後路（見上面）。
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS,
+                SYS_STT_SILENCE_MS)
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS,
+                SYS_STT_SILENCE_MS)
+        }
+        runCatching { r.startListening(intent) }.onFailure {
+            releaseSysStt()
+            return false
+        }
+        return true
+    }
+
+    /** `onResults`／`onError` 都行呢度：記低最好嗰句，等緊嘅話就即刻交貨 */
+    private fun onSysSttFinal(text: String?) {
+        if (!text.isNullOrBlank()) sysSttText = text
+        sysSttFinished = true
+        sysSttEndedAtMs = sttRecorder?.elapsedMs ?: -1L
+        sysSttPending?.invoke(sysSttText)
+    }
+
+    /**
+     * 放手嗰陣仲未過界：等系統 recognizer 交貨。佢空手回（聽唔到、出錯、
+     * 等到 [SYS_STT_WAIT_MS] 都唔應）就跌返落 AI —— 呢招本來就係為咗慳，
+     * 慳唔到都唔可以當今次語音輸入失敗。
+     *
+     * [clip] = null 即係我哋自己錄嗰條 VAD 判咗冇聲，冇得跌。
+     */
+    private fun waitSysStt(clip: VoiceClip.Ready?) {
+        val myGen = ++sttGeneration
+        val timeout = Runnable { finishSysStt(myGen, clip, sysSttText) }
+        sysSttTimeout = timeout
+        ui.postDelayed(timeout, SYS_STT_WAIT_MS)
+        // 講完一句停一停，有啲 recognizer 未放手就已經自己埋咗單
+        if (sysSttFinished) { finishSysStt(myGen, clip, sysSttText); return }
+        sysSttPending = { finishSysStt(myGen, clip, it) }
+        runCatching { sysStt?.stopListening() }
+    }
+
+    /** 系統嗰邊嘅結局：出到嘢就直接入框，空手就跌返落 [startAiTranscribe] */
+    private fun finishSysStt(gen: Int, clip: VoiceClip.Ready?, text: String?) {
+        if (gen != sttGeneration) return
+        sttGeneration++
+        stopSysSttWait()
+        val out = text?.trim().orEmpty()
+        if (out.isNotEmpty()) {
+            sttBusy = false
+            hideAiLoading()
+            playSttTone(SttTone.OK)
+            commitSttText(out)
+            return
+        }
+        if (clip != null) { startAiTranscribe(clip); return }
+        sttBusy = false
+        hideAiLoading()
+        playSttTone(SttTone.FAIL)
+        toast("沒有聽到說話，已取消")
+    }
+
+    /** 唔再等系統嗰邊，順手收返個 recognizer */
+    private fun stopSysSttWait() {
+        sysSttTimeout?.let { ui.removeCallbacks(it) }
+        sysSttTimeout = null
+        releaseSysStt()
+    }
+
+    /** cancel 咗就唔會再派結果過嚟，之後 [sysStt] 係 null 就代表呢招今次收咗檔 */
+    private fun releaseSysStt() {
+        val r = sysStt ?: return
+        sysStt = null
+        sysSttPending = null
+        // 同 [releaseRecognizer] 一樣 post 出去：呢度好多時係喺佢自己個
+        // listener callback 入面叫，即場 destroy 有啲實作會炸
+        ui.post {
+            runCatching { r.cancel() }
+            runCatching { r.destroy() }
+        }
+    }
+
+    /** 一個 recognizer bundle 入面第一句有料嘅 */
+    private fun sttBest(b: Bundle?): String? =
+        b?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+            ?.firstOrNull { !it.isNullOrBlank() }
+
+    /** 語音辨識出嚟嗰段字入框（簡體輸出開咗就順手轉埋） */
+    private fun commitSttText(text: String) {
+        currentInputConnection?.commitText(
+            if (engine.scOutput) db?.tcsc(text) ?: text else text, 1)
     }
 
     /** 四個階段四把唔同嘅聲：開始錄、錄完、成功、失敗 */
@@ -2034,6 +2207,18 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
         private const val AI_TIMEOUT_MS = 10_000L
         /** 語音辨識要成段錄音上傳，比改寫慢好多，所以放鬆到 100 秒 */
         private const val STT_TIMEOUT_MS = 100_000L
+        /** 放手之後等系統 recognizer 幾耐；等唔到就跌返落 AI */
+        private const val SYS_STT_WAIT_MS = 8_000L
+        /**
+         * 叫系統 recognizer 唔好因為靜咗一陣就自己收工（幾時收工由我哋話事）。
+         * 揀到咁大係因為呢招最多都係頂到 [Prefs.MAX_AI_STT_SYS_SEC] 秒。
+         */
+        private const val SYS_STT_SILENCE_MS = 30_000
+        /**
+         * 系統 recognizer 早過放手幾多先當佢斬咗尾（見 [stopAiStt]）。
+         * 正路講完一句就放手，兩者差極都係幾百毫秒。
+         */
+        private const val SYS_STT_TAIL_MS = 1_500L
         /** 送去 AI 做上下文嘅字數：caret 前面／後面各攞幾多 */
         private const val STT_CONTEXT_BEFORE = 400
         private const val STT_CONTEXT_AFTER = 100
