@@ -346,7 +346,7 @@ object Prefs {
         fontScalePref(ctx, g) * if (g == PadGroup.LATIN) LATIN_FONT_BOOST else 1f
 
     /**
-     * **功能鍵**（同音、Eng、中、⌫、⏎、␣、?123…）鍵面用嘅倍數 ——
+     * **功能鍵**（同音、Eng、中、⌫、⏎、␣、!@#…）鍵面用嘅倍數 ——
      * 固定係 100%，**唔跟設定頁條 slider**（2026-08-29 user 要求）。
      *
      * 條 slider 係為咗睇清楚**啲字**（九宮格出嘅關聯字、英文字母、符號）而拉嘅；

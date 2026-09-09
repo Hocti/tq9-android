@@ -1,1416 +1,1416 @@
-♟	activity	black chess pawn
-♠	activity	black spade suit
-♣	activity	black club suit
-♥	activity	black heart suit
-♦	activity	black diamond suit
-♨	activity	hot springs
-⚽	activity	soccer ball 足球
-⚾	activity	baseball 棒球
-⛷	activity	skier
-⛸	activity	ice skate
-⛹	activity	person with ball
-🎀	activity	ribbon
-🎁	activity	wrapped present 禮物
-🎂	activity	birthday cake 生日蛋糕
-🎃	activity	jack o lantern
-🎄	activity	christmas tree
-🎆	activity	fireworks
-🎇	activity	firework sparkler
-🎈	activity	balloon 氣球
-🎉	activity	party popper 慶祝
-🎊	activity	confetti ball 慶祝
-🎋	activity	tanabata tree
-🎌	activity	crossed flags
-🎍	activity	pine decoration
-🎎	activity	japanese dolls
-🎏	activity	carp streamer
-🎐	activity	wind chime
-🎑	activity	moon viewing ceremony
-🎒	activity	school satchel 書包
-🎓	activity	graduation cap
-🎞	activity	film frames
-🎟	activity	admission tickets
-🎠	activity	carousel horse
-🎡	activity	ferris wheel
-🎢	activity	roller coaster
-🎣	activity	fishing pole and fish
-🎤	activity	microphone 唱歌 咪
-🎥	activity	movie camera
-🎦	activity	cinema
-🎧	activity	headphone 耳機
-🎨	activity	artist palette
-🎩	activity	top hat
-🎪	activity	circus tent
-🎫	activity	ticket
-🎬	activity	clapper board
-🎭	activity	performing arts
-🎮	activity	video game 打機
-🎯	activity	direct hit 目標
-🎰	activity	slot machine
-🎱	activity	billiards 桌球
-🎲	activity	game die 骰
-🎳	activity	bowling
-🎴	activity	flower playing cards
-🎵	activity	musical note 音樂
-🎶	activity	multiple musical notes 音樂
-🎷	activity	saxophone
-🎸	activity	guitar 結他
-🎹	activity	musical keyboard 琴
-🎺	activity	trumpet
-🎻	activity	violin
-🎼	activity	musical score
-🎽	activity	running shirt with sash
-🎾	activity	tennis racquet and ball 網球
-🎿	activity	ski and ski boot
-🏀	activity	basketball and hoop 籃球
-🏁	activity	chequered flag
-🏂	activity	snowboarder
-🏃	activity	runner
-🏄	activity	surfer
-🏅	activity	sports medal
-🏆	activity	trophy 獎盃 冠軍
-🏇	activity	horse racing
-🏈	activity	american football 欖球
-🏉	activity	rugby football
-🏊	activity	swimmer
-🏋	activity	weight lifter
-🏌	activity	golfer
-🏍	activity	racing motorcycle
-🏎	activity	racing car
-🏏	activity	cricket bat and ball
-🏐	activity	volleyball 排球
-🏑	activity	field hockey stick and ball
-🏒	activity	ice hockey stick and puck
-🏓	activity	table tennis paddle and ball
-🏔	activity	snow capped mountain
-🏕	activity	camping
-🏖	activity	beach with umbrella
-🏗	activity	building construction
-🏘	activity	house buildings
-🏙	activity	cityscape
-🏚	activity	derelict house building
-🏛	activity	classical building
-🏜	activity	desert
-🏝	activity	desert island
-🏞	activity	national park
-🏟	activity	stadium
-🏠	activity	house building 屋 家
-🏡	activity	house with garden
-🏢	activity	office building 大廈
-🏣	activity	japanese post office
-🏤	activity	european post office
-🏥	activity	hospital 醫院
-🏦	activity	bank 銀行
-🏧	activity	automated teller machine
-🏨	activity	hotel
-🏩	activity	love hotel
-🏪	activity	convenience store
-🏫	activity	school 學校
-🏬	activity	department store
-🏭	activity	factory
-🏮	activity	izakaya lantern
-🏯	activity	japanese castle
-🏰	activity	european castle
-🏳	activity	waving white flag
-🏴	activity	waving black flag
-🏵	activity	rosette
-🏸	activity	badminton racquet and shuttlecock
-🏹	activity	bow and arrow
-🏺	activity	amphora
-🤿	activity	diving mask
-🥀	activity	wilted flower
-🥁	activity	drum with drumsticks
-🥂	activity	clinking glasses
-🥃	activity	tumbler glass
-🥄	activity	spoon
-🥅	activity	goal net
-🥇	activity	first place medal 金牌
-🥈	activity	second place medal 銀牌
-🥉	activity	third place medal 銅牌
-🥊	activity	boxing glove
-🥋	activity	martial arts uniform
-🥌	activity	curling stone
-🧧	activity	red gift envelope
-🧨	activity	firecracker
-🧩	activity	jigsaw puzzle piece
-🧪	activity	test tube 試管
-🧫	activity	petri dish
-🧬	activity	dna double helix
-🧭	activity	compass
-🧮	activity	abacus
-🧯	activity	fire extinguisher
-🪀	activity	yo yo
-🪁	activity	kite
-🪂	activity	parachute
-🪃	activity	boomerang
-🪄	activity	magic wand
-🪅	activity	pinata
-🪆	activity	nesting dolls
-🪇	activity	maracas
-🪈	activity	flute
-🪐	activity	ringed planet
-🪑	activity	chair
-🪒	activity	razor
-🪓	activity	axe
-🪔	activity	diya lamp
-🪕	activity	banjo
-🌰	animal	chestnut
-🌱	animal	seedling
-🌲	animal	evergreen tree 樹
-🌳	animal	deciduous tree
-🌴	animal	palm tree
-🌵	animal	cactus
-🌶	animal	hot pepper
-🌷	animal	tulip 鬱金香
-🌸	animal	cherry blossom 櫻花
-🌹	animal	rose 玫瑰 花
-🌺	animal	hibiscus
-🌻	animal	sunflower 太陽花
-🌼	animal	blossom
-🌽	animal	ear of maize
-🌾	animal	ear of rice
-🌿	animal	herb
-🍀	animal	four leaf clover 四葉草 好運
-🍁	animal	maple leaf 楓葉
-🍂	animal	fallen leaf
-🍃	animal	leaf fluttering in wind
-🍄	animal	mushroom
-🐀	animal	rat
-🐁	animal	mouse
-🐂	animal	ox
-🐃	animal	water buffalo
-🐄	animal	cow
-🐅	animal	tiger
-🐆	animal	leopard
-🐇	animal	rabbit
-🐈	animal	cat
-🐉	animal	dragon
-🐊	animal	crocodile
-🐋	animal	whale
-🐌	animal	snail 蝸牛
-🐍	animal	snake 蛇
-🐎	animal	horse
-🐏	animal	ram
-🐐	animal	goat
-🐑	animal	sheep
-🐒	animal	monkey
-🐓	animal	rooster
-🐔	animal	chicken 雞
-🐕	animal	dog
-🐖	animal	pig
-🐗	animal	boar
-🐘	animal	elephant 大象
-🐙	animal	octopus 八爪魚
-🐚	animal	spiral shell
-🐛	animal	bug 蟲
-🐜	animal	ant
-🐝	animal	honeybee 蜜蜂
-🐞	animal	lady beetle
-🐟	animal	fish 魚
-🐠	animal	tropical fish
-🐡	animal	blowfish
-🐢	animal	turtle 龜
-🐣	animal	hatching chick
-🐤	animal	baby chick
-🐥	animal	front facing baby chick
-🐦	animal	bird 雀
-🐧	animal	penguin 企鵝
-🐨	animal	koala
-🐩	animal	poodle
-🐪	animal	dromedary camel
-🐫	animal	bactrian camel
-🐬	animal	dolphin 海豚
-🐭	animal	mouse face 老鼠
-🐮	animal	cow face 牛
-🐯	animal	tiger face 老虎
-🐰	animal	rabbit face 兔
-🐱	animal	cat face 貓
-🐲	animal	dragon face
-🐳	animal	spouting whale 鯨
-🐴	animal	horse face 馬
-🐵	animal	monkey face 馬騮
-🐶	animal	dog face 狗
-🐷	animal	pig face 豬
-🐸	animal	frog face 青蛙
-🐹	animal	hamster face
-🐺	animal	wolf face
-🐻	animal	bear face 熊
-🐼	animal	panda face 熊貓
-🐽	animal	pig nose
-🐾	animal	paw prints
-🐿	animal	chipmunk
-💐	animal	bouquet
-🕊	animal	dove of peace
-🦀	animal	crab
-🦁	animal	lion face 獅子
-🦂	animal	scorpion
-🦃	animal	turkey
-🦄	animal	unicorn face 獨角獸
-🦅	animal	eagle 鷹
-🦆	animal	duck 鴨
-🦇	animal	bat
-🦈	animal	shark 鯊魚
-🦉	animal	owl
-🦊	animal	fox face 狐狸
-🦋	animal	butterfly 蝴蝶
-🦌	animal	deer
-🦍	animal	gorilla
-🦎	animal	lizard
-🦏	animal	rhinoceros
-🦐	animal	shrimp
-🦑	animal	squid
-🦒	animal	giraffe face
-🦓	animal	zebra face
-🦔	animal	hedgehog
-🦕	animal	sauropod
-🦖	animal	t rex
-🦗	animal	cricket
-🦘	animal	kangaroo
-🦙	animal	llama
-🦚	animal	peacock
-🦛	animal	hippopotamus
-🦜	animal	parrot
-🦝	animal	raccoon
-🦞	animal	lobster
-🦟	animal	mosquito
-🦠	animal	microbe
-🦡	animal	badger
-🦢	animal	swan
-🦣	animal	mammoth
-🦤	animal	dodo
-🦥	animal	sloth
-🦦	animal	otter
-🦧	animal	orangutan
-🦨	animal	skunk
-🦩	animal	flamingo
-🦪	animal	oyster
-🦫	animal	beaver
-🦬	animal	bison
-🦭	animal	seal
-🦮	animal	guide dog
-🪰	animal	fly
-🪱	animal	worm
-🪲	animal	beetle
-🪳	animal	cockroach
-🪴	animal	potted plant
-🪵	animal	wood
-🪶	animal	feather
-🪷	animal	lotus
-🪸	animal	coral
-🪹	animal	empty nest
-🪺	animal	nest with eggs
-🪻	animal	hyacinth
-🪼	animal	jellyfish
-🪽	animal	wing
-🪿	animal	goose
-☹	face	white frowning face
-☺	face	white smiling face
-👻	face	ghost 鬼
-👼	face	baby angel
-👽	face	extraterrestrial alien 外星人
-👾	face	alien monster
-👿	face	imp 魔鬼
-💀	face	skull 死 骷髏
-💩	face	pile of poo 屎
-😀	face	grinning face 笑 開心
-😁	face	grinning face with smiling eyes 笑 開心
-😂	face	face with tears of joy 笑喊 喊
-😃	face	smiling face with open mouth 笑 開心
-😄	face	smiling face with open mouth and smiling eyes 笑 開心
-😅	face	smiling face with open mouth and cold sweat 苦笑 汗
-😆	face	smiling face with open mouth and tightly closed eyes 大笑
-😇	face	smiling face with halo 天使
-😈	face	smiling face with horns 奸
-😉	face	winking face 眨眼
-😊	face	smiling face with smiling eyes 微笑 害羞
-😋	face	face savouring delicious food 好味 舐
-😌	face	relieved face
-😍	face	smiling face with heart shaped eyes 心心 鍾意
-😎	face	smiling face with sunglasses 型 太陽鏡
-😏	face	smirking face 奸笑
-😐	face	neutral face 無表情
-😑	face	expressionless face 無語
-😒	face	unamused face 無癮 唔想
-😓	face	face with cold sweat 流汗
-😔	face	pensive face 失望 唔開心
-😕	face	confused face 唔明
-😖	face	confounded face 辛苦
-😗	face	kissing face 錫
-😘	face	face throwing a kiss 錫 飛吻
-😙	face	kissing face with smiling eyes
-😚	face	kissing face with closed eyes
-😛	face	face with stuck out tongue 伸脷
-😜	face	face with stuck out tongue and winking eye 扮鬼臉
-😝	face	face with stuck out tongue and tightly closed eyes 扮鬼臉
-😞	face	disappointed face 失望
-😟	face	worried face 擔心
-😠	face	angry face 嬲
-😡	face	pouting face 嬲 火滾
-😢	face	crying face 喊 傷心
-😣	face	persevering face 辛苦
-😤	face	face with look of triumph 嬲
-😥	face	disappointed but relieved face 失望
-😦	face	frowning face with open mouth 驚
-😧	face	anguished face 驚
-😨	face	fearful face 驚
-😩	face	weary face 攰
-😪	face	sleepy face 眼瞓
-😫	face	tired face 攰
-😬	face	grimacing face 尷尬
-😭	face	loudly crying face 大喊 傷心
-😮	face	face with open mouth 哦 驚訝
-😯	face	hushed face 驚訝
-😰	face	face with open mouth and cold sweat 驚 汗
-😱	face	face screaming in fear 嚇死
-😲	face	astonished face 嚇親
-😳	face	flushed face 面紅 尷尬
-😴	face	sleeping face 瞓覺 眼瞓
-😵	face	dizzy face 暈
-😶	face	face without mouth 唔出聲
-😷	face	face with medical mask 口罩
-😸	face	grinning cat face with smiling eyes
-😹	face	cat face with tears of joy 貓笑
-😺	face	smiling cat face with open mouth 貓
-😻	face	smiling cat face with heart shaped eyes
-😼	face	cat face with wry smile
-😽	face	kissing cat face with closed eyes
-😾	face	pouting cat face
-😿	face	crying cat face
-🙀	face	weary cat face
-🙁	face	slightly frowning face 唔開心
-🙂	face	slightly smiling face 微笑
-🙃	face	upside down face 倒轉
-🙄	face	face with rolling eyes 反白眼
-🙈	face	see no evil monkey
-🙉	face	hear no evil monkey
-🙊	face	speak no evil monkey
-🤐	face	zipper mouth face 收聲
-🤑	face	money mouth face 錢 發達
-🤒	face	face with thermometer 病
-🤓	face	nerd face 書呆子
-🤔	face	thinking face 諗 思考
-🤕	face	face with head bandage 受傷
-🤖	face	robot face 機械人
-🤗	face	hugging face 攬 抱
-🤘	face	sign of the horns 搖滾
-🤙	face	call me hand call me
-🤚	face	raised back of hand 手
-🤛	face	left facing fist
-🤜	face	right facing fist
-🤝	face	handshake 握手 合作
-🤞	face	hand with index and middle fingers crossed 祝好運
-🤟	face	i love you hand sign 愛你
-🤠	face	face with cowboy hat 牛仔
-🤡	face	clown face 小丑
-🤢	face	nauseated face 作嘔
-🤣	face	rolling on the floor laughing 爆笑 笑到
-🤤	face	drooling face 流口水
-🤥	face	lying face 講大話
-🤦	face	face palm
-🤧	face	sneezing face 打乞嗤
-🤨	face	face with one eyebrow raised 懷疑
-🤩	face	grinning face with star eyes 星星眼 勁
-🤪	face	grinning face with one large and one small eye 癲
-🤫	face	face with finger covering closed lips 噓 靜
-🤬	face	serious face with symbols covering mouth 鬧 粗口
-🤭	face	smiling face with smiling eyes and hand covering mouth 掩嘴
-🤮	face	face with open mouth vomiting 嘔
-🤯	face	shocked face with exploding head 爆炸 震驚
-🥰	face	smiling face with smiling eyes and three hearts 心心 鍾意
-🥱	face	yawning face 打呵欠 悶
-🥲	face	smiling face with tear
-🥳	face	face with party horn and party hat 慶祝 生日
-🥴	face	face with uneven eyes and wavy mouth 暈
-🥵	face	overheated face 熱
-🥶	face	freezing face 凍
-🥷	face	ninja
-🥸	face	disguised face
-🥹	face	face holding back tears
-🥺	face	face with pleading eyes 求你 可憐
-🌭	food	hot dog 熱狗
-🌮	food	taco
-🌯	food	burrito
-🍅	food	tomato
-🍆	food	aubergine
-🍇	food	grapes 提子
-🍈	food	melon
-🍉	food	watermelon 西瓜
-🍊	food	tangerine
-🍋	food	lemon
-🍌	food	banana 香蕉
-🍍	food	pineapple 菠蘿
-🍎	food	red apple 蘋果
-🍏	food	green apple
-🍐	food	pear
-🍑	food	peach 桃
-🍒	food	cherries
-🍓	food	strawberry 士多啤梨
-🍔	food	hamburger 漢堡
-🍕	food	slice of pizza 薄餅
-🍖	food	meat on bone
-🍗	food	poultry leg
-🍘	food	rice cracker
-🍙	food	rice ball
-🍚	food	cooked rice 飯
-🍛	food	curry and rice
-🍜	food	steaming bowl 麵
-🍝	food	spaghetti
-🍞	food	bread 麵包
-🍟	food	french fries 薯條
-🍠	food	roasted sweet potato
-🍡	food	dango
-🍢	food	oden
-🍣	food	sushi 壽司
-🍤	food	fried shrimp 蝦
-🍥	food	fish cake with swirl design
-🍦	food	soft ice cream 雪糕
-🍧	food	shaved ice
-🍨	food	ice cream
-🍩	food	doughnut 冬甩
-🍪	food	cookie 曲奇
-🍫	food	chocolate bar 朱古力
-🍬	food	candy 糖
-🍭	food	lollipop
-🍮	food	custard
-🍯	food	honey pot
-🍰	food	shortcake 蛋糕
-🍱	food	bento box 便當
-🍲	food	pot of food
-🍳	food	cooking 煎蛋
-🍴	food	fork and knife
-🍵	food	teacup without handle 茶
-🍶	food	sake bottle and cup
-🍷	food	wine glass 酒
-🍸	food	cocktail glass
-🍹	food	tropical drink
-🍺	food	beer mug 啤酒
-🍻	food	clinking beer mugs 飲勝
-🍼	food	baby bottle 奶樽
-🍽	food	fork and knife with plate
-🍾	food	bottle with popping cork
-🍿	food	popcorn
-🥐	food	croissant
-🥑	food	avocado
-🥒	food	cucumber
-🥓	food	bacon
-🥔	food	potato
-🥕	food	carrot
-🥖	food	baguette bread
-🥗	food	green salad
-🥘	food	shallow pan of food
-🥙	food	stuffed flatbread
-🥚	food	egg 蛋
-🥛	food	glass of milk
-🥜	food	peanuts
-🥝	food	kiwifruit
-🥞	food	pancakes
-🥟	food	dumpling
-🥠	food	fortune cookie
-🥡	food	takeout box
-🥢	food	chopsticks
-🥣	food	bowl with spoon
-🥤	food	cup with straw 飲品
-🥥	food	coconut
-🥦	food	broccoli
-🥧	food	pie
-🥨	food	pretzel
-🥩	food	cut of meat
-🥪	food	sandwich
-🥫	food	canned food
-🥬	food	leafy green
-🥭	food	mango
-🥮	food	moon cake
-🥯	food	bagel
-🧀	food	cheese wedge 芝士
-🧁	food	cupcake
-🧂	food	salt shaker
-🧃	food	beverage box
-🧄	food	garlic
-🧅	food	onion
-🧆	food	falafel
-🧇	food	waffle
-🧈	food	butter
-🧉	food	mate drink
-🧊	food	ice cube
-🧋	food	bubble tea
-🧌	food	troll
-🫐	food	blueberries
-🫑	food	bell pepper
-🫒	food	olive
-🫓	food	flatbread
-🫔	food	tamale
-🫕	food	fondue
-🫖	food	teapot
-🫗	food	pouring liquid
-🫘	food	beans
-🫙	food	jar
-🫚	food	ginger root
-🫛	food	pea pod
-☝	hand	white up pointing index 上
-✊	hand	raised fist
-✋	hand	raised hand 手 停
-✌	hand	victory hand 耶 勝利
-✍	hand	writing hand 寫
-👀	hand	eyes 眼 望
-👁	hand	eye 眼
-👂	hand	ear 耳
-👃	hand	nose 鼻
-👄	hand	mouth 嘴
-👅	hand	tongue 脷
-👆	hand	white up pointing backhand index 上
-👇	hand	white down pointing backhand index 下
-👈	hand	white left pointing backhand index 左
-👉	hand	white right pointing backhand index 右
-👊	hand	fisted hand sign
-👋	hand	waving hand sign 拜拜 你好
-👌	hand	ok hand sign ok
-👍	hand	thumbs up sign good 讚 好
-👎	hand	thumbs down sign 差 唔好
-👏	hand	clapping hands sign 拍手 叻
-👐	hand	open hands sign 手
-💅	hand	nail polish 指甲
-💪	hand	flexed biceps 力 加油
-🖐	hand	raised hand with fingers splayed 手
-🖕	hand	reversed hand with middle finger extended 中指
-🖖	hand	raised hand with part between middle and ring fingers 手
-🤲	hand	palms up together 手
-🤳	hand	selfie
-🦴	hand	bone
-🦵	hand	leg
-🦶	hand	foot
-🦷	hand	tooth
-🦸	hand	superhero
-🦹	hand	supervillain
-🦺	hand	safety vest
-🦻	hand	ear with hearing aid
-🦼	hand	motorized wheelchair
-🦽	hand	manual wheelchair
-🦾	hand	mechanical arm
-🦿	hand	mechanical leg
-🧠	hand	brain 腦
-🫀	hand	anatomical heart
-🫁	hand	lungs
-🫂	hand	people hugging
-🫰	hand	hand with index finger and thumb crossed
-🫱	hand	rightwards hand
-🫲	hand	leftwards hand
-🫳	hand	palm down hand
-🫴	hand	palm up hand
-🫵	hand	index pointing at the viewer
-🫶	hand	heart hands
-🫷	hand	leftwards pushing hand
-🫸	hand	rightwards pushing hand
-⌚	object	watch 錶
-⌛	object	hourglass
-⏩	object	black right pointing double triangle
-⏪	object	black left pointing double triangle
-⏫	object	black up pointing double triangle
-⏬	object	black down pointing double triangle
-⏭	object	black right pointing double triangle with vertical bar
-⏮	object	black left pointing double triangle with vertical bar
-⏯	object	black right pointing triangle with double vertical bar
-⏰	object	alarm clock
-⏱	object	stopwatch
-⏲	object	timer clock
-⏳	object	hourglass with flowing sand
-⏸	object	double vertical bar
-⏹	object	black square for stop
-⏺	object	black circle for record
-⚒	object	hammer and pick
-⚓	object	anchor
-⚔	object	crossed swords
-⚕	object	staff of aesculapius
-⚖	object	scales
-⚗	object	alembic
-⚙	object	gear
-⛏	object	pick
-⛑	object	helmet with white cross
-👕	object	t shirt 衫
-👖	object	jeans 褲
-👗	object	dress 裙
-👘	object	kimono
-👙	object	bikini
-👚	object	womans clothes
-👛	object	purse
-👜	object	handbag
-👝	object	pouch
-👞	object	mans shoe 鞋
-👟	object	athletic shoe 鞋
-👠	object	high heeled shoe
-👡	object	womans sandal
-👢	object	womans boots
-💈	object	barber pole
-💉	object	syringe 針
-💊	object	pill 藥
-💋	object	kiss mark
-💌	object	love letter
-💍	object	ring 戒指
-💎	object	gem stone 鑽石
-💏	object	kiss
-💠	object	diamond shape with a dot inside
-💡	object	electric light bulb 燈膽 諗到
-💢	object	anger symbol 嬲
-💣	object	bomb
-💤	object	sleeping symbol 瞓 眼瞓
-💥	object	collision symbol 爆
-💦	object	splashing sweat symbol 水 汗
-💧	object	droplet
-💨	object	dash symbol 走 風
-💫	object	dizzy symbol 暈
-💬	object	speech balloon
-💭	object	thought balloon
-💮	object	white flower
-💯	object	hundred points symbol 一百分 滿分
-💰	object	money bag 錢
-💱	object	currency exchange
-💲	object	heavy dollar sign
-💳	object	credit card 信用卡
-💴	object	banknote with yen sign
-💵	object	banknote with dollar sign 錢
-💶	object	banknote with euro sign
-💷	object	banknote with pound sign
-💸	object	money with wings
-💹	object	chart with upwards trend and yen sign
-💺	object	seat
-💻	object	personal computer 電腦
-💼	object	briefcase
-💽	object	minidisc
-💾	object	floppy disk
-💿	object	optical disc
-📀	object	dvd
-📁	object	file folder
-📂	object	open file folder
-📃	object	page with curl
-📄	object	page facing up
-📅	object	calendar
-📆	object	tear off calendar
-📇	object	card index
-📈	object	chart with upwards trend
-📉	object	chart with downwards trend
-📊	object	bar chart
-📋	object	clipboard
-📌	object	pushpin 釘
-📍	object	round pushpin
-📎	object	paperclip 萬字夾
-📏	object	straight ruler
-📐	object	triangular ruler
-📑	object	bookmark tabs
-📒	object	ledger
-📓	object	notebook
-📔	object	notebook with decorative cover
-📕	object	closed book
-📖	object	open book 書
-📗	object	green book
-📘	object	blue book
-📙	object	orange book
-📚	object	books 書
-📛	object	name badge
-📜	object	scroll
-📝	object	memo 寫 筆記
-📞	object	telephone receiver 電話
-📟	object	pager
-📠	object	fax machine
-📡	object	satellite antenna
-📢	object	public address loudspeaker 宣布
-📣	object	cheering megaphone
-📤	object	outbox tray
-📥	object	inbox tray
-📦	object	package 包裹
-📧	object	e mail symbol 電郵
-📨	object	incoming envelope
-📩	object	envelope with downwards arrow above 訊息
-📪	object	closed mailbox with lowered flag
-📫	object	closed mailbox with raised flag
-📬	object	open mailbox with raised flag
-📭	object	open mailbox with lowered flag
-📮	object	postbox
-📯	object	postal horn
-📰	object	newspaper
-📱	object	mobile phone 電話 手機
-📲	object	mobile phone with rightwards arrow at left
-📳	object	vibration mode
-📴	object	mobile phone off
-📵	object	no mobile phones
-📶	object	antenna with bars
-📷	object	camera 相機
-📸	object	camera with flash
-📹	object	video camera
-📺	object	television 電視
-📻	object	radio
-📼	object	videocassette
-📽	object	film projector
-📿	object	prayer beads
-🔦	object	electric torch
-🔧	object	wrench 士巴拿
-🔨	object	hammer 鎚
-🔩	object	nut and bolt
-🔪	object	hocho
-🔫	object	pistol
-🔬	object	microscope 顯微鏡
-🖥	object	desktop computer
-🖨	object	printer 打印機
-🖱	object	three button mouse
-🖲	object	trackball
-🖼	object	frame with picture
-🗂	object	card index dividers
-🗃	object	card file box
-🗄	object	file cabinet
-🗑	object	wastebasket
-🗒	object	spiral note pad
-🗓	object	spiral calendar pad
-🗜	object	compression
-🗝	object	old key
-🗞	object	rolled up newspaper
-🗡	object	dagger knife
-🗣	object	speaking head in silhouette
-🗩	object	right speech bubble
-🗳	object	ballot box with ballot
-🧰	object	toolbox
-🧱	object	brick
-🧲	object	magnet
-🧳	object	luggage
-🧴	object	lotion bottle
-🧵	object	spool of thread
-🧶	object	ball of yarn
-🧷	object	safety pin
-🧸	object	teddy bear 公仔
-🧹	object	broom 掃
-🧺	object	basket 籃
-🧻	object	roll of paper
-🧼	object	bar of soap
-🧽	object	sponge
-🧾	object	receipt 單
-🧿	object	nazar amulet
-🩰	object	ballet shoes
-🩱	object	one piece swimsuit
-🩲	object	briefs
-🩳	object	shorts
-🩴	object	thong sandal
-🩵	object	light blue heart
-🩶	object	grey heart
-🩷	object	pink heart
-🩸	object	drop of blood
-🩹	object	adhesive bandage
-🩺	object	stethoscope 醫生
-🩻	object	x ray
-🩼	object	crutch
-🎅	people	father christmas
-👤	people	bust in silhouette
-👥	people	busts in silhouette
-👦	people	boy
-👧	people	girl
-👨	people	man
-👩	people	woman
-👪	people	family
-👫	people	man and woman holding hands
-👬	people	two men holding hands
-👭	people	two women holding hands
-👮	people	police officer
-👯	people	woman with bunny ears
-👰	people	bride with veil
-👱	people	person with blond hair
-👲	people	man with gua pi mao
-👳	people	man with turban
-👴	people	older man
-👵	people	older woman
-👶	people	baby
-👷	people	construction worker
-👸	people	princess
-👹	people	japanese ogre
-👺	people	japanese goblin
-💁	people	information desk person
-💂	people	guardsman
-💃	people	dancer
-💄	people	lipstick 唇膏
-💆	people	face massage
-💇	people	haircut
-🕴	people	man in business suit levitating
-🕵	people	sleuth or spy
-🕶	people	dark sunglasses
-🕷	people	spider
-🕸	people	spider web
-🕹	people	joystick
-🕺	people	man dancing
-🙅	people	face with no good gesture
-🙆	people	face with ok gesture
-🙇	people	person bowing deeply
-🙋	people	happy person raising one hand
-🙌	people	person raising both hands in celebration 萬歲
-🙍	people	person frowning
-🙎	people	person with pouting face
-🙏	people	person with folded hands 唔該 拜託 祈禱
-🚴	people	bicyclist
-🚵	people	mountain bicyclist
-🚶	people	pedestrian
-🛀	people	bath
-🛌	people	sleeping accommodation
-🤰	people	pregnant woman
-🤱	people	breast feeding
-🤼	people	wrestlers
-🤽	people	water polo
-🤾	people	handball
-🧍	people	standing person
-🧎	people	kneeling person
-🧏	people	deaf person
-🧐	people	face with monocle 研究
-🧑	people	adult
-🧒	people	child
-🧓	people	older adult
-🧔	people	bearded person
-🧕	people	person with headscarf
-🧖	people	person in steamy room
-🧗	people	person climbing
-🧘	people	person in lotus position
-🧙	people	mage
-🧚	people	fairy
-🧛	people	vampire
-🧜	people	merperson
-🧝	people	elf
-🧞	people	genie
-🧟	people	zombie
-©	symbol	copyright sign
-®	symbol	registered sign
-‼	symbol	double exclamation mark
-⁉	symbol	exclamation question mark
-™	symbol	trade mark sign
-ℹ	symbol	information source
-↔	symbol	left right arrow
-↕	symbol	up down arrow
-↖	symbol	north west arrow
-↗	symbol	north east arrow
-↘	symbol	south east arrow
-↙	symbol	south west arrow
-↩	symbol	leftwards arrow with hook
-↪	symbol	rightwards arrow with hook
-Ⓜ	symbol	circled latin capital letter m
-▪	symbol	black small square
-▫	symbol	white small square
-▶	symbol	black right pointing triangle
-◀	symbol	black left pointing triangle
-◻	symbol	white medium square
-◼	symbol	black medium square
-◽	symbol	white medium small square
-◾	symbol	black medium small square
-☀	symbol	black sun with rays 太陽 晴
-☁	symbol	cloud 雲 陰
-☂	symbol	umbrella 遮
-☃	symbol	snowman
-☄	symbol	comet
-☎	symbol	black telephone
-☑	symbol	ballot box with check
-☔	symbol	umbrella with rain drops
-☕	symbol	hot beverage 咖啡
-☘	symbol	shamrock
-☠	symbol	skull and crossbones
-☢	symbol	radioactive sign
-☣	symbol	biohazard sign
-☦	symbol	orthodox cross
-☪	symbol	star and crescent
-☮	symbol	peace symbol
-☯	symbol	yin yang
-☸	symbol	wheel of dharma
-♀	symbol	female sign
-♂	symbol	male sign
-♈	symbol	aries
-♉	symbol	taurus
-♊	symbol	gemini
-♋	symbol	cancer
-♌	symbol	leo
-♍	symbol	virgo
-♎	symbol	libra
-♏	symbol	scorpius
-♐	symbol	sagittarius
-♑	symbol	capricorn
-♒	symbol	aquarius
-♓	symbol	pisces
-♻	symbol	black universal recycling symbol 回收
-♾	symbol	permanent paper sign
-♿	symbol	wheelchair symbol
-⚛	symbol	atom symbol
-⚜	symbol	fleur de lis
-⚠	symbol	warning sign 小心 警告
-⚡	symbol	high voltage sign 閃電
-⚧	symbol	male with stroke and male and female sign
-⚪	symbol	medium white circle
-⚫	symbol	medium black circle
-⚰	symbol	coffin
-⚱	symbol	funeral urn
-⛄	symbol	snowman without snow 雪人
-⛅	symbol	sun behind cloud
-⛈	symbol	thunder cloud and rain 雷雨
-⛎	symbol	ophiuchus
-⛓	symbol	chains
-⛔	symbol	no entry
-✂	symbol	black scissors 剪刀
-✅	symbol	white heavy check mark 啱 得
-✏	symbol	pencil 鉛筆
-✒	symbol	black nib
-✔	symbol	heavy check mark
-✖	symbol	heavy multiplication x
-✝	symbol	latin cross
-✡	symbol	star of david
-✨	symbol	sparkles 閃 靚
-✳	symbol	eight spoked asterisk
-✴	symbol	eight pointed black star
-❄	symbol	snowflake 雪 凍
-❇	symbol	sparkle
-❌	symbol	cross mark 錯 唔得
-❎	symbol	negative squared cross mark
-❓	symbol	black question mark ornament 問號
-❔	symbol	white question mark ornament
-❕	symbol	white exclamation mark ornament
-❗	symbol	heavy exclamation mark symbol 感嘆號
-❣	symbol	heavy heart exclamation mark ornament
-❤	symbol	heavy black heart 心 愛
-➕	symbol	heavy plus sign
-➖	symbol	heavy minus sign
-➗	symbol	heavy division sign
-➡	symbol	black rightwards arrow 右 箭嘴
-➰	symbol	curly loop
-➿	symbol	double curly loop
-⤴	symbol	arrow pointing rightwards then curving upwards
-⤵	symbol	arrow pointing rightwards then curving downwards
-⬅	symbol	leftwards black arrow 左 箭嘴
-⬆	symbol	upwards black arrow 上 箭嘴
-⬇	symbol	downwards black arrow 下 箭嘴
-⬛	symbol	black large square
-⬜	symbol	white large square
-⭐	symbol	white medium star 星
-⭕	symbol	heavy large circle
-〰	symbol	wavy dash
-〽	symbol	part alternation mark
-㊗	symbol	circled ideograph congratulation
-㊙	symbol	circled ideograph secret
-🀄	symbol	mahjong tile red dragon
-🃏	symbol	playing card black joker
-🅰	symbol	negative squared latin capital letter a
-🅱	symbol	negative squared latin capital letter b
-🅾	symbol	negative squared latin capital letter o
-🅿	symbol	negative squared latin capital letter p
-🆎	symbol	negative squared ab
-🆑	symbol	squared cl
-🆒	symbol	squared cool
-🆓	symbol	squared free 免費
-🆔	symbol	squared id
-🆕	symbol	squared new 新
-🆖	symbol	squared ng
-🆗	symbol	squared ok ok
-🆘	symbol	squared sos
-🆙	symbol	squared up with exclamation mark
-🆚	symbol	squared vs
-🈁	symbol	squared katakana koko
-🈂	symbol	squared katakana sa
-🈚	symbol	squared cjk unified ideograph 7121
-🈯	symbol	squared cjk unified ideograph 6307
-🈲	symbol	squared cjk unified ideograph 7981 禁
-🈳	symbol	squared cjk unified ideograph 7a7a
-🈴	symbol	squared cjk unified ideograph 5408
-🈵	symbol	squared cjk unified ideograph 6e80
-🈶	symbol	squared cjk unified ideograph 6709
-🈷	symbol	squared cjk unified ideograph 6708
-🈸	symbol	squared cjk unified ideograph 7533
-🈹	symbol	squared cjk unified ideograph 5272
-🈺	symbol	squared cjk unified ideograph 55b6
-🉐	symbol	circled ideograph advantage 得
-🉑	symbol	circled ideograph accept
-👑	symbol	crown 皇冠
-👒	symbol	womans hat
-👓	symbol	eyeglasses 眼鏡
-👔	symbol	necktie
-👣	symbol	footprints
-💑	symbol	couple with heart
-💒	symbol	wedding
-💓	symbol	beating heart 心
-💔	symbol	broken heart 心碎 失戀
-💕	symbol	two hearts 心 愛
-💖	symbol	sparkling heart 心
-💗	symbol	growing heart 心
-💘	symbol	heart with arrow 心
-💙	symbol	blue heart 心
-💚	symbol	green heart 心
-💛	symbol	yellow heart 心
-💜	symbol	purple heart 心
-💝	symbol	heart with ribbon 心 禮物
-💞	symbol	revolving hearts 心
-💟	symbol	heart decoration
-🔀	symbol	twisted rightwards arrows
-🔁	symbol	clockwise rightwards and leftwards open circle arrows
-🔂	symbol	clockwise rightwards and leftwards open circle arrows with circled one overlay
-🔃	symbol	clockwise downwards and upwards open circle arrows
-🔄	symbol	anticlockwise downwards and upwards open circle arrows 重新
-🔅	symbol	low brightness symbol
-🔆	symbol	high brightness symbol
-🔇	symbol	speaker with cancellation stroke 靜音
-🔈	symbol	speaker
-🔉	symbol	speaker with one sound wave
-🔊	symbol	speaker with three sound waves 大聲
-🔋	symbol	battery 電池
-🔌	symbol	electric plug 插頭
-🔍	symbol	left pointing magnifying glass 搵 搜尋
-🔎	symbol	right pointing magnifying glass 搵 搜尋
-🔏	symbol	lock with ink pen
-🔐	symbol	closed lock with key
-🔑	symbol	key 鎖匙
-🔒	symbol	lock 鎖
-🔓	symbol	open lock
-🔔	symbol	bell 鐘 通知
-🔕	symbol	bell with cancellation stroke 靜音
-🔖	symbol	bookmark
-🔗	symbol	link symbol
-🔘	symbol	radio button
-🔙	symbol	back with leftwards arrow above
-🔚	symbol	end with leftwards arrow above
-🔛	symbol	on with exclamation mark with left right arrow above
-🔜	symbol	soon with rightwards arrow above
-🔝	symbol	top with upwards arrow above
-🔞	symbol	no one under eighteen symbol 十八禁
-🔟	symbol	keycap ten
-🔠	symbol	input symbol for latin capital letters
-🔡	symbol	input symbol for latin small letters
-🔢	symbol	input symbol for numbers
-🔣	symbol	input symbol for symbols
-🔤	symbol	input symbol for latin letters
-🔥	symbol	fire 火 勁
-🔭	symbol	telescope
-🔮	symbol	crystal ball
-🔯	symbol	six pointed star with middle dot
-🔰	symbol	japanese symbol for beginner
-🔱	symbol	trident emblem
-🔲	symbol	black square button
-🔳	symbol	white square button
-🔴	symbol	large red circle
-🔵	symbol	large blue circle
-🔶	symbol	large orange diamond
-🔷	symbol	large blue diamond
-🔸	symbol	small orange diamond
-🔹	symbol	small blue diamond
-🔺	symbol	up pointing red triangle
-🔻	symbol	down pointing red triangle
-🔼	symbol	up pointing small red triangle
-🔽	symbol	down pointing small red triangle
-🕉	symbol	om symbol
-🕋	symbol	kaaba
-🕌	symbol	mosque
-🕍	symbol	synagogue
-🕎	symbol	menorah with nine branches
-🕐	symbol	clock face one oclock 時間
-🕑	symbol	clock face two oclock
-🕒	symbol	clock face three oclock
-🕓	symbol	clock face four oclock
-🕔	symbol	clock face five oclock
-🕕	symbol	clock face six oclock
-🕖	symbol	clock face seven oclock
-🕗	symbol	clock face eight oclock
-🕘	symbol	clock face nine oclock
-🕙	symbol	clock face ten oclock
-🕚	symbol	clock face eleven oclock
-🕛	symbol	clock face twelve oclock
-🕜	symbol	clock face one thirty
-🕝	symbol	clock face two thirty
-🕞	symbol	clock face three thirty
-🕟	symbol	clock face four thirty
-🕠	symbol	clock face five thirty
-🕡	symbol	clock face six thirty
-🕢	symbol	clock face seven thirty
-🕣	symbol	clock face eight thirty
-🕤	symbol	clock face nine thirty
-🕥	symbol	clock face ten thirty
-🕦	symbol	clock face eleven thirty
-🕧	symbol	clock face twelve thirty
-🕰	symbol	mantelpiece clock
-🕳	symbol	hole 窿
-🖤	symbol	black heart 黑心
-🟠	symbol	large orange circle
-🟡	symbol	large yellow circle
-🟢	symbol	large green circle
-🟣	symbol	large purple circle
-🟤	symbol	large brown circle
-🟥	symbol	large red square
-🟦	symbol	large blue square
-🟧	symbol	large orange square
-🟨	symbol	large yellow square
-🟩	symbol	large green square
-🟪	symbol	large purple square
-🟫	symbol	large brown square
-🤌	symbol	pinched fingers
-🤍	symbol	white heart 白心
-🤎	symbol	brown heart
-🤏	symbol	pinching hand
-🤴	symbol	prince
-🤵	symbol	man in tuxedo
-🤶	symbol	mother christmas
-🤷	symbol	shrug
-🤸	symbol	person doing cartwheel
-🤹	symbol	juggling
-🤺	symbol	fencer
-🥍	symbol	lacrosse stick and ball
-🥎	symbol	softball
-🥏	symbol	flying disc
-🥻	symbol	sari
-🥼	symbol	lab coat
-🥽	symbol	goggles
-🥾	symbol	hiking boot
-🥿	symbol	flat shoe
-🦯	symbol	probing cane
-🧡	symbol	orange heart 心
-🧢	symbol	billed cap 帽
-🧣	symbol	scarf
-🧤	symbol	gloves
-🧥	symbol	coat
-🧦	symbol	socks
-🪖	symbol	military helmet
-🪗	symbol	accordion
-🪘	symbol	long drum
-🪙	symbol	coin
-🪚	symbol	carpentry saw
-🪛	symbol	screwdriver
-🪜	symbol	ladder
-🪝	symbol	hook
-🪞	symbol	mirror
-🪟	symbol	window
-🪠	symbol	plunger
-🪡	symbol	sewing needle
-🪢	symbol	knot
-🪣	symbol	bucket
-🪤	symbol	mouse trap
-🪥	symbol	toothbrush
-🪦	symbol	headstone
-🪧	symbol	placard
-🪨	symbol	rock
-🪩	symbol	mirror ball
-🪪	symbol	identification card
-🪫	symbol	low battery
-🪬	symbol	hamsa
-🪭	symbol	folding hand fan
-🪮	symbol	hair pick
-🪯	symbol	khanda
-🫃	symbol	pregnant man
-🫄	symbol	pregnant person
-🫅	symbol	person with crown
-🫎	symbol	moose
-🫏	symbol	donkey
-🫠	symbol	melting face
-🫡	symbol	saluting face
-🫢	symbol	face with open eyes and hand over mouth
-🫣	symbol	face with peeking eye
-🫤	symbol	face with diagonal mouth
-🫥	symbol	dotted line face
-🫦	symbol	biting lip
-🫧	symbol	bubbles
-🫨	symbol	shaking face
-⛩	travel	shinto shrine
-⛪	travel	church 教堂
-⛰	travel	mountain
-⛱	travel	umbrella on ground
-⛲	travel	fountain
-⛳	travel	flag in hole
-⛴	travel	ferry
-⛵	travel	sailboat
-⛺	travel	tent
-⛽	travel	fuel pump
-✈	travel	airplane 飛機
-✉	travel	envelope
-🌀	travel	cyclone
-🌁	travel	foggy
-🌂	travel	closed umbrella
-🌃	travel	night with stars
-🌄	travel	sunrise over mountains
-🌅	travel	sunrise
-🌆	travel	cityscape at dusk
-🌇	travel	sunset over buildings
-🌈	travel	rainbow 彩虹
-🌉	travel	bridge at night
-🌊	travel	water wave 海 浪
-🌋	travel	volcano
-🌌	travel	milky way
-🌍	travel	earth globe europe africa 地球
-🌎	travel	earth globe americas
-🌏	travel	earth globe asia australia
-🌐	travel	globe with meridians
-🌑	travel	new moon symbol
-🌒	travel	waxing crescent moon symbol
-🌓	travel	first quarter moon symbol
-🌔	travel	waxing gibbous moon symbol
-🌕	travel	full moon symbol
-🌖	travel	waning gibbous moon symbol
-🌗	travel	last quarter moon symbol
-🌘	travel	waning crescent moon symbol
-🌙	travel	crescent moon 月
-🌚	travel	new moon with face
-🌛	travel	first quarter moon with face
-🌜	travel	last quarter moon with face
-🌝	travel	full moon with face
-🌞	travel	sun with face
-🌟	travel	glowing star 星
-🌠	travel	shooting star
-🌡	travel	thermometer
-🌤	travel	white sun with small cloud
-🌥	travel	white sun behind cloud
-🌦	travel	white sun behind cloud with rain
-🌧	travel	cloud with rain 落雨
-🌨	travel	cloud with snow
-🌩	travel	cloud with lightning
-🌪	travel	cloud with tornado
-🌫	travel	fog
-🌬	travel	wind blowing face
-🗺	travel	world map
-🗻	travel	mount fuji
-🗼	travel	tokyo tower 塔
-🗽	travel	statue of liberty
-🗾	travel	silhouette of japan
-🗿	travel	moyai
-🚀	travel	rocket 火箭
-🚁	travel	helicopter 直升機
-🚂	travel	steam locomotive 火車
-🚃	travel	railway car
-🚄	travel	high speed train
-🚅	travel	high speed train with bullet nose
-🚆	travel	train
-🚇	travel	metro 地鐵
-🚈	travel	light rail
-🚉	travel	station
-🚊	travel	tram
-🚋	travel	tram car
-🚌	travel	bus 巴士
-🚍	travel	oncoming bus
-🚎	travel	trolleybus
-🚏	travel	bus stop
-🚐	travel	minibus
-🚑	travel	ambulance 救護車
-🚒	travel	fire engine 消防車
-🚓	travel	police car
-🚔	travel	oncoming police car
-🚕	travel	taxi 的士
-🚖	travel	oncoming taxi
-🚗	travel	automobile 車
-🚘	travel	oncoming automobile
-🚙	travel	recreational vehicle
-🚚	travel	delivery truck
-🚛	travel	articulated lorry
-🚜	travel	tractor
-🚝	travel	monorail
-🚞	travel	mountain railway
-🚟	travel	suspension railway
-🚠	travel	mountain cableway
-🚡	travel	aerial tramway
-🚢	travel	ship 船
-🚣	travel	rowboat
-🚤	travel	speedboat
-🚥	travel	horizontal traffic light
-🚦	travel	vertical traffic light 紅綠燈
-🚧	travel	construction sign
-🚨	travel	police cars revolving light
-🚩	travel	triangular flag on post
-🚪	travel	door
-🚫	travel	no entry sign 禁止
-🚬	travel	smoking symbol
-🚭	travel	no smoking symbol
-🚮	travel	put litter in its place symbol
-🚯	travel	do not litter symbol
-🚰	travel	potable water symbol
-🚱	travel	non potable water symbol
-🚲	travel	bicycle 單車
-🚳	travel	no bicycles
-🚷	travel	no pedestrians
-🚸	travel	children crossing
-🚹	travel	mens symbol
-🚺	travel	womens symbol
-🚻	travel	restroom
-🚼	travel	baby symbol
-🚽	travel	toilet
-🚾	travel	water closet
-🚿	travel	shower
-🛁	travel	bathtub
-🛂	travel	passport control
-🛃	travel	customs
-🛄	travel	baggage claim
-🛅	travel	left luggage
-🛋	travel	couch and lamp
-🛍	travel	shopping bags
-🛎	travel	bellhop bell
-🛏	travel	bed
-🛐	travel	place of worship
-🛑	travel	octagonal sign
-🛒	travel	shopping trolley 買嘢
-🛕	travel	hindu temple
-🛖	travel	hut
-🛗	travel	elevator
-🛜	travel	wireless
-🛝	travel	playground slide
-🛞	travel	wheel
-🛟	travel	ring buoy
-🛠	travel	hammer and wrench
-🛡	travel	shield
-🛢	travel	oil drum
-🛣	travel	motorway
-🛤	travel	railway track
-🛥	travel	motor boat
-🛩	travel	small airplane
-🛫	travel	airplane departure
-🛬	travel	airplane arriving
-🛰	travel	satellite
-🛳	travel	passenger ship
-🛴	travel	scooter
-🛵	travel	motor scooter 綿羊仔
-🛶	travel	canoe
-🛷	travel	sled
-🛸	travel	flying saucer
-🛹	travel	skateboard
-🛺	travel	auto rickshaw
-🛻	travel	pickup truck
-🛼	travel	roller skate
-🇭🇰	flag	flag hk hong kong 香港 旗
-🇹🇼	flag	flag tw taiwan 台灣 旗
-🇨🇳	flag	flag cn china 中國 旗
-🇯🇵	flag	flag jp japan 日本 旗
-🇰🇷	flag	flag kr korea 韓國 旗
-🇺🇸	flag	flag us united states america 美國 旗
-🇬🇧	flag	flag gb united kingdom britain 英國 旗
-🇫🇷	flag	flag fr france 法國 旗
-🇩🇪	flag	flag de germany 德國 旗
-🇮🇹	flag	flag it italy 意大利 旗
-🇪🇸	flag	flag es spain 西班牙 旗
-🇵🇹	flag	flag pt portugal 葡萄牙 旗
-🇳🇱	flag	flag nl netherlands 荷蘭 旗
-🇧🇪	flag	flag be belgium 旗
-🇨🇭	flag	flag ch switzerland 瑞士 旗
-🇸🇪	flag	flag se sweden 瑞典 旗
-🇳🇴	flag	flag no norway 旗
-🇩🇰	flag	flag dk denmark 旗
-🇫🇮	flag	flag fi finland 旗
-🇷🇺	flag	flag ru russia 俄羅斯 旗
-🇺🇦	flag	flag ua ukraine 旗
-🇨🇦	flag	flag ca canada 加拿大 旗
-🇲🇽	flag	flag mx mexico 旗
-🇧🇷	flag	flag br brazil 巴西 旗
-🇦🇷	flag	flag ar argentina 旗
-🇦🇺	flag	flag au australia 澳洲 旗
-🇳🇿	flag	flag nz new zealand 紐西蘭 旗
-🇮🇳	flag	flag in india 印度 旗
-🇮🇩	flag	flag id indonesia 印尼 旗
-🇲🇾	flag	flag my malaysia 馬來西亞 旗
-🇸🇬	flag	flag sg singapore 新加坡 旗
-🇹🇭	flag	flag th thailand 泰國 旗
-🇻🇳	flag	flag vn vietnam 越南 旗
-🇵🇭	flag	flag ph philippines 菲律賓 旗
-🇲🇴	flag	flag mo macau 澳門 旗
-🇹🇷	flag	flag tr turkey 旗
-🇬🇷	flag	flag gr greece 希臘 旗
-🇵🇱	flag	flag pl poland 旗
-🇮🇪	flag	flag ie ireland 旗
-🇦🇹	flag	flag at austria 旗
-🇨🇿	flag	flag cz czechia 旗
-🇮🇱	flag	flag il israel 旗
-🇸🇦	flag	flag sa saudi arabia 旗
-🇦🇪	flag	flag ae united arab emirates 旗
-🇪🇬	flag	flag eg egypt 埃及 旗
-🇿🇦	flag	flag za south africa 旗
-🇳🇬	flag	flag ng nigeria 旗
-🇰🇪	flag	flag ke kenya 旗
-🇵🇰	flag	flag pk pakistan 旗
-🇧🇩	flag	flag bd bangladesh 旗
-🇳🇵	flag	flag np nepal 旗
-🏳	flag	flag white 旗
-🏴	flag	flag black 旗
-🏁	flag	flag chequered checkered finish 終點 旗
-🚩	flag	flag triangular 旗
+♟	activity	chess pawn black chess pawn expendable black dupe game piece
+♠	activity	spade suit black spade suit poker cards suits magic black card game spades
+♣	activity	club suit black club suit poker cards magic suits black card clubs game
+♥	activity	heart suit black heart suit poker cards magic suits black card game hearts
+♦	activity	diamond suit black diamond suit poker cards magic suits black card diamonds game
+♨	activity	hot springs bath warm relax hotsprings onsen steam steaming
+⚽	activity	soccer ball sports football
+⚾	activity	baseball sports balls ball softball
+⛷	activity	skier sports winter snow ski
+⛸	activity	ice skate sports skating
+⛹	activity	person bouncing ball person with ball sports human basketball player
+🎀	activity	ribbon decoration pink girl bowtie bow celebration
+🎁	activity	wrapped gift wrapped present present birthday christmas xmas box celebration entertainment
+🎂	activity	birthday cake food dessert cake candles celebration party pastry sweet
+🎃	activity	jack-o-lantern jack o lantern halloween light pumpkin creepy fall activity celebration entertainment gourd
+🎄	activity	christmas tree festival vacation december xmas celebration activity entertainment xmas tree
+🎆	activity	fireworks photo festival carnival congratulations activity celebration entertainment explosion
+🎇	activity	sparkler firework sparkler stars night shine activity celebration entertainment firework fireworks hanabi senko sparkle
+🎈	activity	balloon party celebration birthday circus activity entertainment red
+🎉	activity	party popper party congratulations birthday magic circus celebration tada activity entertainment hat hooray
+🎊	activity	confetti ball festival party birthday circus activity celebration entertainment
+🎋	activity	tanabata tree plant nature branch summer bamboo wish star festival tanzaku activity banner celebration entertainment japanese
+🎌	activity	crossed flags japanese nation country border activity celebration cross flag two
+🎍	activity	pine decoration japanese plant nature vegetable panda new years bamboo activity celebration kadomatsu year
+🎎	activity	japanese dolls japanese toy kimono activity celebration doll entertainment festival hinamatsuri imperial
+🎏	activity	carp streamer fish japanese koinobori carp banner activity celebration entertainment flag flags socks wind
+🎐	activity	wind chime nature ding spring bell activity celebration entertainment furin jellyfish
+🎑	activity	moon viewing ceremony photo japan asia tsukimi activity autumn celebration dumplings entertainment festival grass harvest mid rice scene
+🎒	activity	backpack school satchel student education bag activity rucksack satchel school
+🎓	activity	graduation cap school college degree university graduation cap hat legal learn education academic activity board celebration clothing graduate mortar square
+🎞	activity	film frames movie cinema entertainment strip
+🎟	activity	admission tickets sports concert entrance entertainment ticket
+🎠	activity	carousel horse photo carnival activity entertainment fairground go merry round
+🎡	activity	ferris wheel photo carnival londoneye activity amusement big entertainment fairground observation park
+🎢	activity	roller coaster carnival playground photo fun activity amusement entertainment park rollercoaster theme
+🎣	activity	fishing pole fishing pole and fish food hobby summer entertainment fish rod
+🎤	activity	microphone sound music pa sing talkshow activity entertainment karaoke mic singing
+🎥	activity	movie camera film record activity cinema entertainment hollywood video
+🎦	activity	cinema blue-square record film movie curtain stage theater activity camera entertainment movies screen symbol
+🎧	activity	headphone music score gadgets activity earbud earphone earphones entertainment headphones ipod
+🎨	activity	artist palette design paint draw colors activity art entertainment museum painting improve
+🎩	activity	top hat magic gentleman classy circus activity clothing entertainment formal groom tophat wear
+🎪	activity	circus tent festival carnival party activity big entertainment top
+🎫	activity	ticket event concert pass activity admission entertainment stub tour world
+🎬	activity	clapper board movie film record activity clapboard director entertainment slate
+🎭	activity	performing arts acting theater drama activity art comedy entertainment greek logo mask masks theatre theatre masks tragedy
+🎮	activity	video game play console ps4 controller entertainment gamepad playstation u wii xbox
+🎯	activity	bullseye direct hit game play bar target activity archery bull dart darts entertainment eye
+🎰	activity	slot machine bet gamble vegas fruit machine luck casino activity gambling game poker
+🎱	activity	pool 8 ball billiards pool hobby game luck magic 8ball billiard cue eight snooker
+🎲	activity	game die dice random tabletop play luck entertainment gambling
+🎳	activity	bowling sports fun play ball game pin pins skittles ten
+🎴	activity	flower playing cards game sunset red activity card deck entertainment hanafuda hwatu japanese of cards
+🎵	activity	musical note score tone sound activity beamed eighth entertainment music notes pair quavers
+🎶	activity	musical notes multiple musical notes music score activity entertainment multiple note singing
+🎷	activity	saxophone music instrument jazz blues activity entertainment sax
+🎸	activity	guitar music instrument acoustic guitar activity bass electric entertainment rock
+🎹	activity	musical keyboard piano instrument compose activity entertainment music
+🎺	activity	trumpet music brass activity entertainment horn instrument jazz
+🎻	activity	violin music instrument orchestra symphony activity entertainment quartet smallest string worlds
+🎼	activity	musical score treble clef compose activity entertainment music sheet
+🎽	activity	running shirt running shirt with sash play pageant athletics marathon sash singlet
+🎾	activity	tennis tennis racquet and ball sports balls green ball racket racquet
+🎿	activity	skis ski and ski boot sports winter cold snow boot ski skiing
+🏀	activity	basketball basketball and hoop sports balls nba ball hoop orange
+🏁	activity	chequered flag contest finishline race gokart checkered finish girl grid milestone racing
+🏂	activity	snowboarder sports winter ski snow snowboard snowboarding
+🏃	activity	person running runner move exercise jogging marathon run workout
+🏄	activity	person surfing surfer sport sea surf
+🏅	activity	sports medal award winning gold winner
+🏆	activity	trophy win award contest place ftw ceremony championship prize winner winners
+🏇	activity	horse racing animal betting competition gambling luck jockey race racehorse
+🏈	activity	american football sports balls nfl ball gridiron superbowl
+🏉	activity	rugby football sports team ball league union
+🏊	activity	person swimming swimmer sport pool swim
+🏋	activity	person lifting weights weight lifter sports training exercise bodybuilder gym lifter weight weightlifter workout
+🏌	activity	person golfing golfer sports business ball club golf
+🏍	activity	motorcycle racing motorcycle race sports fast motorbike racing
+🏎	activity	racing car sports race fast formula f1 one
+🏏	activity	cricket game cricket bat and ball sports ball bat field
+🏐	activity	volleyball sports balls ball game
+🏑	activity	field hockey field hockey stick and ball sports ball game stick
+🏒	activity	ice hockey ice hockey stick and puck sports game puck stick
+🏓	activity	ping pong table tennis paddle and ball sports pingpong ball bat game paddle table tennis
+🏔	activity	snow-capped mountain snow capped mountain photo nature environment winter cold
+🏕	activity	camping photo outdoors tent campsite
+🏖	activity	beach with umbrella weather summer sunny sand mojito
+🏗	activity	building construction wip working progress crane architectural
+🏘	activity	houses house buildings buildings photo building group house
+🏙	activity	cityscape photo night life urban building city skyline
+🏚	activity	derelict house derelict house building abandon evict broken building abandoned haunted old
+🏛	activity	classical building art culture history
+🏜	activity	desert photo warm saharah
+🏝	activity	desert island photo tropical mojito
+🏞	activity	national park photo environment nature
+🏟	activity	stadium photo place sports concert venue grandstand sport
+🏠	activity	house house building building home
+🏡	activity	house with garden home plant nature building tree
+🏢	activity	office building building bureau work city high rise
+🏣	activity	japanese post office building envelope communication japan mark postal
+🏤	activity	post office european post office building email european
+🏥	activity	hospital building health surgery doctor cross emergency medical medicine red room
+🏦	activity	bank building money sales cash business enterprise bakkureru bk branch
+🏧	activity	atm sign automated teller machine money sales cash blue-square payment bank automated machine teller
+🏨	activity	hotel building accomodation checkin accommodation h
+🏩	activity	love hotel like affection dating building heart hospital
+🏪	activity	convenience store building shopping groceries corner e eleven® hour kwik mart shop
+🏫	activity	school building student education learn teach clock elementary high middle tower
+🏬	activity	department store building shopping mall center shops
+🏭	activity	factory building industry pollution smoke industrial smog
+🏮	activity	red paper lantern izakaya lantern light paper halloween spooky asian bar izakaya japanese
+🏯	activity	japanese castle photo building fortress
+🏰	activity	castle european castle building royalty history european turrets
+🏳	activity	white flag waving white flag losing loser lost surrender give up fail waving
+🏴	activity	black flag waving black flag pirate waving
+🏵	activity	rosette flower decoration military plant
+🏸	activity	badminton badminton racquet and shuttlecock sports birdie game racquet shuttlecock
+🏹	activity	bow and arrow sports archer archery sagittarius tool zodiac
+🏺	activity	amphora vase jar aquarius cooking drink jug tool zodiac
+🤿	activity	diving mask sport ocean scuba snorkeling
+🥀	activity	wilted flower plant nature flower rose dead drooping
+🥁	activity	drum drum with drumsticks music instrument drumsticks snare
+🥂	activity	clinking glasses beverage drink party alcohol celebrate cheers wine champagne toast celebration clink glass
+🥃	activity	tumbler glass drink beverage drunk alcohol liquor booze bourbon scotch whisky glass shot rum whiskey
+🥄	activity	spoon cutlery kitchen tableware
+🥅	activity	goal net sports catch
+🥇	activity	1st place medal first place medal award winning first gold
+🥈	activity	2nd place medal second place medal award second silver
+🥉	activity	3rd place medal third place medal award third bronze
+🥊	activity	boxing glove sports fighting
+🥋	activity	martial arts uniform judo karate taekwondo
+🥌	activity	curling stone sports game rock
+🧧	activity	red envelope red gift envelope gift ang good hóngbāo lai luck money packet pao see
+🧨	activity	firecracker dynamite boom explode explosion explosive fireworks
+🧩	activity	puzzle piece jigsaw puzzle piece interlocking puzzle piece clue jigsaw
+🧪	activity	test tube chemistry experiment lab science chemist test
+🧫	activity	petri dish bacteria biology culture lab biologist
+🧬	activity	dna dna double helix biologist genetics life double evolution gene helix
+🧭	activity	compass magnetic navigation orienteering
+🧮	activity	abacus calculation count counting frame math
+🧯	activity	fire extinguisher quench extinguish
+🪀	activity	yo-yo yo yo toy fluctuate yoyo
+🪁	activity	kite wind fly soar toy
+🪂	activity	parachute fly glide hang parasail skydive
+🪃	activity	boomerang weapon australia rebound repercussion
+🪄	activity	magic wand supernature power witch wizard
+🪅	activity	piñata pinata mexico candy celebration party
+🪆	activity	nesting dolls matryoshka toy doll russia russian
+🪇	activity	maracas music instrument percussion shaker
+🪈	activity	flute bamboo music instrument pied piper recorder
+🪐	activity	ringed planet outerspace planets saturn saturnine space
+🪑	activity	chair sit furniture seat
+🪒	activity	razor cut sharp shave
+🪓	activity	axe tool chop cut hatchet split wood
+🪔	activity	diya lamp lighting oil
+🪕	activity	banjo music instructment activity entertainment instrument stringed
+🌰	animal	chestnut food squirrel acorn nut plant
+🌱	animal	seedling plant nature grass lawn spring sprout sprouting young seed
+🌲	animal	evergreen tree plant nature fir pine wood
+🌳	animal	deciduous tree plant nature rounded shedding wood
+🌴	animal	palm tree plant vegetable nature summer beach mojito tropical coconut
+🌵	animal	cactus vegetable plant nature desert
+🌶	animal	hot pepper food spicy chilli chili plant
+🌷	animal	tulip flowers plant nature summer spring flower
+🌸	animal	cherry blossom nature plant spring flower pink sakura
+🌹	animal	rose flowers valentines love spring flower plant red
+🌺	animal	hibiscus plant vegetable flowers beach flower
+🌻	animal	sunflower nature plant fall flower sun yellow
+🌼	animal	blossom nature flowers yellow blossoming flower daisy flower plant
+🌽	animal	ear of corn ear of maize food vegetable plant cob maize maze
+🌾	animal	sheaf of rice ear of rice nature plant crop ear farming grain wheat
+🌿	animal	herb vegetable plant medicine weed grass lawn crop leaf
+🍀	animal	four leaf clover vegetable plant nature lucky irish ireland luck
+🍁	animal	maple leaf nature plant vegetable ca fall canada canadian falling
+🍂	animal	fallen leaf nature plant vegetable leaves autumn brown fall falling
+🍃	animal	leaf fluttering in wind nature plant tree vegetable grass lawn spring blow flutter green leaves
+🍄	animal	mushroom plant vegetable fungus shroom toadstool
+🐀	animal	rat animal mouse rodent
+🐁	animal	mouse animal nature rodent dormouse mice mouse2
+🐂	animal	ox animal cow beef bull bullock oxen steer taurus zodiac
+🐃	animal	water buffalo animal nature ox cow domestic
+🐄	animal	cow beef ox animal nature moo milk cow2 dairy
+🐅	animal	tiger animal nature roar bengal tiger2
+🐆	animal	leopard animal nature african jaguar
+🐇	animal	rabbit animal nature pet magic spring bunny rabbit2
+🐈	animal	cat animal meow pet cats cat2 domestic feline housecat
+🐉	animal	dragon animal myth nature chinese green fairy tale
+🐊	animal	crocodile animal nature reptile lizard alligator croc
+🐋	animal	whale animal nature sea ocean whale2
+🐌	animal	snail slow animal shell garden slug
+🐍	animal	snake animal evil nature hiss python bearer ophiuchus serpent zodiac
+🐎	animal	horse animal gamble luck equestrian galloping racehorse racing speed
+🐏	animal	ram animal sheep nature aries male zodiac
+🐐	animal	goat animal nature capricorn zodiac
+🐑	animal	ewe sheep animal nature wool shipit female lamb
+🐒	animal	monkey animal nature banana circus cheeky
+🐓	animal	rooster animal nature chicken bird cock cockerel
+🐔	animal	chicken animal cluck nature bird hen
+🐕	animal	dog animal nature friend doge pet faithful dog2 doggo
+🐖	animal	pig animal nature hog pig2 sow
+🐗	animal	boar animal nature pig warthog wild
+🐘	animal	elephant animal nature nose th circus
+🐙	animal	octopus animal creature ocean sea nature beach
+🐚	animal	spiral shell nature sea beach seashell
+🐛	animal	bug animal insect nature worm caterpillar
+🐜	animal	ant animal insect nature bug
+🐝	animal	honeybee animal insect nature bug spring honey bee bumblebee
+🐞	animal	lady beetle animal insect nature ladybug bug ladybird
+🐟	animal	fish animal food nature freshwater pisces zodiac
+🐠	animal	tropical fish animal swim ocean beach nemo blue yellow
+🐡	animal	blowfish animal nature food sea ocean fish fugu pufferfish
+🐢	animal	turtle animal slow nature tortoise terrapin
+🐣	animal	hatching chick animal chicken egg born baby bird
+🐤	animal	baby chick animal chicken bird yellow
+🐥	animal	front-facing baby chick front facing baby chick animal chicken baby bird hatched standing
+🐦	animal	bird animal nature fly tweet spring
+🐧	animal	penguin animal nature bird
+🐨	animal	koala animal nature bear face marsupial
+🐩	animal	poodle dog animal 101 nature pet miniature standard toy
+🐪	animal	camel dromedary camel animal hot desert hump arabian bump dromedary one
+🐫	animal	two-hump camel bactrian camel two hump camel animal nature hot desert hump asian bactrian bump
+🐬	animal	dolphin animal nature fish sea ocean flipper fins beach
+🐭	animal	mouse face animal nature cheese wedge rodent
+🐮	animal	cow face beef ox animal nature moo milk happy
+🐯	animal	tiger face animal cat danger wild nature roar cute
+🐰	animal	rabbit face animal nature pet spring magic bunny easter
+🐱	animal	cat face animal meow nature pet kitten kitty
+🐲	animal	dragon face animal myth nature chinese green fairy head tale
+🐳	animal	spouting whale animal nature sea ocean cute face
+🐴	animal	horse face animal brown nature head
+🐵	animal	monkey face animal nature circus head
+🐶	animal	dog face animal friend nature woof puppy pet faithful
+🐷	animal	pig face animal oink nature head
+🐸	animal	frog frog face animal nature croak toad face
+🐹	animal	hamster hamster face animal nature face pet
+🐺	animal	wolf wolf face animal nature wild face
+🐻	animal	bear bear face animal nature wild face teddy
+🐼	animal	panda panda face animal nature face
+🐽	animal	pig nose animal oink face snout
+🐾	animal	paw prints animal tracking footprints dog cat pet feet kitten print puppy
+🐿	animal	chipmunk animal nature rodent squirrel
+💐	animal	bouquet flowers nature spring flower plant romance
+🕊	animal	dove dove of peace animal bird fly peace
+🦀	animal	crab animal crustacean cancer zodiac
+🦁	animal	lion lion face animal nature face leo zodiac
+🦂	animal	scorpion animal arachnid scorpio scorpius zodiac
+🦃	animal	turkey animal bird thanksgiving wild
+🦄	animal	unicorn unicorn face animal nature mystical face
+🦅	animal	eagle animal nature bird bald
+🦆	animal	duck animal nature bird mallard
+🦇	animal	bat animal nature blind vampire batman
+🦈	animal	shark animal nature fish sea ocean jaws fins beach great white
+🦉	animal	owl animal nature bird hoot wise
+🦊	animal	fox fox face animal nature face
+🦋	animal	butterfly animal insect nature caterpillar pretty
+🦌	animal	deer animal nature horns venison buck reindeer stag
+🦍	animal	gorilla animal nature circus
+🦎	animal	lizard animal nature reptile gecko
+🦏	animal	rhinoceros animal nature horn rhino
+🦐	animal	shrimp animal ocean nature seafood food prawn shellfish small
+🦑	animal	squid animal nature ocean sea food molusc
+🦒	animal	giraffe giraffe face animal nature spots safari face
+🦓	animal	zebra zebra face animal nature stripes safari face stripe
+🦔	animal	hedgehog animal nature spiny face
+🦕	animal	sauropod animal nature dinosaur brachiosaurus brontosaurus diplodocus extinct
+🦖	animal	t-rex t rex animal nature dinosaur tyrannosaurus extinct trex
+🦗	animal	cricket animal chirp grasshopper insect orthoptera
+🦘	animal	kangaroo animal nature australia joey hop marsupial jump roo
+🦙	animal	llama animal nature alpaca guanaco vicuña wool
+🦚	animal	peacock animal nature peahen bird ostentatious proud
+🦛	animal	hippopotamus animal nature hippo
+🦜	animal	parrot animal nature bird pirate talk
+🦝	animal	raccoon animal nature curious face sly
+🦞	animal	lobster animal nature bisque claws seafood
+🦟	animal	mosquito animal nature insect malaria disease fever pest virus
+🦠	animal	microbe amoeba bacteria germs virus covid cell coronavirus germ microorganism
+🦡	animal	badger animal nature honey pester
+🦢	animal	swan animal nature bird cygnet duckling ugly
+🦣	animal	mammoth elephant tusks extinct extinction large tusk woolly
+🦤	animal	dodo animal bird extinct extinction large mauritius obsolete
+🦥	animal	sloth animal lazy slow
+🦦	animal	otter animal fishing playful
+🦧	animal	orangutan animal ape
+🦨	animal	skunk animal smelly stink
+🦩	animal	flamingo animal flamboyant tropical
+🦪	animal	oyster food diving pearl
+🦫	animal	beaver animal rodent dam
+🦬	animal	bison ox buffalo herd wisent
+🦭	animal	seal animal creature sea lion
+🦮	animal	guide dog animal blind accessibility eye seeing
+🪰	animal	fly insect disease maggot pest rotting
+🪱	animal	worm animal annelid earthworm parasite
+🪲	animal	beetle insect bug
+🪳	animal	cockroach insect pests pest roach
+🪴	animal	potted plant greenery house boring grow houseplant nurturing useless
+🪵	animal	wood nature timber trunk construction log lumber
+🪶	animal	feather bird fly flight light plumage
+🪷	animal	lotus flower calm meditation buddhism hinduism india purity vietnam
+🪸	animal	coral ocean sea reef
+🪹	animal	empty nest bird nesting
+🪺	animal	nest with eggs bird nesting
+🪻	animal	hyacinth flower lavender
+🪼	animal	jellyfish sting tentacles
+🪽	animal	wing angel birds flying fly
+🪿	animal	goose silly jemima goosebumps honk
+☹	face	frowning face white frowning face face sad upset frown megafrown unhappy white
+☺	face	smiling face white smiling face face blush massage happiness happy outlined pleased relaxed smile smiley white
+👻	face	ghost halloween spooky scary creature disappear face fairy fantasy ghoul monster tale
+👼	face	baby angel heaven wings halo cherub cupid face fairy fantasy putto tale
+👽	face	alien extraterrestrial alien ufo paul weird outer space creature et extraterrestrial face fairy fantasy monster tale external
+👾	face	alien monster game arcade play creature extraterrestrial face fairy fantasy invader retro space tale ufo video
+👿	face	angry face with horns imp devil angry horns demon evil fairy fantasy goblin purple sad tale
+💀	face	skull dead skeleton creepy death body danger face fairy grey halloween monster poison tale
+💩	face	pile of poo hankey shitface fail turd shit comic crap dirt dog dung face monster poop smiling bad needs improvement
+😀	face	grinning face face smile happy joy d grin smiley
+😁	face	beaming face with smiling eyes grinning face with smiling eyes face happy smile joy kawaii eye grin grinning
+😂	face	face with tears of joy face cry tears weep happy happytears haha crying laugh laughing lol tear
+😃	face	grinning face with big eyes smiling face with open mouth face happy joy haha d smile funny mouth open smiley smiling
+😄	face	grinning face with smiling eyes smiling face with open mouth and smiling eyes face happy joy funny haha laugh like d smile eye grin mouth open pleased smiley
+😅	face	grinning face with sweat smiling face with open mouth and cold sweat face hot happy laugh sweat smile relief cold exercise mouth open smiling
+😆	face	grinning squinting face smiling face with open mouth and tightly closed eyes happy joy lol satisfied haha face glad xd laugh big closed eyes grin laughing mouth open smile smiling tightly
+😇	face	smiling face with halo face angel heaven halo innocent fairy fantasy smile tale
+😈	face	smiling face with horns devil horns evil fairy fantasy happy imp purple red devil smile tale
+😉	face	winking face face happy mischievous secret smile eye flirt wink winky
+😊	face	smiling face with smiling eyes face smile happy flushed crush embarrassed shy joy blush eye proud smiley
+😋	face	face savoring food face savouring delicious food happy joy tongue smile face silly yummy nom delicious savouring goofy hungry lick licking lips smiling um yum
+😌	face	relieved face face relaxed phew massage happiness content pleased whew
+😍	face	smiling face with heart-eyes smiling face with heart shaped eyes smiling face with heart eyes face love like affection valentines infatuation crush heart eye shaped smile
+😎	face	smiling face with sunglasses face cool smile summer beach sunglass best bright eye eyewear friends glasses mutual snapchat sun weather
+😏	face	smirking face face smile mean prank smug sarcasm flirting sexual smirk suggestive
+😐	face	neutral face indifference meh neutral deadpan faced mouth straight
+😑	face	expressionless face face indifferent meh deadpan inexpressive mouth straight unexpressive
+😒	face	unamused face indifference bored straight face serious sarcasm unimpressed skeptical dubious ugh side eye dissatisfied meh unhappy
+😓	face	downcast face with sweat face with cold sweat face hot sad tired exercise cold hard work
+😔	face	pensive face face sad depressed upset dejected sadface sorrowful
+😕	face	confused face face indifference huh weird hmmm meh nonplussed puzzled s
+😖	face	confounded face face confused sick unwell oops s mouth quivering scrunched
+😗	face	kissing face love like face 3 valentines infatuation kiss duck kissy whistling
+😘	face	face blowing a kiss face throwing a kiss face love like affection valentines infatuation kiss blow flirt heart kissing throwing
+😙	face	kissing face with smiling eyes face affection valentines infatuation kiss eye kissy smile whistle whistling
+😚	face	kissing face with closed eyes face love like affection valentines infatuation kiss eye kissy
+😛	face	face with tongue face with stuck out tongue face prank childish playful mischievous smile tongue cheeky out stuck
+😜	face	winking face with tongue face with stuck out tongue and winking eye face prank childish playful mischievous smile wink tongue crazy eye joke out silly stuck
+😝	face	squinting face with tongue face with stuck out tongue and tightly closed eyes face prank playful mischievous smile tongue closed eye eyes horrible out stuck taste tightly
+😞	face	disappointed face face sad upset depressed sadface
+😟	face	worried face face concern nervous sad sadface
+😠	face	angry face mad face annoyed frustrated anger grumpy
+😡	face	enraged face pouting face angry mad hate despise enraged grumpy pout rage red
+😢	face	crying face face tears sad depressed upset cry tear
+😣	face	persevering face face sick no upset oops eyes helpless persevere scrunched struggling
+😤	face	face with steam from nose face with look of triumph face gas phew proud pride triumph airing frustrated grievances look mad smug steaming won
+😥	face	sad but relieved face disappointed but relieved face face phew sweat nervous disappointed eyebrow whew
+😦	face	frowning face with open mouth face aw what frown yawning
+😧	face	anguished face face stunned nervous pained
+😨	face	fearful face face scared terrified nervous fear oops shocked surprised
+😩	face	weary face face tired sleepy sad frustrated upset distraught wailing
+😪	face	sleepy face face tired rest nap bubble side sleep snot tear
+😫	face	tired face sick whine upset frustrated distraught exhausted fed up
+😬	face	grimacing face face grimace teeth awkward eek nervous
+😭	face	loudly crying face sobbing face cry tears sad upset depressed bawling sob tear
+😮	face	face with open mouth face surprise impressed wow whoa o surprised sympathy
+😯	face	hushed face face woo shh silence speechless stunned surprise surprised
+😰	face	anxious face with sweat face with open mouth and cold sweat face nervous sweat blue cold concerned face mouth open rushed
+😱	face	face screaming in fear face munch scared omg alone fearful home horror scream shocked
+😲	face	astonished face face xox surprised poisoned amazed drunk face gasp gasping shocked totally
+😳	face	flushed face face blush shy flattered blushing dazed embarrassed eyes open shame wide
+😴	face	sleeping face face tired sleepy night zzz sleep snoring
+😵	face	face with crossed-out eyes dizzy face spent unconscious xox dizzy cross crossed dead eyes knocked out spiral eyes
+😶	face	face without mouth face blank mouthless mute no quiet silence silent
+😷	face	face with medical mask face sick ill disease covid cold coronavirus doctor medicine surgical
+😸	face	grinning cat with smiling eyes grinning cat face with smiling eyes animal cats smile eye face grin happy
+😹	face	cat with tears of joy cat face with tears of joy animal cats haha happy tears face laughing tear
+😺	face	grinning cat smiling cat face with open mouth animal cats happy smile face mouth open smiley smiling
+😻	face	smiling cat with heart-eyes smiling cat face with heart shaped eyes smiling cat with heart eyes animal love like affection cats valentines heart eye face loving cat shaped smile
+😼	face	cat with wry smile cat face with wry smile animal cats smirk face ironic smirking
+😽	face	kissing cat kissing cat face with closed eyes animal cats kiss closed eye eyes face
+😾	face	pouting cat pouting cat face animal cats face grumpy
+😿	face	crying cat crying cat face animal tears weep sad cats upset cry face sad cat tear
+🙀	face	weary cat weary cat face animal cats munch scared scream face fear horror oh screaming surprised
+🙁	face	slightly frowning face face frowning disappointed sad upset frown unhappy
+🙂	face	slightly smiling face face smile fine happy this
+🙃	face	upside-down face upside down face face flipped silly smile sarcasm
+🙄	face	face with rolling eyes face eyeroll frustrated eye roll
+🙈	face	see-no-evil monkey see no evil monkey monkey animal nature haha blind covering eyes face forbidden gesture ignore mizaru not prohibited
+🙉	face	hear-no-evil monkey hear no evil monkey animal monkey nature covering deaf ears face forbidden gesture kikazaru not prohibited
+🙊	face	speak-no-evil monkey speak no evil monkey monkey animal nature omg covering face forbidden gesture hush iwazaru mouth mute not no speaking prohibited ignore
+🤐	face	zipper-mouth face zipper mouth face face sealed zipper secret hush lips silence zip
+🤑	face	money-mouth face money mouth face face rich dollar money eyes sign
+🤒	face	face with thermometer sick temperature thermometer cold fever covid ill
+🤓	face	nerd face face nerdy geek dork glasses smiling
+🤔	face	thinking face face hmmm think consider chin shade thinker throwing thumb
+🤕	face	face with head-bandage face with head bandage injured clumsy bandage hurt bandaged injury
+🤖	face	robot robot face computer machine bot face monster
+🤗	face	smiling face with open hands hugging face face smile hug hands hugs open smiling
+🤘	hand	sign of the horns hand fingers evil eye sign of horns rock on body devil finger heavy metal
+🤙	hand	call me hand call me hand call me hands gesture shaka body phone sign
+🤚	hand	raised back of hand fingers raised backhand body
+🤛	hand	left-facing fist left facing fist hand fistbump body bump leftwards
+🤜	hand	right-facing fist right facing fist hand fistbump body bump rightwards right fist
+🤝	hand	handshake agreement shake deal hand hands meeting shaking
+🤞	hand	crossed fingers hand with index and middle fingers crossed good lucky body cross finger hand hopeful index luck middle
+🤟	hand	love-you gesture i love you hand sign love you gesture hand fingers gesture body i ily sign
+🤠	face	cowboy hat face face with cowboy hat face cowgirl hat
+🤡	face	clown face face mock
+🤢	face	nauseated face face vomit gross green sick throw up ill barf disgust disgusted green face
+🤣	face	rolling on the floor laughing face rolling floor laughing lol haha rofl laugh rotfl
+🤤	face	drooling face face drool
+🤥	face	lying face face lie pinocchio liar long nose
+🤦	people	person facepalming face palm disappointed disbelief exasperation face facepalm head hitting palm picard smh
+🤧	face	sneezing face face gesundheit sneeze sick allergy achoo
+🤨	face	face with raised eyebrow face with one eyebrow raised face distrust scepticism disapproval disbelief surprise suspicious colbert mild one rock skeptic
+🤩	face	star-struck grinning face with star eyes star struck face smile starry eyes grinning excited eyed wow
+🤪	face	zany face grinning face with one large and one small eye face goofy crazy excited eye eyes grinning large one small wacky wild
+🤫	face	shushing face face with finger covering closed lips face quiet shhh closed covering finger hush lips shh shush silence
+🤬	face	face with symbols on mouth serious face with symbols covering mouth face swearing cursing cussing profanity expletive covering foul grawlix over serious
+🤭	face	face with hand over mouth smiling face with smiling eyes and hand covering mouth face whoops shock surprise blushing covering eyes quiet smiling
+🤮	face	face vomiting face with open mouth vomiting face sick barf ill mouth open puke spew throwing up vomit
+🤯	face	exploding head shocked face with exploding head face shocked mind blown blowing explosion mad
+🥰	face	smiling face with hearts smiling face with smiling eyes and three hearts face love like affection valentines infatuation crush hearts adore eyes three
+🥱	face	yawning face tired sleepy bored yawn
+🥲	face	smiling face with tear sad cry pretend grateful happy proud relieved smile touched
+🥳	face	partying face face with party horn and party hat face celebration woohoo birthday hat horn party
+🥴	face	woozy face face with uneven eyes and wavy mouth face dizzy intoxicated tipsy wavy drunk eyes groggy mouth uneven
+🥵	face	hot face overheated face face feverish heat red sweating overheated stroke
+🥶	face	cold face freezing face face blue freezing frozen frostbite icicles ice
+🥷	face	ninja ninjutsu skills japanese fighter hidden stealth
+🥸	face	disguised face pretent brows glasses moustache disguise incognito nose
+🥹	face	face holding back tears touched gratitude cry angry proud resist sad
+🥺	face	pleading face face with pleading eyes face begging mercy cry tears sad grievance eyes glossy puppy simp
+🌭	food	hot dog food frankfurter america hotdog redhot sausage wiener
+🌮	food	taco food mexican
+🌯	food	burrito food mexican wrap
+🍅	food	tomato fruit vegetable nature food plant
+🍆	food	eggplant aubergine vegetable nature food phallic plant purple
+🍇	food	grapes fruit food wine grape plant
+🍈	food	melon fruit nature food cantaloupe honeydew muskmelon plant
+🍉	food	watermelon fruit food picnic summer plant
+🍊	food	tangerine food fruit nature orange mandarin plant
+🍋	food	lemon fruit nature citrus lemonade plant
+🍌	food	banana fruit food monkey plant plantain
+🍍	food	pineapple fruit nature food plant
+🍎	food	red apple fruit mac school delicious plant
+🍏	food	green apple fruit nature delicious golden granny plant smith
+🍐	food	pear fruit nature food plant
+🍑	food	peach fruit nature food bottom butt plant
+🍒	food	cherries food fruit berries cherry plant red wild
+🍓	food	strawberry fruit food nature berry plant
+🍔	food	hamburger meat fast food beef cheeseburger mcdonalds burger king
+🍕	food	pizza slice of pizza food party italy cheese pepperoni slice
+🍖	food	meat on bone good food drumstick barbecue bbq manga
+🍗	food	poultry leg food meat drumstick bird chicken turkey bone
+🍘	food	rice cracker food japanese snack senbei
+🍙	food	rice ball food japanese onigiri omusubi
+🍚	food	cooked rice food asian boiled bowl steamed
+🍛	food	curry rice curry and rice food spicy hot indian
+🍜	food	steaming bowl food japanese noodle chopsticks ramen noodles soup
+🍝	food	spaghetti food italian pasta noodle
+🍞	food	bread food wheat breakfast toast loaf
+🍟	food	french fries chips snack fast food potato mcdonald's
+🍠	food	roasted sweet potato food nature plant goguma yam
+🍡	food	dango food dessert sweet japanese barbecue meat balls green pink skewer stick white
+🍢	food	oden skewer food japanese kebab seafood stick
+🍣	food	sushi food fish japanese rice sashimi seafood
+🍤	food	fried shrimp food animal appetizer summer prawn tempura
+🍥	food	fish cake with swirl fish cake with swirl design food japan sea beach narutomaki pink swirl kamaboko surimi ramen design fishcake pastry
+🍦	food	soft ice cream food hot dessert summer icecream mr. serve sweet whippy
+🍧	food	shaved ice hot dessert summer cone snow sweet
+🍨	food	ice cream food hot dessert bowl sweet
+🍩	food	doughnut food dessert snack sweet donut breakfast
+🍪	food	cookie food snack oreo chocolate sweet dessert biscuit chip
+🍫	food	chocolate bar food snack dessert sweet candy
+🍬	food	candy snack dessert sweet lolly
+🍭	food	lollipop food snack candy sweet dessert lollypop sucker
+🍮	food	custard dessert food pudding flan caramel creme sweet
+🍯	food	honey pot bees sweet kitchen honeypot
+🍰	food	shortcake food dessert cake pastry piece slice strawberry sweet
+🍱	food	bento box food japanese box lunch assets
+🍲	food	pot of food food meat soup hot pot bowl stew
+🍳	food	cooking food breakfast kitchen egg skillet fried frying pan
+🍴	food	fork and knife cutlery kitchen cooking silverware tableware
+🍵	food	teacup without handle drink bowl breakfast green british beverage cup matcha tea
+🍶	food	sake sake bottle and cup wine drink drunk beverage japanese alcohol booze bar bottle cup rice
+🍷	food	wine glass drink beverage drunk alcohol booze bar red
+🍸	food	cocktail glass drink drunk alcohol beverage booze mojito bar martini
+🍹	food	tropical drink beverage cocktail summer beach alcohol booze mojito bar fruit punch tiki vacation
+🍺	food	beer mug relax beverage drink drunk party pub summer alcohol booze bar stein
+🍻	food	clinking beer mugs relax beverage drink drunk party pub summer alcohol booze bar beers cheers clink drinks mug
+🍼	food	baby bottle food container milk drink feeding
+🍽	food	fork and knife with plate food eat meal lunch dinner restaurant cooking cutlery dining tableware
+🍾	food	bottle with popping cork drink wine bottle celebration bar bubbly champagne party sparkling
+🍿	food	popcorn food movie theater films snack drama corn popping
+🥐	food	croissant food bread french breakfast crescent roll
+🥑	food	avocado fruit food
+🥒	food	cucumber fruit food pickle gherkin vegetable
+🥓	food	bacon food breakfast pork pig meat brunch rashers
+🥔	food	potato food tuber vegatable starch baked idaho vegetable
+🥕	food	carrot vegetable food orange
+🥖	food	baguette bread food bread french france bakery
+🥗	food	green salad food healthy lettuce vegetable
+🥘	food	shallow pan of food food cooking casserole paella skillet curry
+🥙	food	stuffed flatbread food flatbread stuffed gyro mediterranean doner falafel kebab pita sandwich shawarma
+🥚	food	egg food chicken breakfast easter egg
+🥛	food	glass of milk beverage drink cow
+🥜	food	peanuts food nut nuts peanut vegetable
+🥝	food	kiwi fruit kiwifruit fruit food chinese gooseberry
+🥞	food	pancakes food breakfast flapjacks hotcakes brunch crêpe crêpes hotcake pancake
+🥟	food	dumpling food empanada pierogi potsticker gyoza gyōza jiaozi
+🥠	food	fortune cookie food prophecy dessert
+🥡	food	takeout box food leftovers chinese container out oyster pail take
+🥢	food	chopsticks food hashi jeotgarak kuaizi
+🥣	food	bowl with spoon food breakfast cereal oatmeal porridge congee tableware
+🥤	food	cup with straw drink soda go juice malt milkshake pop smoothie soft tableware water
+🥥	food	coconut fruit nature food palm cocoanut colada piña
+🥦	food	broccoli fruit food vegetable cabbage wild
+🥧	food	pie food dessert pastry filling sweet
+🥨	food	pretzel food bread twisted germany bakery soft twist
+🥩	food	cut of meat food cow meat cut chop lambchop porkchop steak
+🥪	food	sandwich food lunch bread toast bakery cheese deli meat vegetables
+🥫	food	canned food food soup tomatoes can preserve tin tinned
+🥬	food	leafy green food vegetable plant bok choy cabbage kale lettuce chinese cos greens romaine
+🥭	food	mango fruit food tropical
+🥮	food	moon cake food autumn dessert festival mooncake yuèbǐng
+🥯	food	bagel food bread bakery schmear jewish bakery breakfast cheese cream
+🧀	food	cheese wedge food chadder swiss
+🧁	food	cupcake food dessert bakery sweet cake fairy pastry
+🧂	food	salt salt shaker condiment shaker
+🧃	food	beverage box drink juice straw sweet
+🧄	food	garlic food spice cook flavoring plant vegetable
+🧅	food	onion cook food spice flavoring plant vegetable
+🧆	food	falafel food mediterranean chickpea falfel meatball
+🧇	food	waffle food breakfast brunch indecisive iron
+🧈	food	butter food cook dairy
+🧉	food	mate mate drink drink tea beverage bombilla chimarrão cimarrón maté yerba
+🧊	food	ice ice cube water cold cube iceberg
+🧋	food	bubble tea taiwan boba milk tea straw momi pearl tapioca
+🧌	food	troll mystical monster fairy fantasy tale shrek
+🫐	food	blueberries fruit berry bilberry blue blueberry
+🫑	food	bell pepper fruit plant capsicum vegetable
+🫒	food	olive fruit food olives
+🫓	food	flatbread flour food bakery arepa bread flat lavash naan pita
+🫔	food	tamale food masa mexican tamal wrapped
+🫕	food	fondue cheese pot food chocolate melted swiss
+🫖	food	teapot drink hot kettle pot tea
+🫗	food	pouring liquid cup water drink empty glass spill
+🫘	food	beans food kidney legume
+🫙	food	jar container sauce condiment empty store
+🫚	food	ginger root spice yellow cooking gingerbread
+🫛	food	pea pod cozy green
+☝	hand	index pointing up white up pointing index hand fingers direction up body finger point secret white
+✊	hand	raised fist fingers hand grasp body clenched power pump punch
+✋	hand	raised hand fingers stop highfive palm ban body five high
+✌	hand	victory hand fingers ohyeah hand peace victory two air body quotes sign v
+✍	hand	writing hand lower left ballpoint pen stationery write compose body
+👀	hand	eyes look watch stalk peek see body eye eyeballs face shifty wide
+👁	hand	eye face look see watch stare body single
+👂	hand	ear face hear sound listen body ears hearing listening nose
+👃	hand	nose smell sniff body smelling sniffing stinky
+👄	hand	mouth kiss body kissing lips
+👅	hand	tongue mouth playful body out taste
+👆	hand	backhand index pointing up white up pointing backhand index fingers hand direction up body finger middle point white
+👇	hand	backhand index pointing down white down pointing backhand index fingers hand direction down body finger point white
+👈	hand	backhand index pointing left white left pointing backhand index direction fingers hand left body finger point white
+👉	hand	backhand index pointing right white right pointing backhand index fingers hand direction right body finger point white
+👊	hand	oncoming fist fisted hand sign angry violence fist hit attack hand body bro brofist bump clenched closed facepunch fisted punch sign
+👋	hand	waving hand waving hand sign wave hands gesture goodbye solong farewell hello hi palm body sign
+👌	hand	ok hand ok hand sign ok fingers limbs perfect ok okay body sign
+👍	hand	thumbs up thumbs up sign good thumbsup yes awesome good agree accept cool hand like +1 approve body ok sign thumb
+👎	hand	thumbs down thumbs down sign thumbsdown no dislike hand -1 bad body bury disapprove sign thumb
+👏	hand	clapping hands clapping hands sign hands praise applause congrats yay body clap golf hand round sign
+👐	hand	open hands open hands sign fingers butterfly hands open body hand hug jazz sign
+💅	hand	nail polish nail care beauty manicure finger fashion nail slay body cosmetics fingers nonchalant
+💪	hand	flexed biceps arm flex hand summer strong biceps bicep body comic feats flexing muscle muscles strength workout
+🖐	hand	hand with fingers splayed raised hand with fingers splayed hand fingers palm body finger five raised
+🖕	hand	middle finger reversed hand with middle finger extended hand fingers rude middle flipping bird body dito extended fu medio reversed
+🖖	hand	vulcan salute raised hand with part between middle and ring fingers hand fingers spock star trek between body finger middle part prosper raised ring split
+🤲	hand	palms up together hands gesture cupped prayer body dua facing
+🤳	hand	selfie camera phone arm hand
+🦴	hand	bone skeleton body
+🦵	hand	leg kick limb body
+🦶	hand	foot kick stomp body
+🦷	hand	tooth teeth dentist body
+🦸	hand	superhero marvel fantasy good hero heroine superpower superpowers
+🦹	hand	supervillain marvel bad criminal evil fantasy superpower superpowers villain
+🦺	hand	safety vest protection emergency
+🦻	hand	ear with hearing aid accessibility body hard
+🦼	hand	motorized wheelchair accessibility
+🦽	hand	manual wheelchair accessibility
+🦾	hand	mechanical arm accessibility body prosthetic
+🦿	hand	mechanical leg accessibility body prosthetic
+🧠	hand	brain smart intelligent body organ
+🫀	hand	anatomical heart health heartbeat cardiology organ pulse
+🫁	hand	lungs breathe breath exhalation inhalation organ respiration
+🫂	hand	people hugging care goodbye hello hug thanks
+🫰	hand	hand with index finger and thumb crossed heart love money expensive snap
+🫱	hand	rightwards hand palm offer right rightward
+🫲	hand	leftwards hand palm offer left leftward
+🫳	hand	palm down hand palm drop dismiss shoo
+🫴	hand	palm up hand lift offer demand beckon catch come
+🫵	hand	index pointing at the viewer you recruit point
+🫶	hand	heart hands love appreciation support
+🫷	hand	leftwards pushing hand highfive pressing stop
+🫸	hand	rightwards pushing hand highfive pressing stop
+⌚	object	watch time accessories apple clock timepiece wrist wristwatch
+⌛	object	hourglass done hourglass time clock oldschool limit exam quiz test sand timer
+⏩	object	fast-forward button black right pointing double triangle fast forward button blue-square play speed continue arrow black double pointing right symbol triangle
+⏪	object	fast reverse button black left pointing double triangle play blue-square arrow black double left pointing rewind symbol triangle revert
+⏫	object	fast up button black up pointing double triangle blue-square direction top arrow black double pointing triangle
+⏬	object	fast down button black down pointing double triangle blue-square direction bottom arrow black double pointing triangle
+⏭	object	next track button black right pointing double triangle with vertical bar forward next blue-square arrow bar black double pointing right scene skip symbol triangle vertical
+⏮	object	last track button black left pointing double triangle with vertical bar backward arrow bar black double left pointing previous scene skip symbol triangle vertical
+⏯	object	play or pause button black right pointing triangle with double vertical bar blue-square play pause arrow bar black double play/pause pointing right symbol triangle vertical
+⏰	object	alarm clock time wake morning
+⏱	object	stopwatch time deadline clock
+⏲	object	timer clock alarm
+⏳	object	hourglass not done hourglass with flowing sand oldschool time countdown flowing sand timer
+⏸	object	pause button double vertical bar pause blue-square bar double symbol vertical
+⏹	object	stop button black square for stop blue-square black for square symbol
+⏺	object	record button black circle for record blue-square black circle for symbol
+⚒	object	hammer and pick tools build create tool
+⚓	object	anchor ship ferry sea boat admiralty fisherman pattern tool
+⚔	object	crossed swords weapon
+⚕	object	medical symbol staff of aesculapius health hospital aesculapius asclepius asklepios care doctor medicine rod snake staff
+⚖	object	balance scale scales law fairness weight justice libra tool zodiac
+⚗	object	alembic distilling science experiment chemistry tool
+⚙	object	gear cog cogwheel tool
+⛏	object	pick tools dig mining pickaxe tool
+⛑	object	rescue workers helmet helmet with white cross rescue worker s helmet construction build aid cross face hat white workers
+👕	object	t-shirt t shirt fashion cloth casual shirt tee clothing polo tshirt
+👖	object	jeans fashion shopping clothing denim pants trousers
+👗	object	dress clothes fashion shopping clothing gown skirt
+👘	object	kimono dress fashion women female japanese clothing dressing gown
+👙	object	bikini swimming female woman girl fashion beach summer bathers clothing swim swimsuit
+👚	object	womans clothes woman s clothes fashion shopping bags female blouse clothing pink shirt womans
+👛	object	purse fashion accessories money sales shopping clothing coin wallet
+👜	object	handbag fashion accessory accessories shopping bag clothing purse womens
+👝	object	clutch bag pouch bag accessories shopping clothing small
+👞	object	mans shoe man s shoe fashion male brown clothing dress mans
+👟	object	running shoe athletic shoe shoes sports sneakers athletic clothing runner sneaker sport tennis trainer
+👠	object	high-heeled shoe high heeled shoe fashion shoes female pumps stiletto clothing heel heels woman
+👡	object	womans sandal woman s sandal shoes fashion flip flops clothing heeled sandals shoe womans
+👢	object	womans boot womans boots woman s boot shoes fashion boots clothing cowgirl heeled high knee shoe womans
+💈	object	barber pole hair salon style barber's haircut hairdresser shop stripes
+💉	object	syringe health hospital drugs blood medicine needle doctor nurse shot sick tool vaccination vaccine
+💊	object	pill health medicine doctor pharmacy drug capsule drugs sick tablet
+💋	object	kiss mark face lips love like affection valentines heart kissing lipstick romance
+💌	object	love letter email like affection envelope valentines heart mail note romance
+💍	object	ring wedding propose marriage valentines diamond fashion jewelry gem engagement engaged romance
+💎	object	gem stone blue ruby diamond jewelry gemstone jewel romance
+💏	object	kiss pair valentines love like dating marriage couple couplekiss female gender heart kissing male man men neutral romance woman women
+💠	object	diamond with a dot diamond shape with a dot inside jewel blue gem crystal fancy comic cuteness flower geometric inside kawaii shape
+💡	object	light bulb electric light bulb light electricity idea comic electric
+💢	object	anger symbol angry mad comic pop sign vein
+💣	object	bomb boom explode explosion terrorism comic
+💤	object	zzz sleeping symbol sleepy tired dream bedtime boring comic sign sleep sleeping symbol
+💥	object	collision collision symbol bomb explode explosion blown bang boom comic impact red spark symbol break
+💦	object	sweat droplets splashing sweat symbol water drip oops comic drops plewds splashing symbol workout
+💧	object	droplet water drip faucet spring cold comic drop sweat weather
+💨	object	dashing away dash symbol wind air fast shoo fart smoke puff blow comic dash gust running steam symbol vaping
+💫	object	dizzy dizzy symbol star sparkle shoot magic circle comic symbol animations transitions
+💬	object	speech balloon bubble words message talk chatting chat comic comment dialog text literals
+💭	object	thought balloon bubble cloud speech thinking dream comic
+💮	object	white flower japanese spring blossom cherry doily done paper stamp well
+💯	object	hundred points hundred points symbol score perfect numbers century exam quiz test pass hundred 100 full keep symbol
+💰	object	money bag dollar payment coins sale cream moneybag moneybags rich
+💱	object	currency exchange money sales dollar travel bank
+💲	object	heavy dollar sign money sales payment currency buck
+💳	object	credit card money sales dollar bill payment shopping amex bank club diners mastercard subscription visa
+💴	object	yen banknote banknote with yen sign money sales japanese dollar currency bank banknotes bill note sign
+💵	object	dollar banknote banknote with dollar sign money sales bill currency american bank banknotes note sign
+💶	object	euro banknote banknote with euro sign money sales dollar currency bank banknotes bill note sign
+💷	object	pound banknote banknote with pound sign british sterling money sales bills uk england currency bank banknotes bill note quid sign twenty
+💸	object	money with wings dollar bills payment sale bank banknote bill fly flying losing note
+💹	object	chart increasing with yen chart with upwards trend and yen sign green-square graph presentation stats bank currency exchange growth market money rate rise sign trend upward upwards
+💺	object	seat sit airplane transport bus flight fly aeroplane chair train
+💻	object	laptop personal computer technology screen display monitor computer desktop notebook pc personal
+💼	object	briefcase business documents work law legal job career suitcase
+💽	object	computer disk minidisc technology record data disk 90s entertainment minidisk optical
+💾	object	floppy disk oldschool technology save 90s 80s computer
+💿	object	optical disk optical disc technology dvd disk disc 90s cd compact computer rom
+📀	object	dvd cd disk disc computer entertainment optical rom video
+📁	object	file folder documents business office closed directory manilla
+📂	object	open file folder documents load
+📃	object	page with curl documents office paper curled curly page document license
+📄	object	page facing up documents office paper information document printed
+📅	object	calendar schedule date day emoji july world
+📆	object	tear-off calendar tear off calendar schedule date planning day desk
+📇	object	card index business stationery rolodex system
+📈	object	chart increasing chart with upwards trend graph presentation stats recovery business economics money sales good success growth metrics pointing positive chart trend up upward upwards analytics
+📉	object	chart decreasing chart with downwards trend graph presentation stats recession business economics money sales bad failure down downwards down pointing metrics negative chart trend
+📊	object	bar chart graph presentation stats metrics
+📋	object	clipboard stationery documents
+📌	object	pushpin stationery mark here location pin tack thumb
+📍	object	round pushpin stationery location map here dropped pin red
+📎	object	paperclip documents stationery clippy
+📏	object	straight ruler stationery calculate length math school drawing architect sketch edge
+📐	object	triangular ruler stationery math architect sketch set triangle
+📑	object	bookmark tabs favorite save order tidy mark marker
+📒	object	ledger notes paper binder book bound notebook spiral yellow
+📓	object	notebook stationery record notes paper study black book composition white
+📔	object	notebook with decorative cover classroom notes record paper study book decorated
+📕	object	closed book read library knowledge textbook learn red
+📖	object	open book book read library knowledge literature learn study novel
+📗	object	green book read library knowledge study textbook
+📘	object	blue book read library knowledge learn study textbook
+📙	object	orange book read library knowledge textbook study
+📚	object	books literature library study book pile stack
+📛	object	name badge fire forbid tag tofu
+📜	object	scroll documents ancient history paper degree document parchment
+📝	object	memo write documents stationery pencil paper writing legal exam quiz test study compose communication document memorandum note documentation
+📞	object	telephone receiver technology communication dial call handset phone
+📟	object	pager bbcall oldschool 90s beeper bleeper communication
+📠	object	fax machine communication technology facsimile
+📡	object	satellite antenna communication future radio space dish signal
+📢	object	loudspeaker public address loudspeaker volume sound address announcement bullhorn communication loud megaphone pa public system
+📣	object	megaphone cheering megaphone sound speaker volume bullhorn cheering communication mega
+📤	object	outbox tray inbox email box communication letter mail sent
+📥	object	inbox tray email documents box communication letter mail receive
+📦	object	package mail gift cardboard box moving communication parcel shipping container
+📧	object	e-mail e mail symbol e mail communication inbox email letter symbol
+📨	object	incoming envelope email inbox communication fast letter lines mail receive
+📩	object	envelope with arrow envelope with downwards arrow above email communication above down downwards insert letter mail outgoing sent
+📪	object	closed mailbox with lowered flag email communication inbox mail postbox
+📫	object	closed mailbox with raised flag email inbox communication mail postbox
+📬	object	open mailbox with raised flag email inbox communication mail postbox
+📭	object	open mailbox with lowered flag email inbox communication mail no postbox
+📮	object	postbox email letter envelope communication mail mailbox
+📯	object	postal horn instrument music bugle communication entertainment french post
+📰	object	newspaper press headline communication news paper
+📱	object	mobile phone technology apple gadgets dial cell communication iphone smartphone telephone responsive design
+📲	object	mobile phone with arrow mobile phone with rightwards arrow at left iphone incoming call calling cell communication left pointing receive rightwards telephone
+📳	object	vibration mode orange-square phone cell communication heart mobile silent telephone
+📴	object	mobile phone off mute orange-square silence quiet cell communication telephone
+📵	object	no mobile phones iphone mute circle cell communication forbidden not phone prohibited smartphones telephone
+📶	object	antenna bars antenna with bars blue-square reception phone internet connection wifi bluetooth bars bar cell cellular communication mobile signal stairs strength telephone
+📷	object	camera gadgets photography digital entertainment photo video
+📸	object	camera with flash photography gadgets photo video snapshots
+📹	object	video camera film record camcorder entertainment
+📺	object	television technology program oldschool show entertainment tv video
+📻	object	radio communication music podcast program digital entertainment video wireless
+📼	object	videocassette record video oldschool 90s 80s entertainment tape vcr vhs
+📽	object	film projector video tape record movie cinema entertainment
+📿	object	prayer beads dhikr religious clothing necklace religion rosary
+🔦	object	flashlight electric torch dark camping sight night electric light tool torch
+🔧	object	wrench tools diy ikea fix maintainer spanner tool
+🔨	object	hammer tools build create claw handyman tool
+🔩	object	nut and bolt handy tools fix screw tool
+🔪	object	kitchen knife hocho knife blade cutlery kitchen weapon butchers chop cooking cut tool
+🔫	object	water pistol pistol violence weapon revolver gun handgun shoot squirt tool water
+🔬	object	microscope laboratory experiment zoomin science study investigate magnify tool
+🖥	object	desktop computer technology computing screen imac
+🖨	object	printer paper ink computer
+🖱	object	computer mouse three button mouse click button three
+🖲	object	trackball technology trackpad computer
+🖼	object	framed picture frame with picture photography art frame museum painting
+🗂	object	card index dividers organizing business stationery
+🗃	object	card file box business stationery database
+🗄	object	file cabinet filing organizing
+🗑	object	wastebasket bin trash rubbish garbage toss basket can litter wastepaper
+🗒	object	spiral notepad spiral note pad memo stationery note pad
+🗓	object	spiral calendar spiral calendar pad date schedule planning pad
+🗜	object	clamp compression tool compress table vice winzip
+🗝	object	old key lock door password clue
+🗞	object	rolled-up newspaper rolled up newspaper press headline delivery news paper roll
+🗡	object	dagger dagger knife weapon knife
+🗣	object	speaking head speaking head in silhouette user person human sing say talk face mansplaining shout shouting silhouette speak
+🗩	object	right speech bubble comment chat message dialog talk
+🗳	object	ballot box with ballot election vote voting
+🧰	object	toolbox tools diy fix maintainer mechanic chest tool
+🧱	object	brick bricks clay construction mortar wall infrastructure
+🧲	object	magnet attraction magnetic horseshoe
+🧳	object	luggage packing travel suitcase
+🧴	object	lotion bottle moisturizer sunscreen shampoo
+🧵	object	thread spool of thread needle sewing spool string crafts
+🧶	object	yarn ball of yarn ball crochet knit crafts
+🧷	object	safety pin diaper punk rock
+🧸	object	teddy bear plush stuffed plaything toy
+🧹	object	broom cleaning sweeping witch brush sweep
+🧺	object	basket laundry farming picnic
+🧻	object	roll of paper roll toilet towels
+🧼	object	soap bar of soap bar bathing cleaning lather soapdish
+🧽	object	sponge absorbing cleaning porous
+🧾	object	receipt accounting expenses bookkeeping evidence proof
+🧿	object	nazar amulet bead charm boncuğu evil eye talisman
+🩰	object	ballet shoes dance clothing pointe shoe
+🩱	object	one-piece swimsuit one piece swimsuit fashion bathing clothing suit swim
+🩲	object	briefs clothing bathing brief suit swim swimsuit underwear
+🩳	object	shorts clothing bathing pants suit swim swimsuit underwear
+🩴	object	thong sandal footwear summer beach flip flops jandals sandals thongs zōri
+🩵	object	light blue heart ice baby blue
+🩶	object	grey heart silver monochrome
+🩷	object	pink heart valentines
+🩸	object	drop of blood period hurt harm wound bleed doctor donation injury medicine menstruation
+🩹	object	adhesive bandage heal aid band doctor medicine plaster
+🩺	object	stethoscope health doctor heart medicine healthcheck
+🩻	object	x-ray x ray skeleton medicine bones doctor medical ray x
+🩼	object	crutch accessibility assist aid cane disability hurt mobility stick
+🎅	people	santa claus father christmas festival man male xmas activity celebration men nicholas saint sinterklaas
+👤	people	bust in silhouette user person human shadow
+👥	people	busts in silhouette user person human group team bust people shadows silhouettes two users contributors
+👦	people	boy man male guy teenager child young
+👧	people	girl female woman teenager child maiden virgin virgo young zodiac
+👨	people	man mustache father dad guy classy sir moustache adult male men
+👩	people	woman female girls lady adult women yellow
+👪	people	family home parents child mom dad father mother people human boy female male man men woman women
+👫	people	woman and man holding hands man and woman holding hands pair people human love date dating like affection valentines marriage couple female hand heterosexual hold male men straight women
+👬	people	men holding hands two men holding hands pair couple love like bromance friendship people human date gay hand hold lgbt male man pride two
+👭	people	women holding hands two women holding hands pair friendship couple love like female people human date hand hold lesbian lgbt pride two woman
+👮	people	police officer cop law policeman policewoman
+👯	people	people with bunny ears woman with bunny ears perform costume dancer dancing ear partying wearing women
+👰	people	person with veil bride with veil couple marriage wedding woman bride person
+👱	people	person blond hair person with blond hair hairstyle blonde haired man
+👲	people	person with skullcap man with gua pi mao man with skullcap male boy chinese asian cap gua hat mao person pi
+👳	people	person wearing turban man with turban headdress arab man muslim sikh
+👴	people	old man older man human male men old elder senior adult elderly grandpa older
+👵	people	old woman older woman human female women lady old elder senior adult elderly grandma nanna older
+👶	people	baby child boy girl toddler newborn young
+👷	people	construction worker labor build builder face hard hat helmet safety add ci update ci
+👸	people	princess girl woman female blond crown royal queen blonde fairy fantasy tale tiara women
+👹	people	ogre japanese ogre monster red mask halloween scary creepy devil demon creature face fairy fantasy oni tale shrek
+👺	people	goblin japanese goblin red evil mask monster scary creepy creature face fairy fantasy long nose tale tengu
+💁	people	person tipping hand information desk person information attendant bellhop concierge desk female flick girl hair help sassy woman women
+💂	people	guard guardsman protect british
+💃	people	woman dancing dancer female girl woman fun dance dress red salsa women
+💄	people	lipstick female girl fashion woman cosmetics gloss lip makeup style
+💆	people	person getting massage face massage relax face head massaging salon spa
+💇	people	person getting haircut haircut hairstyle barber beauty cutting hair hairdresser parlor
+🕴	people	person in suit levitating man in business suit levitating man in suit levitating suit business levitate hover jump boy hovering jabsco male men person rude walt
+🕵	people	detective sleuth or spy human spy eye or private sleuth
+🕶	people	sunglasses dark sunglasses face cool accessories dark eye eyewear glasses
+🕷	people	spider animal arachnid insect
+🕸	people	spider web animal insect arachnid silk cobweb spiderweb
+🕹	people	joystick game play entertainment video
+🕺	people	man dancing male boy fun dancer dance disco men
+🙅	people	person gesturing no face with no good gesture decline arms deal denied face forbidden gesture good halt hand not ok prohibited stop x
+🙆	people	person gesturing ok face with ok gesture agree ballerina face gesture hand hands head
+🙇	people	person bowing person bowing deeply respectiful apology bow boy cute deeply dogeza gesture man massage respect sorry thanks
+🙋	people	person raising hand happy person raising one hand question answering gesture happy one raised up
+🙌	hand	raising hands person raising both hands in celebration gesture hooray yea celebration hands air arms banzai body both festivus hallelujah hand miracle person praise raised two
+🙍	people	person frowning worried frown gesture sad woman
+🙎	people	person pouting person with pouting face upset blank face fed gesture look up
+🙏	hand	folded hands person with folded hands please hope wish namaste highfive pray thank you thanks thx appreciate ask body bow five gesture hand high person prayer pressed together
+🚴	people	person biking bicyclist bicycle bike cyclist sport move
+🚵	people	person mountain biking mountain bicyclist bicycle bike cyclist sport move bicyclist biker
+🚶	people	person walking pedestrian move hike walk walker
+🛀	people	person taking bath bath clean shower bathroom bathing bathtub hot
+🛌	people	person in bed sleeping accommodation bed rest accommodation hotel sleep sleeping
+🤰	people	pregnant woman baby female pregnancy pregnant lady women
+🤱	people	breast-feeding breast feeding nursing baby breastfeeding child female infant milk mother woman women
+🤼	people	people wrestling wrestlers sport wrestle wrestler
+🤽	people	person playing water polo water polo sport
+🤾	people	person playing handball handball sport ball
+🧍	people	person standing standing person still stand
+🧎	people	person kneeling kneeling person pray respectful kneel
+🧏	people	deaf person accessibility ear hear
+🧐	people	face with monocle face stuffy wealthy rich exploration inspection
+🧑	people	person adult gender-neutral female gender inclusive male man men neutral unspecified woman women
+🧒	people	child gender-neutral young boy gender girl inclusive neutral person unspecified
+🧓	people	older person older adult human elder senior gender-neutral adult female gender male man men neutral old unspecified woman women
+🧔	people	person beard bearded person man beard person bewhiskered bearded
+🧕	people	woman with headscarf person with headscarf female hijab mantilla tichel
+🧖	people	person in steamy room relax spa hamam sauna steam steambath
+🧗	people	person climbing sport bouldering climber rock
+🧘	people	person in lotus position meditate meditation serenity yoga
+🧙	people	mage magic fantasy sorcerer sorceress witch wizard
+🧚	people	fairy wings magical fantasy oberon puck titania
+🧛	people	vampire blood twilight dracula fantasy undead
+🧜	people	merperson sea fantasy merboy mergirl mermaid merman merwoman
+🧝	people	elf magical ears fantasy legolas pointed
+🧞	people	genie magical wishes djinn djinni fantasy jinni
+🧟	people	zombie dead fantasy undead walking
+©	symbol	copyright copyright sign ip license circle law legal c sign
+®	symbol	registered registered sign alphabet circle r sign
+‼	symbol	double exclamation mark exclamation surprise bangbang punctuation red
+⁉	symbol	exclamation question mark wat punctuation surprise interrobang red
+™	symbol	trade mark trade mark sign trademark brand law legal sign tm
+ℹ	symbol	information information source blue-square alphabet letter i info lowercase source tourist
+↔	symbol	left-right arrow left right arrow shape direction horizontal sideways arrows horizontal arrows
+↕	symbol	up-down arrow up down arrow blue-square direction way vertical arrows intercardinal northwest
+↖	symbol	up-left arrow north west arrow up left arrow blue-square point direction diagonal northwest intercardinal left arrow north upper west
+↗	symbol	up-right arrow north east arrow up right arrow blue-square point direction diagonal northeast east intercardinal north upper
+↘	symbol	down-right arrow south east arrow down right arrow blue-square direction diagonal southeast east intercardinal lower right arrow south
+↙	symbol	down-left arrow south west arrow down left arrow blue-square direction diagonal southwest intercardinal left arrow lower south west
+↩	symbol	right arrow curving left leftwards arrow with hook back return blue-square undo enter curved email hook leftwards reply
+↪	symbol	left arrow curving right rightwards arrow with hook blue-square return rotate direction email forward hook rightwards right curved
+Ⓜ	symbol	circled m circled latin capital letter m alphabet blue-circle letter capital circle latin metro
+▪	symbol	black small square shape icon geometric
+▫	symbol	white small square shape icon geometric
+▶	symbol	play button black right pointing triangle blue-square right direction play arrow black forward pointing right triangle triangle
+◀	symbol	reverse button black left pointing triangle blue-square left direction arrow backward black pointing triangle
+◻	symbol	white medium square shape stone icon geometric
+◼	symbol	black medium square shape button icon geometric
+◽	symbol	white medium-small square white medium small square shape stone icon button geometric
+◾	symbol	black medium-small square black medium small square icon shape button geometric
+☀	symbol	sun black sun with rays weather nature brightness summer beach spring black bright rays space sunny sunshine
+☁	symbol	cloud weather sky cloudy overcast
+☂	symbol	umbrella weather spring clothing open rain
+☃	symbol	snowman winter season cold weather christmas xmas frozen snow snowflakes snowing
+☄	symbol	comet space
+☎	symbol	telephone black telephone technology communication dial black phone rotary
+☑	symbol	check box with check ballot box with check ok agree confirm black-square vote election yes tick ballot checkbox mark
+☔	symbol	umbrella with rain drops rainy weather spring clothing drop raining
+☕	symbol	hot beverage beverage caffeine latte espresso coffee mug cafe chocolate drink steaming tea
+☘	symbol	shamrock vegetable plant nature irish clover trefoil
+☠	symbol	skull and crossbones poison danger deadly scary death pirate evil body face halloween monster
+☢	symbol	radioactive radioactive sign nuclear danger international radiation sign symbol
+☣	symbol	biohazard biohazard sign danger sign
+☦	symbol	orthodox cross suppedaneum religion christian
+☪	symbol	star and crescent islam muslim religion
+☮	symbol	peace symbol hippie sign
+☯	symbol	yin yang balance religion tao taoist
+☸	symbol	wheel of dharma hinduism buddhism sikhism jainism buddhist helm religion
+♀	symbol	female sign woman women lady girl symbol venus
+♂	symbol	male sign man boy men mars symbol
+♈	symbol	aries sign purple-square zodiac astrology ram
+♉	symbol	taurus purple-square sign zodiac astrology bull ox
+♊	symbol	gemini sign zodiac purple-square astrology twins
+♋	symbol	cancer sign zodiac purple-square astrology crab
+♌	symbol	leo sign purple-square zodiac astrology lion
+♍	symbol	virgo sign zodiac purple-square astrology maiden virgin
+♎	symbol	libra sign purple-square zodiac astrology balance justice scales
+♏	symbol	scorpio scorpius sign zodiac purple-square astrology scorpion
+♐	symbol	sagittarius sign zodiac purple-square astrology archer
+♑	symbol	capricorn sign zodiac purple-square astrology goat
+♒	symbol	aquarius sign purple-square zodiac astrology bearer water
+♓	symbol	pisces purple-square sign zodiac astrology fish
+♻	symbol	recycling symbol black universal recycling symbol arrow environment garbage trash black green logo recycle universal reuse
+♾	symbol	infinity permanent paper sign forever paper permanent sign unbounded universal
+♿	symbol	wheelchair symbol blue-square disabled accessibility access accessible bathroom
+⚛	symbol	atom symbol science physics chemistry atheist
+⚜	symbol	fleur-de-lis fleur de lis decorative scout new orleans saints scouts
+⚠	symbol	warning warning sign exclamation wip alert error problem issue sign symbol
+⚡	symbol	high voltage high voltage sign thunder weather lightning bolt fast zap danger electric electricity sign thunderbolt speed
+⚧	symbol	transgender symbol male with stroke and male and female sign transgender lgbtq female lgbt male pride sign stroke
+⚪	symbol	white circle medium white circle shape round geometric medium
+⚫	symbol	black circle medium black circle shape button round geometric medium
+⚰	symbol	coffin vampire dead die death rip graveyard cemetery casket funeral box remove
+⚱	symbol	funeral urn dead die death rip ashes vase
+⛄	symbol	snowman without snow winter season cold weather christmas xmas frozen without snow frosty olaf
+⛅	symbol	sun behind cloud weather nature cloudy morning fall spring partly sunny
+⛈	symbol	cloud with lightning and rain thunder cloud and rain weather lightning thunder
+⛎	symbol	ophiuchus sign purple-square constellation astrology bearer serpent snake zodiac
+⛓	symbol	chains lock arrest chain
+⛔	symbol	no entry limit security privacy bad denied stop circle forbidden not prohibited traffic
+✂	symbol	scissors black scissors stationery cut black cutting tool
+✅	symbol	check mark button white heavy check mark green-square ok agree vote election answer tick green heavy symbol white pass tests
+✏	symbol	pencil stationery write paper writing school study lead pencil2 typos
+✒	symbol	black nib pen stationery writing write fountain ✒ fountain
+✔	symbol	check mark heavy check mark ok nike answer yes tick heavy
+✖	symbol	multiply heavy multiplication x multiplication sign math calculation cancel heavy symbol x
+✝	symbol	latin cross christianity christian religion
+✡	symbol	star of david judaism jew jewish magen religion
+✨	symbol	sparkles stars shine shiny cool awesome good magic entertainment glitter sparkle star
+✳	symbol	eight-spoked asterisk eight spoked asterisk star sparkle green-square
+✴	symbol	eight-pointed star eight pointed black star eight pointed star orange-square shape polygon black orange
+❄	symbol	snowflake winter season cold weather christmas xmas snow snowing
+❇	symbol	sparkle stars green-square awesome good fireworks
+❌	symbol	cross mark no delete remove cancel red multiplication multiply x
+❎	symbol	cross mark button negative squared cross mark x green-square no deny negative square squared
+❓	symbol	red question mark black question mark ornament question mark doubt confused black ornament punctuation red
+❔	symbol	white question mark white question mark ornament doubts gray huh confused grey ornament outlined punctuation
+❕	symbol	white exclamation mark white exclamation mark ornament surprise punctuation gray wow warning grey ornament outlined
+❗	symbol	red exclamation mark heavy exclamation mark symbol exclamation mark heavy exclamation mark danger surprise punctuation wow warning bang red symbol
+❣	symbol	heart exclamation heavy heart exclamation mark ornament decoration love above an as dot heavy mark ornament punctuation red
+❤	symbol	red heart heavy black heart love like valentines black heavy
+➕	symbol	plus heavy plus sign plus sign math calculation addition more increase heavy symbol add
+➖	symbol	minus heavy minus sign minus sign math calculation subtract less heavy symbol remove
+➗	symbol	divide heavy division sign division sign math calculation heavy symbol
+➡	symbol	right arrow black rightwards arrow blue-square next black cardinal direction east pointing rightwards
+➰	symbol	curly loop scribble draw shape squiggle curl curling
+➿	symbol	double curly loop tape cassette curl curling voicemail
+⤴	symbol	right arrow curving up arrow pointing rightwards then curving upwards blue-square direction top heading pointing rightwards then upwards
+⤵	symbol	right arrow curving down arrow pointing rightwards then curving downwards blue-square direction bottom curved downwards heading pointing rightwards then
+⬅	symbol	left arrow leftwards black arrow blue-square previous back black cardinal direction leftwards pointing west
+⬆	symbol	up arrow upwards black arrow blue-square continue top direction black cardinal north pointing upwards upgrade
+⬇	symbol	down arrow downwards black arrow blue-square direction bottom black cardinal downwards pointing south downgrade
+⬛	symbol	black large square shape icon button geometric
+⬜	symbol	white large square shape icon stone button geometric
+⭐	symbol	star white medium star night yellow gold medium white
+⭕	symbol	hollow red circle heavy large circle circle round correct heavy large mark o
+〰	symbol	wavy dash draw line moustache mustache squiggle scribble punctuation wave
+〽	symbol	part alternation mark graph presentation stats business economics bad m mcdonalds
+㊗	symbol	japanese congratulations button circled ideograph congratulation chinese kanji japanese red-circle circled congratulate congratulation ideograph meaning sign congratulations
+㊙	symbol	japanese secret button circled ideograph secret privacy chinese sshh kanji red-circle circled ideograph meaning sign secret
+🀄	symbol	mahjong red dragon mahjong tile red dragon game play chinese kanji tile
+🃏	symbol	joker playing card black joker poker cards game play magic black card entertainment playing wildcard
+🅰	symbol	a button blood type negative squared latin capital letter a a button red-square alphabet letter blood capital latin negative squared type
+🅱	symbol	b button blood type negative squared latin capital letter b b button red-square alphabet letter blood capital latin negative squared type
+🅾	symbol	o button blood type negative squared latin capital letter o o button alphabet red-square letter blood capital latin negative o2 squared type
+🅿	symbol	p button negative squared latin capital letter p cars blue-square alphabet letter capital latin negative parking sign squared
+🆎	symbol	ab button blood type negative squared ab ab button red-square alphabet blood negative squared type
+🆑	symbol	cl button squared cl alphabet words red-square clear sign squared
+🆒	symbol	cool button squared cool words blue-square sign square squared
+🆓	symbol	free button squared free blue-square words sign squared
+🆔	symbol	id button squared id purple-square words identification identity sign squared
+🆕	symbol	new button squared new blue-square words start fresh sign squared
+🆖	symbol	ng button squared ng blue-square words shape icon blooper good no sign squared
+🆗	symbol	ok button squared ok ok good agree yes blue-square okay sign square squared
+🆘	symbol	sos button squared sos help red-square words emergency 911 distress sign signal squared
+🆙	symbol	up button squared up with exclamation mark blue-square above high exclamation level mark sign squared up
+🆚	symbol	vs button squared vs words orange-square squared versus
+🈁	symbol	japanese here button squared katakana koko blue-square here katakana japanese destination koko meaning sign squared word
+🈂	symbol	japanese service charge button squared katakana sa japanese blue-square katakana charge meaning or sa sign squared service
+🈚	symbol	japanese free of charge button squared cjk unified ideograph 7121 nothing chinese kanji japanese orange-square charge cjk ideograph lacking meaning negation sign squared u7121 unified free
+🈯	symbol	japanese reserved button squared cjk unified ideograph 6307 chinese point green-square kanji cjk finger ideograph meaning sign squared u6307 unified reserved
+🈲	symbol	japanese prohibited button squared cjk unified ideograph 7981 kanji japanese chinese forbidden limit restricted red-square cjk forbid ideograph meaning prohibit sign squared u7981 unified prohibited
+🈳	symbol	japanese vacancy button squared cjk unified ideograph 7a7a kanji japanese chinese empty sky blue-square 7a7a available cjk ideograph meaning sign squared u7a7a unified vacancy
+🈴	symbol	japanese passing grade button squared cjk unified ideograph 5408 japanese chinese join kanji red-square agreement cjk grade ideograph meaning sign squared together u5408 unified passing
+🈵	symbol	japanese no vacancy button squared cjk unified ideograph 6e80 full chinese japanese red-square kanji 6e80 cjk fullness ideograph meaning sign squared u6e80 unified vacancy no
+🈶	symbol	japanese not free of charge button squared cjk unified ideograph 6709 orange-square chinese have kanji charge cjk exist ideograph meaning own sign squared u6709 unified not
+🈷	symbol	japanese monthly amount button squared cjk unified ideograph 6708 chinese month moon japanese orange-square kanji amount cjk ideograph meaning radical sign squared u6708 unified monthly
+🈸	symbol	japanese application button squared cjk unified ideograph 7533 chinese japanese kanji orange-square apply cjk form ideograph meaning monkey request sign squared u7533 unified application
+🈹	symbol	japanese discount button squared cjk unified ideograph 5272 cut divide chinese kanji pink-square bargain cjk ideograph meaning sale sign squared u5272 unified discount
+🈺	symbol	japanese open for business button squared cjk unified ideograph 55b6 japanese opening hours orange-square 55b6 business chinese cjk ideograph meaning operating sign squared u55b6 unified work open
+🉐	symbol	japanese bargain button circled ideograph advantage chinese kanji obtain get circle acquire advantage circled ideograph meaning sign bargain
+🉑	symbol	japanese acceptable button circled ideograph accept ok good chinese kanji agree yes orange-circle accept circled ideograph meaning sign acceptable
+👑	symbol	crown king kod leader royalty lord clothing queen royal
+👒	symbol	womans hat woman s hat fashion accessories female lady spring bow clothing ladies womans
+👓	symbol	glasses eyeglasses fashion accessories eyesight nerdy dork geek clothing eye eyewear
+👔	symbol	necktie shirt suitup formal fashion cloth business clothing tie
+👣	symbol	footprints feet tracking walking beach body clothing footprint footsteps print tracks
+💑	symbol	couple with heart pair love like affection human dating valentines marriage female gender loving male man men neutral romance woman women
+💒	symbol	wedding love like affection couple marriage bride groom activity chapel church heart romance
+💓	symbol	beating heart love like affection valentines pink heart alarm heartbeat pulsating wifi
+💔	symbol	broken heart sad sorry break heart heartbreak breaking brokenhearted
+💕	symbol	two hearts love like affection valentines heart pink small
+💖	symbol	sparkling heart love like affection valentines excited sparkle sparkly stars heart
+💗	symbol	growing heart like love affection valentines pink excited heartpulse multiple nervous pulse triple
+💘	symbol	heart with arrow love like heart affection valentines cupid lovestruck romance
+💙	symbol	blue heart love like affection valentines brand neutral
+💚	symbol	green heart love like affection valentines nct
+💛	symbol	yellow heart love like affection valentines bf gold snapchat
+💜	symbol	purple heart love like affection valentines bts emoji
+💝	symbol	heart with ribbon love valentines box chocolate chocolates gift valentine
+💞	symbol	revolving hearts love like affection valentines heart two
+💟	symbol	heart decoration purple-square love like
+🔀	symbol	shuffle tracks button twisted rightwards arrows blue-square shuffle music random arrow arrows crossed rightwards symbol twisted merge
+🔁	symbol	repeat button clockwise rightwards and leftwards open circle arrows loop record arrow arrows circle clockwise leftwards open retweet rightwards symbol
+🔂	symbol	repeat single button clockwise rightwards and leftwards open circle arrows with circled one overlay blue-square loop arrow arrows circle circled clockwise leftwards number once one open overlay rightwards symbol track
+🔃	symbol	clockwise vertical arrows clockwise downwards and upwards open circle arrows sync cycle round repeat arrow circle downwards open reload upwards
+🔄	symbol	counterclockwise arrows button anticlockwise downwards and upwards open circle arrows blue-square sync cycle anticlockwise arrow circle downwards open refresh rotate switch upwards withershins
+🔅	symbol	dim button low brightness symbol sun afternoon warm summer brightness decrease low symbol
+🔆	symbol	bright button high brightness symbol sun light brightness high increase symbol
+🔇	symbol	muted speaker speaker with cancellation stroke sound volume silence quiet cancellation mute off silent stroke
+🔈	symbol	speaker low volume speaker sound volume silence broadcast soft
+🔉	symbol	speaker medium volume speaker with one sound wave volume speaker broadcast low one reduce sound wave
+🔊	symbol	speaker high volume speaker with three sound waves volume noise noisy speaker broadcast entertainment increase loud sound three waves
+🔋	symbol	battery power energy sustain aa phone
+🔌	symbol	electric plug charger power ac adaptor cable electricity
+🔍	symbol	magnifying glass tilted left left pointing magnifying glass search zoom find detective icon mag magnifier pointing tool
+🔎	symbol	magnifying glass tilted right right pointing magnifying glass search zoom find detective icon mag magnifier pointing tool seo
+🔏	symbol	locked with pen lock with ink pen security secret fountain ink lock lock with nib privacy
+🔐	symbol	locked with key closed lock with key security privacy closed lock secure secret
+🔑	symbol	key lock door password gold
+🔒	symbol	locked lock security password padlock closed private privacy
+🔓	symbol	unlocked open lock privacy security lock open padlock unlock
+🔔	symbol	bell sound notification christmas xmas chime liberty ringer wedding
+🔕	symbol	bell with slash bell with cancellation stroke sound volume mute quiet silent cancellation disabled forbidden muted no not notifications off prohibited ringer stroke
+🔖	symbol	bookmark favorite label save mark price tag
+🔗	symbol	link link symbol rings url chain hyperlink linked symbol
+🔘	symbol	radio button input old music circle geometric
+🔙	symbol	back arrow back with leftwards arrow above arrow words return above leftwards
+🔚	symbol	end arrow end with leftwards arrow above words arrow above leftwards
+🔛	symbol	on arrow on with exclamation mark with left right arrow above arrow words above exclamation left mark on right
+🔜	symbol	soon arrow soon with rightwards arrow above arrow words above rightwards
+🔝	symbol	top arrow top with upwards arrow above words blue-square above up upwards
+🔞	symbol	no one under eighteen no one under eighteen symbol 18 drink pub night minor circle age forbidden not nsfw prohibited restriction symbol underage
+🔟	symbol	keycap 10 keycap ten numbers 10 blue-square ten number
+🔠	symbol	input latin uppercase input symbol for latin capital letters alphabet words letters uppercase blue-square abcd capital for symbol
+🔡	symbol	input latin lowercase input symbol for latin small letters blue-square letters lowercase alphabet abcd for small symbol
+🔢	symbol	input numbers input symbol for numbers numbers blue-square 1234 1 2 3 4 for numeric symbol
+🔣	symbol	input symbols input symbol for symbols blue-square music note ampersand percent glyphs characters for symbol symbol input
+🔤	symbol	input latin letters input symbol for latin letters blue-square alphabet abc for symbol
+🔥	symbol	fire hot cook flame burn lit snapstreak tool remove
+🔭	symbol	telescope stars space zoom science astronomy stargazing tool
+🔮	symbol	crystal ball disco party magic circus fortune teller clairvoyant fairy fantasy psychic purple tale tool
+🔯	symbol	dotted six-pointed star six pointed star with middle dot dotted six pointed star purple-square religion jewish hexagram dot fortune middle
+🔰	symbol	japanese symbol for beginner badge shield chevron green leaf mark shoshinsha tool yellow
+🔱	symbol	trident emblem weapon spear anchor pitchfork ship tool
+🔲	symbol	black square button shape input frame geometric
+🔳	symbol	white square button shape input geometric outlined
+🔴	symbol	red circle large red circle shape error danger geometric large
+🔵	symbol	blue circle large blue circle shape icon button geometric large
+🔶	symbol	large orange diamond shape jewel gem geometric
+🔷	symbol	large blue diamond shape jewel gem geometric
+🔸	symbol	small orange diamond shape jewel gem geometric
+🔹	symbol	small blue diamond shape jewel gem geometric
+🔺	symbol	red triangle pointed up up pointing red triangle shape direction up top geometric pointing small
+🔻	symbol	red triangle pointed down down pointing red triangle shape direction bottom geometric pointing small
+🔼	symbol	upwards button up pointing small red triangle blue-square triangle direction point forward top arrow pointing red small up
+🔽	symbol	downwards button down pointing small red triangle blue-square direction bottom arrow down pointing red small triangle
+🕉	symbol	om om symbol hinduism buddhism sikhism jainism aumkara hindu omkara pranava religion symbol
+🕋	symbol	kaaba mecca mosque islam muslim religion
+🕌	symbol	mosque islam worship minaret domed muslim religion roof
+🕍	symbol	synagogue judaism worship temple jewish jew religion synagog
+🕎	symbol	menorah menorah with nine branches hanukkah candles jewish branches candelabrum candlestick chanukiah nine religion
+🕐	symbol	one oclock clock face one oclock one o clock 1 100 1300 time late early schedule clock1 face oclock
+🕑	symbol	two oclock clock face two oclock two o clock 2 200 1400 time late early schedule clock2 face oclock
+🕒	symbol	three oclock clock face three oclock three o clock 3 300 1500 time late early schedule clock3 face oclock
+🕓	symbol	four oclock clock face four oclock four o clock 4 400 1600 time late early schedule clock4 face oclock
+🕔	symbol	five oclock clock face five oclock five o clock 5 500 1700 time late early schedule clock5 face oclock
+🕕	symbol	six oclock clock face six oclock six o clock 6 600 1800 time late early schedule dawn dusk clock6 face oclock
+🕖	symbol	seven oclock clock face seven oclock seven o clock 7 700 1900 time late early schedule clock7 face oclock
+🕗	symbol	eight oclock clock face eight oclock eight o clock 8 800 2000 time late early schedule clock8 face oclock
+🕘	symbol	nine oclock clock face nine oclock nine o clock 9 900 2100 time late early schedule clock9 face oclock
+🕙	symbol	ten oclock clock face ten oclock ten o clock 10 1000 2200 time late early schedule clock10 face oclock
+🕚	symbol	eleven oclock clock face eleven oclock eleven o clock 11 1100 2300 time late early schedule clock11 face oclock
+🕛	symbol	twelve oclock clock face twelve oclock twelve o clock 12 0000 1200 time noon midnight midday late early schedule clock12 face oclock
+🕜	symbol	one-thirty clock face one thirty one thirty 130 1330 time late early schedule clock clock130 face
+🕝	symbol	two-thirty clock face two thirty two thirty 230 1430 time late early schedule clock clock230 face
+🕞	symbol	three-thirty clock face three thirty three thirty 330 1530 time late early schedule clock clock330 face
+🕟	symbol	four-thirty clock face four thirty four thirty 430 1630 time late early schedule clock clock430 face
+🕠	symbol	five-thirty clock face five thirty five thirty 530 1730 time late early schedule clock clock530 face
+🕡	symbol	six-thirty clock face six thirty six thirty 630 1830 time late early schedule clock clock630 face
+🕢	symbol	seven-thirty clock face seven thirty seven thirty 730 1930 time late early schedule clock clock730 face
+🕣	symbol	eight-thirty clock face eight thirty eight thirty 830 2030 time late early schedule clock clock830 face
+🕤	symbol	nine-thirty clock face nine thirty nine thirty 930 2130 time late early schedule clock clock930 face
+🕥	symbol	ten-thirty clock face ten thirty ten thirty 1030 2230 time late early schedule clock clock1030 face
+🕦	symbol	eleven-thirty clock face eleven thirty eleven thirty 1130 2330 time late early schedule clock clock1130 face
+🕧	symbol	twelve-thirty clock face twelve thirty twelve thirty 0030 1230 time late early schedule clock clock1230 face
+🕰	symbol	mantelpiece clock time
+🕳	symbol	hole embarrassing
+🖤	symbol	black heart evil dark wicked
+🟠	symbol	orange circle large orange circle round geometric large
+🟡	symbol	yellow circle large yellow circle round geometric large
+🟢	symbol	green circle large green circle round geometric large
+🟣	symbol	purple circle large purple circle round geometric large
+🟤	symbol	brown circle large brown circle round geometric large
+🟥	symbol	red square large red square card geometric large
+🟦	symbol	blue square large blue square geometric large
+🟧	symbol	orange square large orange square geometric large
+🟨	symbol	yellow square large yellow square card geometric large
+🟩	symbol	green square large green square geometric large
+🟪	symbol	purple square large purple square geometric large
+🟫	symbol	brown square large brown square geometric large
+🤌	hand	pinched fingers size tiny small che finger gesture hand interrogation ma purse sarcastic vuoi
+🤍	symbol	white heart pure
+🤎	symbol	brown heart coffee
+🤏	hand	pinching hand tiny small size amount body little
+🤴	symbol	prince boy man male crown royal king fairy fantasy men tale
+🤵	symbol	person in tuxedo man in tuxedo couple marriage wedding groom male men person suit
+🤶	symbol	mrs. claus mother christmas mrs claus woman female xmas activity celebration mrs. santa women
+🤷	people	person shrugging shrug regardless doubt ignorance indifference shruggie
+🤸	symbol	person cartwheeling person doing cartwheel sport gymnastic cartwheel doing gymnast gymnastics
+🤹	symbol	person juggling juggling performance balance juggle juggler multitask skill
+🤺	symbol	person fencing fencer sports fencing sword
+🥍	symbol	lacrosse lacrosse stick and ball sports ball stick game goal sport
+🥎	symbol	softball sports balls ball game glove sport underarm
+🥏	symbol	flying disc sports frisbee ultimate game golf sport
+🥻	symbol	sari dress clothing saree shari
+🥼	symbol	lab coat doctor experiment scientist chemist clothing
+🥽	symbol	goggles eyes protection safety clothing eye swimming welding
+🥾	symbol	hiking boot backpacking camping hiking clothing
+🥿	symbol	flat shoe ballet slip-on slipper clothing womans
+🦯	symbol	white cane probing cane accessibility blind white
+🧡	symbol	orange heart love like affection valentines
+🧢	symbol	billed cap cap baseball clothing hat
+🧣	symbol	scarf neck winter clothes clothing
+🧤	symbol	gloves hands winter clothes clothing hand
+🧥	symbol	coat jacket clothing
+🧦	symbol	socks stockings clothes clothing pair stocking
+🪖	symbol	military helmet army protection soldier warrior
+🪗	symbol	accordion music accordian box concertina squeeze
+🪘	symbol	long drum music beat conga djembe rhythm
+🪙	symbol	coin money currency gold metal silver treasure
+🪚	symbol	carpentry saw cut chop carpenter hand lumber tool
+🪛	symbol	screwdriver tools screw tool
+🪜	symbol	ladder tools climb rung step tool
+🪝	symbol	hook tools catch crook curve ensnare fishing point selling tool
+🪞	symbol	mirror reflection reflector speculum
+🪟	symbol	window scenery air frame fresh glass opening transparent view
+🪠	symbol	plunger toilet cup force plumber suction
+🪡	symbol	sewing needle stitches embroidery sutures tailoring
+🪢	symbol	knot rope scout tangled tie twine twist
+🪣	symbol	bucket water container cask pail vat
+🪤	symbol	mouse trap cheese bait mousetrap rodent snare
+🪥	symbol	toothbrush hygiene dental bathroom brush clean teeth
+🪦	symbol	headstone death rip grave cemetery graveyard halloween tombstone
+🪧	symbol	placard announcement demonstration lawn picket post protest sign
+🪨	symbol	rock stone boulder construction heavy solid
+🪩	symbol	mirror ball disco dance party glitter
+🪪	symbol	identification card document credentials id license security
+🪫	symbol	low battery drained dead electronic energy no red
+🪬	symbol	hamsa religion protection amulet fatima hand mary miriam
+🪭	symbol	folding hand fan flamenco hot sensu
+🪮	symbol	hair pick afro comb
+🪯	symbol	khanda sikhism religion
+🫃	symbol	pregnant man baby belly bloated full
+🫄	symbol	pregnant person baby belly bloated full
+🫅	symbol	person with crown royalty power monarch noble regal
+🫎	symbol	moose canada sweden sven cool
+🫏	symbol	donkey eeyore mule
+🫠	symbol	melting face hot heat disappear dissolve dread liquid melt sarcasm
+🫡	symbol	saluting face respect salute ok sunny troops yes
+🫢	symbol	face with open eyes and hand over mouth silence secret shock surprise amazement awe disbelief embarrass gasp scared
+🫣	symbol	face with peeking eye scared frightening embarrassing shy captivated peep stare
+🫤	symbol	face with diagonal mouth skeptic confuse frustrated indifferent confused disappointed meh skeptical unsure
+🫥	symbol	dotted line face invisible lonely isolation depression depressed disappear hide introvert
+🫦	symbol	biting lip flirt sexy pain worry anxious fear flirting nervous uncomfortable worried
+🫧	symbol	bubbles soap fun carbonation sparkling burp clean underwater
+🫨	symbol	shaking face dizzy shock blurry earthquake
+⛩	travel	shinto shrine temple japan kyoto kami michi no religion
+⛪	travel	church building religion christ christian cross
+⛰	travel	mountain photo nature environment
+⛱	travel	umbrella on ground weather summer beach parasol rain sun
+⛲	travel	fountain photo summer water fresh feature park
+⛳	travel	flag in hole sports business flag hole summer golf
+⛴	travel	ferry boat ship yacht passenger
+⛵	travel	sailboat ship summer transportation water sailing boat dinghy resort sea vehicle yacht
+⛺	travel	tent photo camping outdoors
+⛽	travel	fuel pump gas station petroleum diesel fuelpump petrol
+✈	travel	airplane vehicle transportation flight fly aeroplane plane
+✉	travel	envelope letter postal inbox communication email ✉ letter
+🌀	travel	cyclone weather swirl blue cloud vortex spiral whirlpool spin tornado hurricane typhoon dizzy twister
+🌁	travel	foggy photo mountain bridge city fog fog bridge karl under weather
+🌂	travel	closed umbrella weather rain drizzle clothing collapsed umbrella pink
+🌃	travel	night with stars evening city downtown star starry weather
+🌄	travel	sunrise over mountains view vacation photo morning mountain sun weather
+🌅	travel	sunrise morning view vacation photo sun sunset weather
+🌆	travel	cityscape at dusk photo evening sky buildings building city landscape orange sun sunset weather
+🌇	travel	sunset sunset over buildings photo good morning dawn building buildings city dusk over sun sunrise weather
+🌈	travel	rainbow nature happy unicorn face photo sky spring gay lgbt pride primary rain weather
+🌉	travel	bridge at night photo sanfrancisco gate golden weather
+🌊	travel	water wave sea water wave nature tsunami disaster beach ocean waves weather
+🌋	travel	volcano photo nature disaster eruption mountain weather
+🌌	travel	milky way photo space stars galaxy night sky universe weather
+🌍	travel	globe showing europe-africa earth globe europe africa globe showing europe africa globe world earth international planet
+🌎	travel	globe showing americas earth globe americas globe world usa earth international planet
+🌏	travel	globe showing asia-australia earth globe asia australia globe showing asia australia globe world east earth international planet
+🌐	travel	globe with meridians earth international world internet interweb i18n global web wide www internationalization localization
+🌑	travel	new moon new moon symbol nature twilight planet space night evening sleep dark eclipse shadow moon solar symbol weather
+🌒	travel	waxing crescent moon waxing crescent moon symbol nature twilight planet space night evening sleep symbol weather
+🌓	travel	first quarter moon first quarter moon symbol nature twilight planet space night evening sleep symbol weather
+🌔	travel	waxing gibbous moon waxing gibbous moon symbol nature night sky gray twilight planet space evening sleep symbol weather
+🌕	travel	full moon full moon symbol nature yellow twilight planet space night evening sleep symbol weather
+🌖	travel	waning gibbous moon waning gibbous moon symbol nature twilight planet space night evening sleep waxing gibbous moon symbol weather
+🌗	travel	last quarter moon last quarter moon symbol nature twilight planet space night evening sleep symbol weather
+🌘	travel	waning crescent moon waning crescent moon symbol nature twilight planet space night evening sleep symbol weather
+🌙	travel	crescent moon night sleep sky evening magic space weather
+🌚	travel	new moon face new moon with face nature twilight planet space night evening sleep creepy dark molester weather
+🌛	travel	first quarter moon face first quarter moon with face nature twilight planet space night evening sleep weather
+🌜	travel	last quarter moon face last quarter moon with face nature twilight planet space night evening sleep weather
+🌝	travel	full moon face full moon with face nature twilight planet space night evening sleep bright moonface smiley smiling weather
+🌞	travel	sun with face nature morning sky bright smiley smiling space summer sunface weather
+🌟	travel	glowing star night sparkle awesome good magic glittery glow shining star2
+🌠	travel	shooting star night photo activity falling meteoroid space stars upon when wish you
+🌡	travel	thermometer weather temperature hot cold
+🌤	travel	sun behind small cloud white sun with small cloud weather white
+🌥	travel	sun behind large cloud white sun behind cloud weather white
+🌦	travel	sun behind rain cloud white sun behind cloud with rain weather white
+🌧	travel	cloud with rain weather
+🌨	travel	cloud with snow weather cold
+🌩	travel	cloud with lightning weather thunder
+🌪	travel	tornado cloud with tornado weather cyclone twister cloud whirlwind
+🌫	travel	fog weather cloud
+🌬	travel	wind face wind blowing face gust air blow blowing cloud mother nature weather
+🗺	travel	world map location direction travel
+🗻	travel	mount fuji photo mountain nature japanese capped san snow
+🗼	travel	tokyo tower photo japanese eiffel red
+🗽	travel	statue of liberty american newyork new york
+🗾	travel	map of japan silhouette of japan nation country japanese asia silhouette
+🗿	travel	moai moyai rock easter island carving face human statue stone
+🚀	travel	rocket launch ship staffmode nasa outer space fly shuttle vehicle deploy
+🚁	travel	helicopter transportation vehicle fly
+🚂	travel	locomotive steam locomotive transportation vehicle train engine railway steam
+🚃	travel	railway car transportation vehicle carriage electric railcar railroad train tram trolleybus wagon
+🚄	travel	high-speed train high speed train transportation vehicle bullettrain railway shinkansen side
+🚅	travel	bullet train high speed train with bullet nose transportation vehicle speed fast public travel bullettrain front high nose railway shinkansen
+🚆	travel	train transportation vehicle diesel electric passenger railway regular train2
+🚇	travel	metro transportation blue-square mrt underground tube subway train vehicle
+🚈	travel	light rail transportation vehicle railway
+🚉	travel	station transportation vehicle public platform railway train
+🚊	travel	tram transportation vehicle trolleybus
+🚋	travel	tram car transportation vehicle carriage public travel train trolleybus
+🚌	travel	bus car vehicle transportation school
+🚍	travel	oncoming bus vehicle transportation front
+🚎	travel	trolleybus bart transportation vehicle bus electric bus tram trolley
+🚏	travel	bus stop transportation wait busstop
+🚐	travel	minibus vehicle car transportation bus minivan mover people
+🚑	travel	ambulance health 911 hospital vehicle
+🚒	travel	fire engine transportation cars vehicle department truck
+🚓	travel	police car vehicle cars transportation law legal enforcement cop patrol side
+🚔	travel	oncoming police car vehicle law legal enforcement 911 front of 🚓 cop
+🚕	travel	taxi uber vehicle cars transportation new side taxicab york
+🚖	travel	oncoming taxi vehicle cars uber front taxicab
+🚗	travel	automobile red transportation vehicle car side
+🚘	travel	oncoming automobile car vehicle transportation front
+🚙	travel	sport utility vehicle recreational vehicle transportation vehicle blue campervan car motorhome recreational rv
+🚚	travel	delivery truck cars transportation vehicle resources
+🚛	travel	articulated lorry vehicle cars transportation express green semi truck
+🚜	travel	tractor vehicle car farming agriculture farm
+🚝	travel	monorail transportation vehicle
+🚞	travel	mountain railway transportation vehicle car funicular train
+🚟	travel	suspension railway vehicle transportation
+🚠	travel	mountain cableway transportation vehicle ski cable gondola
+🚡	travel	aerial tramway transportation vehicle ski cable car gondola ropeway
+🚢	travel	ship transportation titanic deploy boat cruise passenger vehicle
+🚣	travel	person rowing boat rowboat sport move paddles vehicle
+🚤	travel	speedboat ship transportation vehicle summer boat motorboat powerboat
+🚥	travel	horizontal traffic light transportation signal
+🚦	travel	vertical traffic light transportation driving semaphore signal
+🚧	travel	construction construction sign wip progress caution warning barrier black roadwork sign striped yellow work in progress
+🚨	travel	police car light police cars revolving light police ambulance 911 emergency alert error pinged law legal beacon cars emergency light flashing revolving rotating siren vehicle warning
+🚩	travel	triangular flag triangular flag on post mark milestone place pole post red flag
+🚪	travel	door house entry exit doorway front
+🚫	travel	prohibited no entry sign forbid stop limit denied disallow circle backslash banned block crossed entry forbidden no not red restricted sign
+🚬	travel	cigarette smoking symbol kills tobacco joint smoke activity smoking symbol
+🚭	travel	no smoking no smoking symbol cigarette blue-square smell smoke forbidden not prohibited sign symbol
+🚮	travel	litter in bin sign put litter in its place symbol blue-square sign human info its litterbox person place put symbol trash
+🚯	travel	no littering do not litter symbol trash bin garbage circle do forbidden litter not prohibited symbol
+🚰	travel	potable water potable water symbol blue-square liquid restroom cleaning faucet drink drinking symbol tap thirst thirsty
+🚱	travel	non-potable water non potable water symbol non potable water drink faucet tap circle drinking forbidden no not prohibited symbol
+🚲	travel	bicycle bike sports exercise hipster push vehicle
+🚳	travel	no bicycles no bikes bicycle bike cyclist prohibited circle forbidden not sign vehicle
+🚷	travel	no pedestrians rules crossing walking circle forbidden not pedestrian people prohibited
+🚸	travel	children crossing school warning danger sign driving yellow-diamond child kids pedestrian traffic experience usability
+🚹	travel	mens room mens symbol men s room toilet restroom wc blue-square gender male lavatory man mens symbol
+🚺	travel	womens room womens symbol women s room purple-square woman female toilet loo restroom gender lavatory symbol wc womens womens toilet
+🚻	travel	restroom blue-square toilet refresh wc gender bathroom lavatory sign
+🚼	travel	baby symbol orange-square child change changing nursery station
+🚽	travel	toilet restroom wc washroom bathroom potty loo
+🚾	travel	water closet toilet restroom blue-square lavatory wc
+🚿	travel	shower clean water bathroom bath head
+🛁	travel	bathtub clean shower bathroom bath bubble
+🛂	travel	passport control custom blue-square border permissions authorization roles
+🛃	travel	customs passport border blue-square
+🛄	travel	baggage claim blue-square airport transport
+🛅	travel	left luggage blue-square travel baggage bag with key locked locker suitcase
+🛋	travel	couch and lamp read chill hotel lounge settee sofa
+🛍	travel	shopping bags mall buy purchase bag hotel
+🛎	travel	bellhop bell service hotel
+🛏	travel	bed sleep rest bedroom hotel
+🛐	travel	place of worship religion church temple prayer building religious
+🛑	travel	stop sign octagonal sign stop octagonal
+🛒	travel	shopping cart shopping trolley trolley
+🛕	travel	hindu temple religion
+🛖	travel	hut house structure roundhouse yurt
+🛗	travel	elevator lift accessibility hoist
+🛜	travel	wireless wifi internet contactless signal
+🛝	travel	playground slide fun park amusement play
+🛞	travel	wheel car transport circle tire turn
+🛟	travel	ring buoy life saver life preserver float rescue safety
+🛠	travel	hammer and wrench tools build create spanner tool
+🛡	travel	shield protection security weapon
+🛢	travel	oil drum barrell
+🛣	travel	motorway road cupertino interstate highway
+🛤	travel	railway track train transportation
+🛥	travel	motor boat ship motorboat vehicle
+🛩	travel	small airplane flight transportation fly vehicle aeroplane plane
+🛫	travel	airplane departure airport flight landing aeroplane departures off plane taking vehicle
+🛬	travel	airplane arrival airplane arriving airport flight boarding aeroplane arrivals arriving landing plane vehicle
+🛰	travel	satellite communication gps orbit spaceflight nasa iss artificial space vehicle
+🛳	travel	passenger ship yacht cruise ferry vehicle
+🛴	travel	kick scooter scooter vehicle kick razor
+🛵	travel	motor scooter vehicle vespa sasha bike cycle
+🛶	travel	canoe boat paddle water ship
+🛷	travel	sled sleigh luge toboggan sledge
+🛸	travel	flying saucer transportation vehicle ufo alien extraterrestrial fantasy space
+🛹	travel	skateboard board skate
+🛺	travel	auto rickshaw move transportation tuk
+🛻	travel	pickup truck car transportation vehicle
+🛼	travel	roller skate footwear sports derby inline
+🇭🇰	flag	flag hong kong sar china flag hk hong kong hong kong flag nation country banner hong kong sar china
+🇹🇼	flag	flag taiwan flag tw taiwan tw flag nation country banner taiwan china taiwanese
+🇨🇳	flag	flag china flag cn china china chinese prc flag country nation banner cn indicator letters regional symbol
+🇯🇵	flag	flag japan flag jp japan japanese nation flag country banner japan jp ja indicator letters regional symbol
+🇰🇷	flag	flag south korea flag kr korea south korea nation flag country banner south korea indicator korean kr letters regional symbol
+🇺🇸	flag	flag united states flag us united states america united states america flag nation country banner united states american indicator islands letters outlying regional symbol us usa
+🇬🇧	flag	flag united kingdom flag gb united kingdom britain united kingdom great britain northern ireland flag nation country banner british uk english england union jack united kingdom cornwall gb scotland wales
+🇫🇷	flag	flag france flag fr france banner flag nation france french country clipperton fr indicator island letters martin regional saint st. symbol
+🇩🇪	flag	flag germany flag de germany german nation flag country banner germany de deutsch indicator letters regional symbol
+🇮🇹	flag	flag italy flag it italy italy flag nation country banner indicator italian letters regional symbol
+🇪🇸	flag	flag spain flag es spain spain flag nation country banner ceuta es indicator letters melilla regional spanish symbol
+🇵🇹	flag	flag portugal flag pt portugal pt flag nation country banner portugal portugese
+🇳🇱	flag	flag netherlands flag nl netherlands nl flag nation country banner netherlands dutch
+🇧🇪	flag	flag belgium flag be belgium be flag nation country banner belgium belgian
+🇨🇭	flag	flag switzerland flag ch switzerland ch flag nation country banner switzerland cross red swiss
+🇸🇪	flag	flag sweden flag se sweden se flag nation country banner sweden swedish
+🇳🇴	flag	flag norway flag no norway no flag nation country banner norway bouvet jan mayen norwegian svalbard
+🇩🇰	flag	flag denmark flag dk denmark dk flag nation country banner denmark danish
+🇫🇮	flag	flag finland flag fi finland fi flag nation country banner finland finnish
+🇷🇺	flag	flag russia flag ru russia russian federation flag nation country banner russia indicator letters regional ru symbol
+🇺🇦	flag	flag ukraine flag ua ukraine ua flag nation country banner ukraine ukrainian
+🇨🇦	flag	flag canada flag ca canada ca flag nation country banner canada canadian
+🇲🇽	flag	flag mexico flag mx mexico mx flag nation country banner mexico mexican
+🇧🇷	flag	flag brazil flag br brazil br flag nation country banner brazil brasil brazilian for
+🇦🇷	flag	flag argentina flag ar argentina ar flag nation country banner argentina argentinian
+🇦🇺	flag	flag australia flag au australia au flag nation country banner australia aussie australian heard mcdonald
+🇳🇿	flag	flag new zealand flag nz new zealand new zealand flag nation country banner new zealand kiwi
+🇮🇳	flag	flag india flag in india in flag nation country banner india indian
+🇮🇩	flag	flag indonesia flag id indonesia flag nation country banner indonesia indonesian
+🇲🇾	flag	flag malaysia flag my malaysia my flag nation country banner malaysia malaysian
+🇸🇬	flag	flag singapore flag sg singapore sg flag nation country banner singapore singaporean
+🇹🇭	flag	flag thailand flag th thailand th flag nation country banner thailand thai
+🇻🇳	flag	flag vietnam flag vn vietnam viet nam flag nation country banner vietnam vietnamese
+🇵🇭	flag	flag philippines flag ph philippines ph flag nation country banner philippines
+🇲🇴	flag	flag macao sar china flag mo macau macao flag nation country banner macao sar china macanese flag macau
+🇹🇷	flag	flag türkiye flag tr turkey flag turkey turkey flag nation country banner tr turkish flag türkiye
+🇬🇷	flag	flag greece flag gr greece gr flag nation country banner greece greek
+🇵🇱	flag	flag poland flag pl poland pl flag nation country banner poland polish
+🇮🇪	flag	flag ireland flag ie ireland ie flag nation country banner ireland irish flag
+🇦🇹	flag	flag austria flag at austria at flag nation country banner austria austrian
+🇨🇿	flag	flag czechia flag cz czechia cz flag nation country banner czechia czech republic
+🇮🇱	flag	flag israel flag il israel il flag nation country banner israel israeli
+🇸🇦	flag	flag saudi arabia flag sa saudi arabia flag nation country banner saudi arabia arabian flag
+🇦🇪	flag	flag united arab emirates flag ae united arab emirates united arab emirates flag nation country banner united arab emirates emirati uae
+🇪🇬	flag	flag egypt flag eg egypt eg flag nation country banner egypt egyptian
+🇿🇦	flag	flag south africa flag za south africa south africa flag nation country banner south africa african flag
+🇳🇬	flag	flag nigeria flag ng nigeria flag nation country banner nigeria nigerian
+🇰🇪	flag	flag kenya flag ke kenya ke flag nation country banner kenya kenyan
+🇵🇰	flag	flag pakistan flag pk pakistan pk flag nation country banner pakistan pakistani
+🇧🇩	flag	flag bangladesh flag bd bangladesh bd flag nation country banner bangladesh bangladeshi
+🇳🇵	flag	flag nepal flag np nepal np flag nation country banner nepal nepalese
+🏳	flag	white flag flag white losing loser lost surrender give up fail waving
+🏴	flag	black flag flag black pirate waving
+🏁	flag	chequered flag flag chequered checkered finish contest finishline race gokart checkered finish girl grid milestone racing
+🚩	flag	triangular flag flag triangular mark milestone place pole post red flag

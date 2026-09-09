@@ -576,7 +576,7 @@ class SettingsActivity : AppCompatActivity() {
             "那兩種情況要放開手指才出碼。")
         note("英文鍵盤固定有一行數字：長按數字出對應符號（1 → !），4 另有各國貨幣符號；" +
             "長按字母可選大小寫與重音寫法；長按 , . / 可選其餘標點。")
-        note("長按 ␣ 後不放手，上下左右拖動即可移動游標；長按 ?123 直接跳至純數字鍵盤。")
+        note("長按 ␣ 後不放手，上下左右拖動即可移動游標；長按 !@# 直接跳至純數字鍵盤。")
         if (SHOW_HIDDEN_OPTIONS) {
             switch("英文鍵盤上方加一行數字", Prefs.KEY_LATIN_NUM_ROW, false)
         }

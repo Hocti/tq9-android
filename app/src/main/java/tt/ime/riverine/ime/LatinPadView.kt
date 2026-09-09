@@ -175,14 +175,14 @@ class LatinPadView(context: Context) : RowsPadView(context) {
         // 唔再將收邊嗰兩粒拉長）。空格唔會食掉掂觸 —— 撳落去會 snap 去隔籬粒鍵。
         val r1 = listOf(spacerKey(0.5f)) + "asdfghjkl".map { ch(it.toString()) } +
             listOf(spacerKey(0.5f))
-        // `,` 搬咗落底行（頂咗本來個 `?`），呢行讓返出嚟嘅位就俾 ⇧ 同 ⌫ 拉長
+        // `/` 搬咗上呢行、擺喺 `m` 右面，⇧ 同 ⌫ 就縮返細少少讓位俾佢
         val r2 = listOf(
-            Key(KeyAction.SHIFT, label = shiftLabel(), weight = 1.75f,
+            Key(KeyAction.SHIFT, label = shiftLabel(), weight = 1.25f,
                 accent = shift == ShiftState.LOCK)
-        ) + "zxcvbnm".map { ch(it.toString()) } +
-            listOf(Key(KeyAction.BACKSPACE, label = "⌫", weight = 1.75f, repeatable = true))
+        ) + "zxcvbnm".map { ch(it.toString()) } + listOf(punct("/")) +
+            listOf(Key(KeyAction.BACKSPACE, label = "⌫", weight = 1.25f, repeatable = true))
         val r3 = ArrayList<Key>()
-        // 搵 emoji 嗰陣底行淨係要「退出」同 ␣ 兩粒：`?123`、`中`、`⏎`、標點喺呢頁
+        // 搵 emoji 嗰陣底行淨係要「退出」同 ␣ 兩粒：`!@#`、`中`、`⏎`、標點喺呢頁
         // 一粒都用唔著（打嘅字淨係用嚟篩 emoji，唔會入落個欄）。粒退出掣**寫明幾隻字**
         // —— 以前淨係得個 😀，冇人知撳落去係唔搵住定係入咗個 emoji
         if (emojiSearchMode) {
@@ -190,12 +190,14 @@ class LatinPadView(context: Context) : RowsPadView(context) {
             r3.add(Key(KeyAction.SPACE, label = "␣", weight = 4f))
             return if (numRow) listOf(digits, r0, r1, r2, r3) else listOf(r0, r1, r2, r3)
         }
-        r3.add(Key(KeyAction.TO_CHINESE, label = "中", weight = 1.3f, bigLabel = true))
-        // 長撳 ?123 唔使經符號頁，直接跳去純數字 keypad。
+        // `中` 同 `!@#` 呢兩粒字面本身短，唔使 bigLabel 都夠睇清楚 ——
+        // 用返正常字size，讓返嗰啖位出嚟俾 space bar 擺得更中、闊少少
+        r3.add(Key(KeyAction.TO_CHINESE, label = "中", weight = 1.3f))
+        // 長撳 !@# 唔使經符號頁，直接跳去純數字 keypad。
         // **冇左上角提示字**（2026-08-29 user 要求）—— 呢粒鍵面本身已經四個字符，
         // 英文底行粒粒都窄，再喺左上角迫多個「123」就撞埋一舊。
         // 中文九宮格嗰粒地方鬆啲，個 hint 照留。
-        r3.add(Key(KeyAction.TO_SYMBOL, label = "?123", weight = 1.3f,
+        r3.add(Key(KeyAction.TO_SYMBOL, label = "!@#", weight = 1.3f,
             longAction = KeyAction.TO_NUMBER))
         when (fieldKind) {
             LatinField.EMAIL -> {
@@ -226,11 +228,10 @@ class LatinPadView(context: Context) : RowsPadView(context) {
                 r3.add(Key(KeyAction.CHAR, label = "_", text = "_"))
             }
             LatinField.NORMAL -> {
-                r3.add(Key(KeyAction.SPACE, label = "␣", weight = 3.4f))
-                // space 右邊順住排 `, . /` 三粒，三粒都有長撳 popup
-                r3.add(punct(","))
+                // `/` 搬咗上一行（`m` 右面），呢行淨剩 `.` 喺 space 左面、`,` 喺右面
                 r3.add(punct("."))
-                r3.add(punct("/"))
+                r3.add(Key(KeyAction.SPACE, label = "␣", weight = 3.4f))
+                r3.add(punct(","))
             }
         }
         r3.add(Key(KeyAction.ENTER, label = "⏎", weight = 1.7f, accent = true))

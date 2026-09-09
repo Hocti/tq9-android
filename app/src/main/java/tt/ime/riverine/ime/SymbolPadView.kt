@@ -11,7 +11,7 @@ import android.content.Context
  * 底行嘅規矩（同英文鍵盤一樣，全部鍵盤都跟）：
  *
  *  - **左下兩粒一定係 `Eng` 同 `中`**（英行先），即係「返去英文／中文」，唔使兜圈。
- *  - **`⏎` 上面嗰粒一定係 `⌫`**，所以 `⌫` 同分頁掣（`€£¥`／`?123`）都搬咗上
+ *  - **`⏎` 上面嗰粒一定係 `⌫`**，所以 `⌫` 同分頁掣（`€£¥`／`!@#`）都搬咗上
  *    倒數第二行嘅最左同最右，底行淨返轉鍵盤、space、標點同 `⏎`。
  *
  * 第一頁底行 space 右邊順住排 `, . ? ; /` 五粒（都係打字最常用嗰啲），
@@ -58,7 +58,7 @@ class SymbolPadView(context: Context) : RowsPadView(context) {
             // 最唔常用嗰個（∞）減咗，讓位俾由下面升上嚟嘅 numpad 掣
             r2 = listOf("©", "®", "™", "✓", "§", "¡", "¿", "…", "‰").map { ch(it) } +
                 listOf(Key(KeyAction.TO_NUMBER, label = "numpad", weight = 1.6f))
-            r3 = listOf(Key(KeyAction.SYM_PAGE, label = "?123", weight = 1.4f)) +
+            r3 = listOf(Key(KeyAction.SYM_PAGE, label = "!@#", weight = 1.4f)) +
                 listOf("«", "»", "\u201c", "\u201d", "\u2018", "\u2019", "–", "—").map { ch(it) } +
                 listOf(Key(KeyAction.BACKSPACE, label = "⌫", weight = 1.4f, repeatable = true))
             r4 = listOf(

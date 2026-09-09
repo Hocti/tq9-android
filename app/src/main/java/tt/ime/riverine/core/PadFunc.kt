@@ -73,7 +73,7 @@ enum class PadFunc(
     /** 短撳開關同音；長撳做乜就睇同一個位嘅長撳格 */
     HOMO("同音", "同音", FuncPlace.SIDE_ONLY),
     TO_LATIN("英文鍵盤", "Eng", FuncPlace.SIDE_ONLY, required = true),
-    TO_SYMBOL("符號鍵盤", "?123", FuncPlace.SIDE_ONLY),
+    TO_SYMBOL("符號鍵盤", "!@#", FuncPlace.SIDE_ONLY),
     TO_NUMBER("純數字鍵盤", "123", FuncPlace.SIDE_ONLY),
     SPACE("空格", "␣", FuncPlace.SIDE_ONLY, required = true, tapOnly = true),
     BACKSPACE("刪除", "⌫", FuncPlace.SIDE_ONLY, required = true, tapOnly = true),
