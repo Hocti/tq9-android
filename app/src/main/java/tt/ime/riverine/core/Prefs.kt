@@ -141,6 +141,9 @@ object Prefs {
     /** 打字過程寫落 logcat（見 [InputLog]，預設熄） */
     const val KEY_INPUT_LOG = "input_log"
     const val KEY_STT_LOCALE = "stt_locale"
+
+    /** 提示音音量（0～[MAX_TONE_LEVEL]），見 [toneLevel] */
+    const val KEY_TONE_LEVEL = "tone_level"
     const val KEY_DB_LABEL = "db_label"
     const val KEY_DB_CUSTOM = "db_custom"
     const val KEY_DB_ASSET_VER = "db_asset_ver"
@@ -219,6 +222,15 @@ object Prefs {
 
     /** [KEY_AI_STT_SYS_SEC] 個 slider 拉得去邊（秒） */
     const val MAX_AI_STT_SYS_SEC = 30
+
+    /**
+     * 開系統 recognizer 嗰陣暫時靜咗部機，遮住佢自己嗰兩下「開始／完結」提示聲。
+     *
+     * 嗰兩下係語音辨識服務（多數係 Google app）自己個 process 播嘅，唔經我哋
+     * `playTone`，[KEY_TONE_LEVEL] 管唔到，亦冇公開 API 叫佢唔好播。
+     * 見 `TTInputMethodService.muteEarcons`。
+     */
+    const val KEY_STT_MUTE_EARCON = "stt_mute_earcon"
 
     /**
      * STT 個 prompt 寫到咁死板係有原因嘅：Gemini 好鍾意喺結果前面加句
@@ -515,6 +527,32 @@ object Prefs {
     fun vibrateLevelLabel(level: Int): String =
         arrayOf("關閉", "1（最輕）", "2（中）", "3（最強）")[level.coerceIn(0, MAX_VIBRATE_LEVEL)]
 
+    /**
+     * 提示音音量 0～4（語音輸入開始／結束／成功／失敗，同埋載入失敗嗰下）。
+     * 3 = 以前寫死嗰個音量，所以做預設；0 = 索性唔出聲。
+     *
+     * 同 [sound]（按鍵聲）**冇關係** —— 嗰個係打字嗰下嘅 click，呢個係提示音。
+     */
+    fun toneLevel(ctx: Context): Int =
+        sp(ctx).getInt(KEY_TONE_LEVEL, 3).coerceIn(0, MAX_TONE_LEVEL)
+
+    fun setToneLevel(ctx: Context, level: Int) =
+        sp(ctx).edit().putInt(KEY_TONE_LEVEL, level.coerceIn(0, MAX_TONE_LEVEL)).apply()
+
+    const val MAX_TONE_LEVEL = 4
+
+    /**
+     * `ToneGenerator` 個 volume 收 0～100。level 3 = 80，即係以前寫死嗰個數，
+     * 唔可以郁 —— 郁咗現有 user 一升級就覺得啲提示音無端端變咗。
+     * 0 級唔會叫到（見 `TTInputMethodService.playTone` 直接 return）。
+     */
+    fun toneVolume(level: Int): Int =
+        intArrayOf(0, 25, 50, 80, 100)[level.coerceIn(0, MAX_TONE_LEVEL)]
+
+    fun toneLevelLabel(level: Int): String =
+        arrayOf("關閉（靜音）", "1（最細）", "2", "3（預設）", "4（最大）")[
+            level.coerceIn(0, MAX_TONE_LEVEL)]
+
     fun sound(ctx: Context) = sp(ctx).getBoolean(KEY_SOUND, false)
 
     /** 舊版本一律使用 [KeyPressEffect.LIGHTEN]，新選項的預設值保持相同。 */
@@ -607,6 +645,9 @@ object Prefs {
 
     fun aiSttPrompt(ctx: Context): String =
         sp(ctx).getString(KEY_AI_STT_PROMPT, DEFAULT_AI_STT_PROMPT)!!.ifBlank { DEFAULT_AI_STT_PROMPT }
+
+    /** 見 [KEY_STT_MUTE_EARCON] */
+    fun sttMuteEarcon(ctx: Context) = sp(ctx).getBoolean(KEY_STT_MUTE_EARCON, true)
 
     /** 見 [KEY_AI_STT_SYS_SEC]。0 = 一律用 AI */
     fun aiSttSysSec(ctx: Context): Int =

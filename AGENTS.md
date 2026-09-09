@@ -876,7 +876,11 @@ app 內所有 使用者見到的字（設定頁、toast、鍵面、空狀態提�
   高度**固定為 `root.height`**，用 MATCH_PARENT 會擴大了整個 IME window。
 - **四個階段四種不同的提示音**（`SttTone`）：開始錄 `TONE_PROP_BEEP`、錄音結束
   `TONE_PROP_BEEP2`、成功 `TONE_PROP_ACK`、失敗 `TONE_PROP_NACK`。
-  這些與 `Prefs.sound`（按鍵聲）**沒有關係**，不跟那個開關。
+  這些與 `Prefs.sound`（按鍵聲）**沒有關係**，不跟那個開關 —— 音量另有
+  `Prefs.toneLevel`（0～4，設定頁「其他 → 提示音音量」，`playTone` 一處管晒，
+  連 `playErrorTone` 都跟）。**level 3 = 80，是以前寫死那個數，不可以郁**，
+  否則現有使用者一升級就覺得提示音無端端變了。0 級**不會開 `ToneGenerator`**
+  （播一段「音量 0」的聲一樣會搶了人家部機的 audio focus）。
 - **逾時／離開欄位要記得清**：`sttGeneration` 與 `aiGeneration` 一樣是用來
   當第遲到的 callback；`onFinishInputView` / `onDestroy` 行 `cancelAiStt()`。
 - **放手之後先篩一篩，不要任何事都掟上去**（2026-08-25 加）。`VoiceRecorder.stop()`
@@ -940,6 +944,18 @@ AI 語音輸入開著時，講一兩句都要等 upload + Gemini 回覆，而系
   `..._POSSIBLY_COMPLETE_...`（`SYS_STT_SILENCE_MS` = 30 秒），幾時收工由我們
   `stopListening()` 話事。這兩個 extra **不是每個 recognizer 都認**，所以上面
   那條 `sysTailLost` 後路一定要留。
+- **系統那邊自己那兩下「開始／完結」提示聲，只可以靠靜音遮**（`muteEarcons`）。
+  那兩下在辨識服務（多數是 Google app）自己個 process 度播，`playTone` /
+  `Prefs.toneLevel` 完全管不到，也沒有公開 API 叫它不要播。所以
+  `Prefs.sttMuteEarcon`（設定頁那個掣，預設開）開著時，`startListening()`
+  之前把 `EARCON_STREAMS` 靜掉，`releaseSysStt()` 之後 `EARCON_TAIL_MS`（0.7 秒，
+  等埋那下「完結」聲）才還原。三個位不可以改壞：
+  **逐條 stream 分開 `runCatching`**（靜 `STREAM_SYSTEM` 在不少機上等同郁鈴聲模式，
+  沒有 notification policy access 會掟 `SecurityException`，掟就跳過那條，
+  不可以連 `STREAM_MUSIC` 都一起不做）、**不可以加 `STREAM_NOTIFICATION`**
+  （我們自己那四下提示音就在那條）、**還原一定要有安全網**
+  （`EARCON_MUTE_MAX_MS` 20 秒，加上 `onDestroy` 直接 `unmuteEarcons()`）——
+  留低部機靜了是不可以接受的。
 - **`onPartialResults` 那句要記低**：有些 recognizer 收工只派 partial，final
   那個 bundle 是空的，攞不到 final 就用回最後聽到那句（`sysSttText`）。
 - **`recMs` 要在 `rec.stop()` 之前攞**：`VoiceRecorder.finish()` 會把

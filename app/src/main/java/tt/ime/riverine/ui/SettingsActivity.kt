@@ -5,6 +5,8 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
+import android.media.AudioManager
+import android.media.ToneGenerator
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -75,6 +77,9 @@ class SettingsActivity : AppCompatActivity() {
     companion object {
         /** 開源專案位址（設定頁底部、版本號下方的連結） */
         private const val PROJECT_URL = "https://github.com/Hocti/tq9-android"
+
+        /** 拉完「提示音音量」試響那下有多長（見 [previewTone]） */
+        private const val TONE_PREVIEW_MS = 150
 
         /**
          * 「試打」和「預覽」兩節已按使用者要求隱藏，但程式碼仍完整保留。
@@ -596,7 +601,8 @@ class SettingsActivity : AppCompatActivity() {
         val hasKey = Prefs.aiApiKey(this).isNotBlank()
         note("開啟後，工具列的「語音輸入」改由 AI 辨識：按一下開始錄音，再按一次停止；" +
             "按住不放則放手即停。太短或聽不到說話的錄音不會上傳。")
-        note("錄音同等待期間鍵盤會變灰，並以提示音告知開始、結束、成功與失敗。")
+        note("錄音同等待期間鍵盤會變灰，並以提示音告知開始、結束、成功與失敗。" +
+            "提示音的音量在「其他 → 提示音音量」調整，拉到「關閉」就完全不出聲。")
         if (custom) {
             note("⚠️ 目前使用「自訂 API」，AI 語音輸入只能用 Gemini，" +
                 "請先在「AI 設定」關閉自訂 API。")
@@ -629,6 +635,11 @@ class SettingsActivity : AppCompatActivity() {
                     "超過就取消系統那邊，整段送去 AI。系統那邊聽不到內容時，仍會自動改用 AI。")
                 note("⚠️ 兩邊同時開麥克風要看裝置是否允許；部分裝置只會讓其中一邊收到聲音。" +
                     "若短錄音經常失準或變慢，把這裡調成「關閉」即可回到只用 AI。")
+                switch("蓋住系統辨識的提示聲", Prefs.KEY_STT_MUTE_EARCON, true)
+                note("系統的語音辨識服務自己會播「開始／完結」兩下提示聲，" +
+                    "那是它自己的程序播的，上面的「提示音音量」管不到，也沒有 API 叫它不要播。" +
+                    "開啟這項就在錄音期間暫時靜音（媒體與系統音，不包括我們自己的提示音），" +
+                    "錄完立即還原。代價是錄音那幾秒聽不到正在播放的音樂。")
             }
         }
     }
@@ -898,6 +909,13 @@ class SettingsActivity : AppCompatActivity() {
             Prefs.setVibrateLevel(this, v)
             previewVibrate(v)
         }
+        slider("提示音音量", 0, Prefs.MAX_TONE_LEVEL, Prefs.toneLevel(this), "",
+            format = { Prefs.toneLevelLabel(it) }) { v ->
+            Prefs.setToneLevel(this, v)
+            previewTone(v)
+        }
+        note("語音輸入的開始、結束、成功、失敗四個提示音，以及載入失敗那下的音量。" +
+            "與按鍵聲是兩件事。拉到「關閉」就完全不出聲。")
         note("0 為關閉，1 最輕，2、3 震幅同時間都加大。放手時會震一下讓你試效果。")
         switch("按鍵聲音", Prefs.KEY_SOUND, false)
         slider("長按時間", 200, 700, Prefs.longPressMs(this).toInt(), "ms", step = 10) { v ->
@@ -996,6 +1014,19 @@ class SettingsActivity : AppCompatActivity() {
         val amp = if (v.hasAmplitudeControl()) Prefs.vibrateAmplitude(level)
                   else VibrationEffect.DEFAULT_AMPLITUDE
         runCatching { v.vibrate(VibrationEffect.createOneShot(Prefs.vibrateDurationMs(level), amp)) }
+    }
+
+    /** 拖動完成後嘟一聲，等使用者立即聽到選了那級有多大聲（同 [previewVibrate]） */
+    private fun previewTone(level: Int) {
+        val vol = Prefs.toneVolume(level)
+        if (vol <= 0) return
+        runCatching {
+            val tg = ToneGenerator(AudioManager.STREAM_NOTIFICATION, vol)
+            tg.startTone(ToneGenerator.TONE_PROP_BEEP, TONE_PREVIEW_MS)
+            // 與 `TTInputMethodService.playTone` 一樣，響完就即刻 release，
+            // 不要留住個 audio session
+            content.postDelayed({ runCatching { tg.release() } }, TONE_PREVIEW_MS + 100L)
+        }
     }
 
     /**

@@ -192,6 +192,10 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
     private var sysSttPending: ((String?) -> Unit)? = null
     /** 等到夠鐘就自己埋單嗰個 timeout（[SYS_STT_WAIT_MS]） */
     private var sysSttTimeout: Runnable? = null
+    /** 而家夾硬靜咗邊幾條 stream（見 [muteEarcons]），吉 = 冇靜過 */
+    private var mutedStreams: List<Int> = emptyList()
+    /** 還原音量嗰個 runnable（收工嗰下同埋 [EARCON_MUTE_MAX_MS] 安全網共用） */
+    private var unmuteRun: Runnable? = null
 
     private val clipListener = ClipboardManager.OnPrimaryClipChangedListener {
         runCatching { ClipHistory.current(this) }
@@ -237,6 +241,7 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
     override fun onDestroy() {
         stopStt()
         cancelAiStt()
+        unmuteEarcons() // 收檔前一定要還原，唔可以留低部機靜咗
         clipboard()?.removePrimaryClipChangedListener(clipListener)
         db?.close()
         super.onDestroy()
@@ -1639,10 +1644,15 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
     /**
      * 提示音。每次開一個新 [ToneGenerator] 再 release —— 留住一個唔用就霸住個
      * audio session，IME 好多時喺背景瞓覺，霸住會累到人哋部機播歌都細聲咗。
+     *
+     * 音量跟 [Prefs.toneLevel]（設定頁「其他」）；0 級就連個 `ToneGenerator`
+     * 都唔開，唔係播一段「音量 0」嘅聲一樣會搶咗人哋部機個 audio focus。
      */
     private fun playTone(tone: Int, ms: Int) {
+        val vol = Prefs.toneVolume(Prefs.toneLevel(this))
+        if (vol <= 0) return
         runCatching {
-            val tg = ToneGenerator(AudioManager.STREAM_NOTIFICATION, 80)
+            val tg = ToneGenerator(AudioManager.STREAM_NOTIFICATION, vol)
             tg.startTone(tone, ms)
             ui.postDelayed({ runCatching { tg.release() } }, (ms + 100).toLong())
         }
@@ -2105,11 +2115,57 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
             putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS,
                 SYS_STT_SILENCE_MS)
         }
+        // 開之前先靜咗部機：佢自己嗰兩下「開始／完結」提示聲喺佢個 process 度播，
+        // 我哋條 playTone 管唔到（見 [muteEarcons]）
+        if (Prefs.sttMuteEarcon(this)) muteEarcons()
         runCatching { r.startListening(intent) }.onFailure {
             releaseSysStt()
             return false
         }
         return true
+    }
+
+    /**
+     * 夾硬靜咗 [EARCON_STREAMS] 嗰幾條 stream，遮住語音辨識服務自己播嗰兩下
+     * 提示聲。**冇公開 API 叫佢唔好播**，靜音係業界通用嗰個 workaround。
+     *
+     * 三個位要小心：
+     *
+     *  - **逐條 stream 分開試**。靜 `STREAM_SYSTEM` 喺唔少機上面等同郁鈴聲模式，
+     *    冇 notification policy access 就會掟 `SecurityException` —— 掟就跳過嗰條，
+     *    唔好連 `STREAM_MUSIC` 都一齊唔做。靜到邊幾條就記低邊幾條，還原淨係還原嗰啲。
+     *  - **唔掂 `STREAM_NOTIFICATION`**：我哋自己嗰四下提示音就係喺嗰條
+     *    （見 [playTone]），一齊靜埋就連自己嗰啲都聽唔到。
+     *  - **點都要還原**。除咗正路收工嗰下（[releaseSysStt]），仲有條
+     *    [EARCON_MUTE_MAX_MS] 安全網 —— 有咩意外都唔可以留低部機靜咗。
+     */
+    private fun muteEarcons() {
+        if (mutedStreams.isNotEmpty()) return
+        val am = getSystemService(Context.AUDIO_SERVICE) as? AudioManager ?: return
+        mutedStreams = EARCON_STREAMS.filter { stream ->
+            runCatching { am.adjustStreamVolume(stream, AudioManager.ADJUST_MUTE, 0) }.isSuccess
+        }
+        if (mutedStreams.isEmpty()) return
+        scheduleUnmute(EARCON_MUTE_MAX_MS)
+    }
+
+    /** [delay] 之後還原音量。收工嗰下拖多陣先還原，等埋佢嗰下「完結」聲播完 */
+    private fun scheduleUnmute(delay: Long) {
+        if (mutedStreams.isEmpty()) return
+        unmuteRun?.let { ui.removeCallbacks(it) }
+        val run = Runnable { unmuteEarcons() }
+        unmuteRun = run
+        ui.postDelayed(run, delay)
+    }
+
+    private fun unmuteEarcons() {
+        unmuteRun?.let { ui.removeCallbacks(it) }
+        unmuteRun = null
+        val streams = mutedStreams
+        if (streams.isEmpty()) return
+        mutedStreams = emptyList()
+        val am = getSystemService(Context.AUDIO_SERVICE) as? AudioManager ?: return
+        streams.forEach { runCatching { am.adjustStreamVolume(it, AudioManager.ADJUST_UNMUTE, 0) } }
     }
 
     /** `onResults`／`onError` 都行呢度：記低最好嗰句，等緊嘅話就即刻交貨 */
@@ -2170,6 +2226,8 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
         val r = sysStt ?: return
         sysStt = null
         sysSttPending = null
+        // 收咗工先還原音量，但要拖多陣 —— 佢嗰下「完結」聲係停止聆聽之後先播
+        scheduleUnmute(EARCON_TAIL_MS)
         // 同 [releaseRecognizer] 一樣 post 出去：呢度好多時係喺佢自己個
         // listener callback 入面叫，即場 destroy 有啲實作會炸
         ui.post {
@@ -2219,6 +2277,15 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
          * 正路講完一句就放手，兩者差極都係幾百毫秒。
          */
         private const val SYS_STT_TAIL_MS = 1_500L
+        /**
+         * 開系統 recognizer 嗰陣靜邊幾條 stream（見 [muteEarcons]）。
+         * **唔可以有 `STREAM_NOTIFICATION`** —— 我哋自己嗰四下提示音喺嗰條。
+         */
+        private val EARCON_STREAMS = listOf(AudioManager.STREAM_MUSIC, AudioManager.STREAM_SYSTEM)
+        /** 停止聆聽之後仲要靜幾耐，等埋佢嗰下「完結」聲播完 */
+        private const val EARCON_TAIL_MS = 700L
+        /** 安全網：靜咗最多咁耐，之後點都還原（見 [muteEarcons]） */
+        private const val EARCON_MUTE_MAX_MS = 20_000L
         /** 送去 AI 做上下文嘅字數：caret 前面／後面各攞幾多 */
         private const val STT_CONTEXT_BEFORE = 400
         private const val STT_CONTEXT_AFTER = 100
