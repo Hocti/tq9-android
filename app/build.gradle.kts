@@ -33,8 +33,8 @@ android {
         applicationId = "tt.ime.riverine"
         minSdk = 26
         targetSdk = 36
-        versionCode = 54
-        versionName = "2.0.10"
+        versionCode = 58
+        versionName = "2.0.14"
     }
 
     signingConfigs {
@@ -69,6 +69,9 @@ android {
 
     buildFeatures {
         viewBinding = false
+        // 設定頁靠 `BuildConfig.DEBUG` 決定「記錄輸入過程 (logcat)」出唔出
+        // （見 `SettingsActivity`）—— AGP 8 預設唔再生成 BuildConfig，要開返
+        buildConfig = true
     }
 
     // JVM unit test 入面 `android.*` 全部係冇實作嘅 stub，撞到就掟

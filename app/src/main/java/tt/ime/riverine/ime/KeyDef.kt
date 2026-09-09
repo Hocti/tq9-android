@@ -8,6 +8,12 @@ enum class KeyAction {
     HOMO,         // 同音 toggle（長撳做乜由設定頁話事，預設 [RELATE]）
     RELATE,       // 游標前面嗰隻字嘅關聯字（TTCmd.RELATE）
     PREV_PAGE,    // 選字上一頁（淨係選字模式、夠兩頁先出現喺 0 隔籬）
+    /**
+     * 選字下一頁。撳兩格闊嗰粒 `0` 一路都做得到（`TTEngine.press(0)`），
+     * 呢粒係俾人擺粒實牙實齒嘅「下頁」落左右欄用 —— 見
+     * [tt.ime.riverine.core.PagerLayout.NO_CHANGE]。
+     */
+    NEXT_PAGE,
     TO_CHINESE,
     TO_LATIN,
     TO_SYMBOL,

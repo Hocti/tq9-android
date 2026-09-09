@@ -2,7 +2,6 @@ package tt.ime.riverine.ime
 
 import android.annotation.SuppressLint
 import android.content.Context
-import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
 import android.util.TypedValue
 import android.view.Gravity
@@ -12,7 +11,9 @@ import android.view.ViewGroup
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
+import tt.ime.riverine.core.KeyLayout
 import tt.ime.riverine.core.PadAlign
+import tt.ime.riverine.core.PadFunc
 import tt.ime.riverine.core.PadGroup
 import tt.ime.riverine.core.Prefs
 import kotlin.math.abs
@@ -26,8 +27,9 @@ import kotlin.math.roundToInt
  * 關聯字 —— 好嘥。所以一夠窄就**收起上面條 [OptionBarsView]**，成條 bar 嘅內容
  * 搬晒落嚟呢邊：
  *
- *  - 上面一行（或者兩行，唔夠闊會自動摺）：功能掣（大細位置、貼上、錄音、
- *    emoji、AI），同工具 bar 嗰幾粒一模一樣
+ *  - 上面一行（或者兩行，唔夠闊會自動摺）：功能掣 —— 同工具 bar 嗰行**一模一樣**
+ *    （同一個 [tt.ime.riverine.core.KeyLayout.Layout.tools] 排位，預設就係
+ *    大細位置、貼上、錄音、emoji、AI）
  *  - 下面成塊位：關聯字，可以直接向下 scroll，唔使再撳 ▼ 拉大
  *
  * 兩樣嘢一次過見晒，亦都唔使再喺關聯字／工具之間切（[OptionBarsView] 個 ⇄ 喺呢度
@@ -39,11 +41,19 @@ class SidePanelView(context: Context) : LinearLayout(context) {
     var listener: OptionBarsView.Listener? = null
     var theme: Theme = Theme.of(context)
 
-    private val sizeBtn = TextView(context)
-    private val pasteBtn = TextView(context)
-    private val sttBtn = TextView(context)
-    private val emojiBtn = TextView(context)
-    private val aiBtn = TextView(context)
+    /** 同 [OptionBarsView.ToolBtn] 一樣：粒掣連埋佢個短撳／長撳功能 */
+    private class ToolBtn(val view: TextView, val slot: KeyLayout.Slot)
+
+    private val toolBtns = ArrayList<ToolBtn>()
+    private var toolSlots: List<KeyLayout.Slot> = emptyList()
+
+    private fun btnOf(f: PadFunc): TextView? =
+        toolBtns.firstOrNull { it.slot.tap == f }?.view
+
+    private val sizeBtn: TextView? get() = btnOf(PadFunc.ALIGN)
+    private val sttBtn: TextView? get() = btnOf(PadFunc.STT)
+    private val aiBtn: TextView? get() = btnOf(PadFunc.AI)
+
     private val closeBtn = TextView(context)
 
     private val toolFlow = FlowLayout(context)
@@ -69,31 +79,6 @@ class SidePanelView(context: Context) : LinearLayout(context) {
     init {
         orientation = VERTICAL
 
-        @Suppress("ClickableViewAccessibility")
-        sizeBtn.apply {
-            gravity = Gravity.CENTER
-            textSize = 15f
-            setOnClickListener { listener?.onCycleAlign(); refreshAlignLabel() }
-            setOnTouchListener { v, e -> handleSizeDrag(v, e) }
-            // 撳實唔拉 = 一下子拉到最闊（同工具 bar 嗰粒一樣：呢度淨係記低，
-            // 放手嗰陣先算 —— 見 [handleSizeDrag]）
-            setOnLongClickListener { longPressArmed = true; true }
-        }
-        tool(pasteBtn, ToolIcon.PASTE, "貼上", KeyAction.PASTE)
-        pasteBtn.setOnLongClickListener { listener?.onPasteHistory(); true }
-        tool(sttBtn, ToolIcon.MIC, "語音輸入", KeyAction.STT)
-        // 撳實 🎤 = 一路錄，放手就停（淨係 AI 語音輸入先做得到，所以由 host 話
-        // 收唔收呢下長撳）。onTouch 回 false，粒掣本身嘅短撳／長撳照行；
-        // ACTION_UP 一定喺 performClick 之前到，所以撳一下唔會誤當放手收工。
-        @Suppress("ClickableViewAccessibility")
-        sttBtn.setOnLongClickListener { listener?.onSttHoldStart() == true }
-        sttBtn.setOnTouchListener { _, e ->
-            if (e.actionMasked == MotionEvent.ACTION_UP ||
-                e.actionMasked == MotionEvent.ACTION_CANCEL) listener?.onSttHoldEnd()
-            false
-        }
-        tool(emojiBtn, ToolIcon.EMOJI, "表情符號", KeyAction.TO_EMOJI)
-        tool(aiBtn, ToolIcon.AI, "AI 改寫", KeyAction.AI)
         closeBtn.apply {
             text = "✖"
             gravity = Gravity.CENTER
@@ -103,14 +88,14 @@ class SidePanelView(context: Context) : LinearLayout(context) {
         }
 
         // 側邊欄好窄，一行擺唔晒五六粒就自動摺落第二行（唔會迫到粒粒細過隻手指）
-        toolFlow.hGap = dp(4f).toInt()
-        toolFlow.vGap = dp(4f).toInt()
-        toolFlow.setPadding(dp(4f).toInt(), dp(4f).toInt(), dp(4f).toInt(), dp(2f).toInt())
-        for (v in listOf(closeBtn, sizeBtn, pasteBtn, sttBtn, emojiBtn, aiBtn)) {
-            v.minWidth = dp(40f).roundToInt()
-            v.minHeight = dp(36f).roundToInt()
-            toolFlow.addView(v)
-        }
+        // 粒粒之間兩浸 gap（同鍵盤啲鍵一樣：每邊各縮一浸），出邊一浸
+        toolFlow.hGap = gap() * 2
+        toolFlow.vGap = gap() * 2
+        toolFlow.setPadding(gap(), gap(), gap(), gap())
+        closeBtn.minWidth = dp(40f).roundToInt()
+        closeBtn.minHeight = dp(36f).roundToInt()
+        toolFlow.addView(closeBtn)
+        rebuildTools(KeyLayout.load(context).tools)
 
         candFlow.setPadding(dp(4f).toInt(), dp(2f).toInt(), dp(4f).toInt(), dp(4f).toInt())
         candFlow.onPick = { listener?.onPickCandidate(it) }
@@ -126,11 +111,52 @@ class SidePanelView(context: Context) : LinearLayout(context) {
         refreshAlignLabel()
     }
 
-    /** 同 [OptionBarsView.tool] 一樣：單色圖案（唔係彩色 emoji），顏色跟主題行 */
-    private fun tool(v: TextView, icon: ToolIcon, desc: String, action: KeyAction) {
-        v.gravity = Gravity.CENTER
-        v.setOnClickListener { listener?.onTool(action) }
-        icons[v] = icon to desc
+    /** 同 [OptionBarsView.rebuildTools] 一模一樣嘅砌法，淨係排位換咗 [FlowLayout] */
+    @Suppress("ClickableViewAccessibility")
+    private fun rebuildTools(slots: List<KeyLayout.Slot>) {
+        toolSlots = slots
+        for (b in toolBtns) { icons.remove(b.view); toolFlow.removeView(b.view) }
+        toolBtns.clear()
+
+        for (slot in slots) {
+            val f = slot.tap
+            val v = TextView(context)
+            v.gravity = Gravity.CENTER
+            v.textSize = 15f
+            v.minWidth = dp(40f).roundToInt()
+            v.minHeight = dp(36f).roundToInt()
+            // 工具列冇長撳（[KeyLayout.TOOLS_HAVE_LONG]），所以粒 key 冇 longAction ——
+            // 撳實嗰下一律跌落粒掣自己嗰個內置動作（見 [Listener.onToolLong]）
+            val key = f.toKey()
+            if (f == PadFunc.ALIGN) {
+                v.setOnClickListener { listener?.onCycleAlign(); refreshAlignLabel() }
+                v.setOnTouchListener { view, e -> handleSizeDrag(view, e) }
+                v.setOnLongClickListener { longPressArmed = true; true }
+            } else {
+                v.setOnClickListener { listener?.onTool(f.action()) }
+                v.setOnLongClickListener { listener?.onToolLong(key) == true }
+            }
+            if (f == PadFunc.STT) v.setOnTouchListener { _, e ->
+                if (e.actionMasked == MotionEvent.ACTION_UP ||
+                    e.actionMasked == MotionEvent.ACTION_CANCEL) listener?.onSttHoldEnd()
+                false
+            }
+            val icon = f.toolIcon()
+            if (icon != null) icons[v] = icon to f.label else v.text = f.face
+            v.contentDescription = f.label
+            toolFlow.addView(v)
+            toolBtns.add(ToolBtn(v, slot))
+        }
+        for (b in toolBtns) { b.view.setTextColor(theme.text); styleTool(b.view, theme.keyFaceAlt) }
+        refreshAlignLabel()
+        refreshAiLook()
+        refreshSttLook()
+    }
+
+    /** 設定頁改咗排位先重砌（見 [OptionBarsView.refreshTools]） */
+    fun refreshTools() {
+        val want = KeyLayout.load(context).tools
+        if (want != toolSlots) rebuildTools(want)
     }
 
     /** 同 [OptionBarsView.styleTool] 一樣：底色 + 圖案擺正中間 */
@@ -146,7 +172,7 @@ class SidePanelView(context: Context) : LinearLayout(context) {
         theme = t
         setBackgroundColor(t.background)
         candScroll.setBackgroundColor(t.background)
-        for (v in listOf(sizeBtn, closeBtn, pasteBtn, sttBtn, emojiBtn, aiBtn)) {
+        for (v in listOf(closeBtn) + toolBtns.map { it.view }) {
             v.setTextColor(t.text)
             // 圖案係畫死咗色嘅 drawable，setTextColor 影響唔到，要成個底重新砌
             styleTool(v, t.keyFaceAlt)
@@ -157,11 +183,14 @@ class SidePanelView(context: Context) : LinearLayout(context) {
         rebuildChips()
     }
 
+    /** 同 [OptionBarsView.chipBg] 一樣：圓角 6dp、冇邊框、罅跟「邊框粗細」 */
     private fun chipBg(color: Int): GradientDrawable = GradientDrawable().apply {
         setColor(color)
         cornerRadius = dp(6f)
-        setStroke(1, Color.argb(30, 128, 128, 128))
     }
+
+    /** 見 [OptionBarsView.gap] */
+    private fun gap() = dp(Prefs.gapDp(context).toFloat()).roundToInt()
 
     // ---- 同 OptionBarsView 一樣嘅幾個開關 -----------------------------------
 
@@ -178,12 +207,14 @@ class SidePanelView(context: Context) : LinearLayout(context) {
     /** 未入 Gemini API key 就成粒掣唔見咗（同 [OptionBarsView.setAiVisible] 一樣） */
     fun setAiVisible(visible: Boolean) {
         val want = if (visible) View.VISIBLE else View.GONE
-        if (aiBtn.visibility != want) aiBtn.visibility = want
+        val v = aiBtn ?: return
+        if (v.visibility != want) v.visibility = want
     }
 
     private fun refreshAiLook() {
-        aiBtn.isEnabled = aiReady
-        aiBtn.alpha = if (aiReady) 1f else 0.4f
+        val v = aiBtn ?: return
+        v.isEnabled = aiReady
+        v.alpha = if (aiReady) 1f else 0.4f
     }
 
     fun setSttActive(on: Boolean) {
@@ -193,7 +224,7 @@ class SidePanelView(context: Context) : LinearLayout(context) {
     }
 
     private fun refreshSttLook() {
-        styleTool(sttBtn, if (sttActive) theme.keyAccent else theme.keyFaceAlt)
+        styleTool(sttBtn ?: return, if (sttActive) theme.keyAccent else theme.keyFaceAlt)
     }
 
     fun setCandidates(list: List<String>) {
@@ -234,13 +265,14 @@ class SidePanelView(context: Context) : LinearLayout(context) {
      * [PadAlign.SPLIT]（嗰個係英數鍵盤專用），但個 `when` 都要寫齊。
      */
     fun refreshAlignLabel() {
-        icons[sizeBtn] = when (Prefs.align(context)) {
+        val v = sizeBtn ?: return
+        icons[v] = when (Prefs.align(context)) {
             PadAlign.STRETCH -> ToolIcon.ALIGN_WIDE to "拉闊"
             PadAlign.LEFT_GAP -> ToolIcon.ALIGN_RIGHT to "靠右"
             PadAlign.RIGHT_GAP -> ToolIcon.ALIGN_LEFT to "靠左"
             PadAlign.SPLIT -> ToolIcon.ALIGN_SPLIT to "左右拆開"
         }
-        styleTool(sizeBtn, theme.keyFaceAlt)
+        styleTool(v, theme.keyFaceAlt)
     }
 
     // ---- 大細：同工具 bar 嗰粒掣一樣，上下拖高低、左右拖闊窄 ------------------
@@ -260,6 +292,9 @@ class SidePanelView(context: Context) : LinearLayout(context) {
             MotionEvent.ACTION_DOWN -> {
                 dragX = e.rawX; dragY = e.rawY; dragging = false; horizontal = false
                 longPressArmed = false
+                // 同 [OptionBarsView.handleSizeDrag] 一樣：拉大細要贏過任何
+                // 上手嘅 scroll／捲版，唔係拖到一半個 gesture 就俾人搶咗
+                v.parent?.requestDisallowInterceptTouchEvent(true)
             }
             MotionEvent.ACTION_MOVE -> {
                 val dx = e.rawX - dragX

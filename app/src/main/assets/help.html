@@ -44,17 +44,22 @@
   <ul>
     <li><strong>大格「下頁」</strong>（預設）：按下前往下一頁，長按返回上一頁。</li>
     <li><strong>雙鍵</strong>：將「上頁」和「下頁」分開顯示，並可選擇左右次序。</li>
+    <li><strong>無效果</strong>：<span class="key">0</span> 完全不變樣，長按仍是成對標點。按下去照樣翻下一頁，只是不會為了翻頁而改動排位；想要一顆明確的「下頁」／「上頁」，在「按鍵排位」把它拖到左右兩欄。</li>
   </ul>
   <p class="note">頁碼以 <span class="key">1/10</span> 形式顯示。使用大格「下頁」時，長按 <span class="key">0</span> 的成對標點功能會在選字期間暫停。</p>
 </div>
 
 <h2>按鍵與長按</h2>
 <ul>
-  <li>左上角按鍵的短按和長按功能均可自訂，包括速選字、簡體開關、表情符號、貼上、語音輸入及 AI 改寫。</li>
+  <li>中文鍵盤左欄四顆、右欄四顆，以及整條工具列，每一顆的短按與長按都可以自己編排：「一般 → 按鍵排位」。九宮格 <span class="key">1</span>～<span class="key">9</span>、兩格寬的 <span class="key">0</span> 與「取消」是三三的打法本身，不能改動。</li>
+  <li>從按鍵池往上拖 = 加一顆（池裡不會減少）；格子與格子互拖 = 兩格對調；拖回池裡 = 清走那一格。按一下格子也可以直接選，不一定要拖。</li>
+  <li><strong>工具列只有短按</strong>（那幾顆本來就有自己的按住動作），最多八顆。它沒有 <span class="key">＋</span> 掣 —— 加一顆就是把按鍵池那顆拖到工具列任何空位。</li>
+  <li><span class="key">Eng</span>、<span class="key">␣</span>、<span class="key">⌫</span>、<span class="key">⏎</span>、「轉換工具列」一定要留在左右兩欄，不能放進工具列；<span class="key">␣</span>、<span class="key">⌫</span>、<span class="key">⏎</span> 只能放短按，放了之後同一格不會有長按格。「改變大小」相反，只能放在工具列。</li>
+  <li>鍵面左上角的小字（或小圖案）就是長按會做的事。</li>
   <li>長按「同音」鍵可顯示關聯字；長按 <span class="key">📋</span> 可開啟剪貼簿記錄。</li>
-  <li>九宮格 <span class="key">1</span>～<span class="key">9</span> 長按等於連按兩下。純數字鍵盤不支援長按。</li>
+  <li>九宮格 <span class="key">1</span>～<span class="key">9</span> 長按等於連按兩下。純數字鍵盤只有 <span class="key">Eng</span> 有長按（＝切換輸入法，跟九宮格那顆一樣），其餘按鍵一律沒有。</li>
   <li>長按空白鍵 <span class="key">␣</span> 並拖動，可上下左右移動游標。</li>
-  <li>長按中文鍵盤的 <span class="key">Eng</span> 鍵可切換輸入法。</li>
+  <li>切換輸入法有兩顆按鍵可以擺：「下一個輸入法」與「彈出輸入法選擇表」。預設是左下角 <span class="key">Eng</span> 的長按 = 下一個輸入法。</li>
 </ul>
 
 <h2>滑動輸入</h2>
@@ -69,11 +74,11 @@
   <li>長按字母鍵可選擇大小寫及重音字母。</li>
   <li>長按 <span class="key">,</span>、<span class="key">.</span> 或 <span class="key">/</span> 可選擇其他標點。</li>
   <li>長按 <span class="key">?123</span> 可直接切換至純數字鍵盤。</li>
-  <li>純數字鍵盤左欄為 <span class="key">+</span> <span class="key">-</span> <span class="key">*</span> <span class="key">/</span>；<span class="key">000</span> 可一次輸入三個 0。</li>
+  <li>純數字鍵盤左下兩顆是 <span class="key">中</span> 與 <span class="key">Eng</span>，左上是 <span class="key">*</span> <span class="key">/</span>，右上是 <span class="key">+</span> <span class="key">-</span>；<span class="key">000</span> 可一次輸入三個 0。</li>
 </ul>
 
 <h2>工具列與鍵盤大小</h2>
-<p>工具列提供關聯字、剪貼簿、語音輸入、表情符號及 AI 功能。工具列常駐時，九宮格右上角顯示 <span class="key">⇄</span>；關閉常駐後，則以 <span class="key">☰</span> 開啟或關閉工具列。</p>
+<p>工具列固定顯示，預設提供大小位置、剪貼簿、語音輸入、表情符號及 AI 功能 —— 有哪幾顆、甚麼次序，都可以在「按鍵排位」自己排。切換「關聯字 ⇄ 工具」靠「轉換工具列」那顆按鍵，預設在九宮格右上角，顯示為 <span class="key">⇄</span>。</p>
 <ul>
   <li>按一下大小位置鍵，可切換拉寬、靠左或靠右。</li>
   <li>上下拖動調整鍵盤高度；左右拖動調整鍵盤寬度。</li>

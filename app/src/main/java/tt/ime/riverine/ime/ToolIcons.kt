@@ -55,6 +55,14 @@ enum class ToolIcon {
      * 縮到得十零 dp 都仲認得出，唔會糊成一嚿。
      */
     GLOBE,
+
+    /**
+     * 地球 + 隔籬三條橫線：**彈輸入法選擇表**（[GLOBE] 就係「直接跳去下一個」）。
+     *
+     * 兩粒掣擺得埋一齊（設定頁「按鍵排位」兩個都拖得），淨用個地球就分唔出
+     * 邊粒係邊粒，所以呢個特登係「地球細咗、隔籬有張表」。
+     */
+    GLOBE_LIST,
 }
 
 /**
@@ -96,6 +104,7 @@ class ToolIconDrawable(private val icon: ToolIcon, color: Int) : Drawable() {
             ToolIcon.ALIGN_WIDE -> drawAlign(canvas, left = true, both = true)
             ToolIcon.ALIGN_SPLIT -> drawSplit(canvas)
             ToolIcon.GLOBE -> drawGlobe(canvas)
+            ToolIcon.GLOBE_LIST -> drawGlobeList(canvas)
         }
         canvas.restoreToCount(save)
     }
@@ -212,6 +221,21 @@ class ToolIconDrawable(private val icon: ToolIcon, color: Int) : Drawable() {
         canvas.drawLine(3.2f, 12f, 20.8f, 12f, stroke)
         rect.set(6.9f, 3f, 17.1f, 21f)
         canvas.drawOval(rect, stroke)
+    }
+
+    /**
+     * 地球（細咗、推去左邊）+ 右邊三條橫線做「一張表」。
+     * 條線幼過個地球嘅框，唔係三條線太搶眼，成個圖案得返張表睇得見。
+     */
+    private fun drawGlobeList(canvas: Canvas) {
+        canvas.drawCircle(8f, 12f, 6f, stroke)
+        canvas.drawLine(2.2f, 12f, 13.8f, 12f, stroke)
+        rect.set(5.2f, 6f, 10.8f, 18f)
+        canvas.drawOval(rect, stroke)
+        val thick = stroke.strokeWidth
+        stroke.strokeWidth = thick * 0.8f
+        for (y in listOf(7.4f, 12f, 16.6f)) canvas.drawLine(16.4f, y, 22f, y, stroke)
+        stroke.strokeWidth = thick
     }
 
     /** 箭嘴頭：尖喺 ([tipX], 12)，[dir] = -1 指左、+1 指右，[back] 長、[half] 半高 */

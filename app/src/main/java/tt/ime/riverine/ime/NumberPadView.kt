@@ -1,6 +1,8 @@
 package tt.ime.riverine.ime
 
 import android.content.Context
+import tt.ime.riverine.core.KeyLayout
+import tt.ime.riverine.core.PadFunc
 import tt.ime.riverine.core.PadGroup
 
 /**
@@ -36,8 +38,15 @@ enum class NumField {
  */
 class NumberPadView(context: Context) : RowsPadView(context) {
 
-    /** 呢頁一律唔准長撳（打號碼撳耐咗就彈 popup 出嚟好煩） */
-    override fun allowLongPress(k: Key) = false
+    /**
+     * 呢頁**淨係粒 `Eng` 長撳得**（打號碼撳耐咗就彈 popup 出嚟好煩，
+     * 所以數字同符號一律唔准）。
+     *
+     * `Eng` 係例外，因為佢個長撳係**換輸入法** —— 同中文九宮格嗰粒一模一樣
+     * （見 [toLatin]）。呢頁好多時係打電話號碼／金額，中途想跳去第二個輸入法
+     * 一樣要有得跳，唔應該逼人先返中文頁。
+     */
+    override fun allowLongPress(k: Key) = k.action == KeyAction.TO_LATIN
 
     /** 而家出緊邊套排位（見 [NumField]），連埋 `number` 欄收唔收 `-` / `.` */
     private var fieldKind: NumField = NumField.CALC
@@ -59,7 +68,17 @@ class NumberPadView(context: Context) : RowsPadView(context) {
     private fun op(s: String) = Key(KeyAction.CHAR, label = s, text = s, bigLabel = true)
 
     private fun toChinese() = Key(KeyAction.TO_CHINESE, label = "中", bigLabel = true)
-    private fun toLatin() = Key(KeyAction.TO_LATIN, label = "Eng")
+
+    /**
+     * `Eng`。長撳做乜**跟返中文九宮格嗰粒**（`KeyLayout.longFor`）——
+     * user 喺「按鍵排位」度將佢改做「彈輸入法選擇表」，兩頁一齊變。
+     * 冇配過就冇長撳，粒鍵左上角亦都唔會畫嘢。
+     */
+    private fun toLatin(): Key {
+        val long = KeyLayout.longFor(KeyLayout.load(context), PadFunc.TO_LATIN)
+        return Key(KeyAction.TO_LATIN, label = "Eng",
+            hint = long.face, longAction = long.action())
+    }
     private fun backspace() = Key(KeyAction.BACKSPACE, label = "⌫", repeatable = true)
     private fun enter() = Key(KeyAction.ENTER, label = "⏎", accent = true)
 
@@ -83,40 +102,45 @@ class NumberPadView(context: Context) : RowsPadView(context) {
         listOf(enter(), num(0), backspace())
     )
 
-    // 呢頁**冇一粒鍵有長撳效果** —— 打電話號碼／金額嗰陣撳耐咗少少就彈個
-    // 符號 popup 出嚟好煩，所以數字一律用淨得個 label 嘅 [num]，唔用 digitKey。
-    // `中` / `Eng` 喺右上角（唔喺底行），`0` `000` `.` 就喺底行，
+    // 數字一律用淨得個 label 嘅 [num]（唔用 digitKey）—— 打電話號碼／金額嗰陣
+    // 撳耐咗少少就彈個符號 popup 出嚟好煩。`0` `000` `.` 喺底行，
     // ⌫ 照舊喺 ⏎ 上面。`000` = 一次過打三個 0（金額、電話號碼常用）。
+    //
+    // **`中` / `Eng` 2026-09-09 由右上角搬返落左下角**（user 要求）——
+    // 同其餘三款鍵盤嗰條「左下兩粒係返回英文／中文」嘅規矩睇齊，
+    // 而且 `Eng` 落到最左下，同中文九宮格嗰粒企喺同一個位。
+    // 最左嗰欄啲符號向上推（`* /` 上到頂），讓走嗰對（`+ -`）搬去右上角。
     private fun calcRows() = listOf(
-        listOf(op("+"), num(1), num(2), num(3), toChinese()),
-        listOf(op("-"), num(4), num(5), num(6), toLatin()),
-        listOf(op("*"), num(7), num(8), num(9), backspace()),
-        listOf(op("/"), num(0), op("000"), op("."), enter())
+        listOf(op("*"), num(1), num(2), num(3), op("+")),
+        listOf(op("/"), num(4), num(5), num(6), op("-")),
+        listOf(toChinese(), num(7), num(8), num(9), backspace()),
+        listOf(toLatin(), num(0), op("000"), op("."), enter())
     )
 
     /**
      * 電話：`+ - ( )` 同 `*` `#` 都係撥號串常用（`+852`、`(852) 1234-5678`、
-     * 分機 `#`），`* /` 呢啲計數符號就一粒都唔要。
+     * 分機 `#`），`/` 呢啲計數符號就唔要。`中` / `Eng` 佔咗左下兩格
+     * （見 [calcRows]），所以 `( )` 讓咗去右上角。
      */
     private fun phoneRows() = listOf(
-        listOf(op("("), num(1), num(2), num(3), toChinese()),
-        listOf(op(")"), num(4), num(5), num(6), toLatin()),
-        listOf(op("-"), num(7), num(8), num(9), backspace()),
-        listOf(op("+"), op("*"), num(0), op("#"), enter())
+        listOf(op("-"), num(1), num(2), num(3), op("(")),
+        listOf(op("+"), num(4), num(5), num(6), op(")")),
+        listOf(toChinese(), num(7), num(8), num(9), backspace()),
+        listOf(toLatin(), op("*"), num(0), op("#"), enter())
     )
 
     /**
      * `number` 欄：`+ * /` 一律唔要（會俾輸入框濾走），`-` 淨係 `numberSigned`
-     * 先出，`.` 淨係 `numberDecimal` 先出。兩樣都冇（淨係 `number`，例如數量、
-     * 年齡）就係最左一欄留白 + 底行少咗粒 `.`。
+     * 先出（喺右上角），`.` 淨係 `numberDecimal` 先出（喺底行）。兩樣都冇
+     * （淨係 `number`，例如數量、年齡）就上面兩行左右各留一格白。
      */
     private fun numberRows() = listOf(
-        listOf(spacerKey(1f), num(1), num(2), num(3), toChinese()),
-        listOf(spacerKey(1f), num(4), num(5), num(6), toLatin()),
-        listOf(spacerKey(1f), num(7), num(8), num(9), backspace()),
+        listOf(spacerKey(1f), num(1), num(2), num(3),
+            if (allowSign) op("-") else spacerKey(1f)),
+        listOf(spacerKey(1f), num(4), num(5), num(6), spacerKey(1f)),
+        listOf(toChinese(), num(7), num(8), num(9), backspace()),
         listOf(
-            if (allowSign) op("-") else spacerKey(1f),
-            num(0), op("000"),
+            toLatin(), num(0), op("000"),
             if (allowDecimal) op(".") else spacerKey(1f),
             enter()
         )
@@ -137,11 +161,13 @@ class NumberPadView(context: Context) : RowsPadView(context) {
             if (date) op("/") else spacerKey(1f),
             if (time) op(":") else spacerKey(1f)
         )
+        // 同 [calcRows] 一樣：`中` / `Eng` 佔咗左下兩格，啲分隔符向上推，
+        // 讓走嗰對（`.` `-`）搬去右上角
         return listOf(
-            listOf(col[0], num(1), num(2), num(3), toChinese()),
-            listOf(col[1], num(4), num(5), num(6), toLatin()),
-            listOf(col[2], num(7), num(8), num(9), backspace()),
-            listOf(col[3], num(0).copy(weight = 3f), enter())
+            listOf(col[2], num(1), num(2), num(3), col[0]),
+            listOf(col[3], num(4), num(5), num(6), col[1]),
+            listOf(toChinese(), num(7), num(8), num(9), backspace()),
+            listOf(toLatin(), num(0).copy(weight = 3f), enter())
         )
     }
 

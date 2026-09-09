@@ -45,10 +45,12 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import com.google.android.material.tabs.TabLayout
+import tt.ime.riverine.BuildConfig
 import tt.ime.riverine.core.AiStt
 import tt.ime.riverine.core.BarMode
 import tt.ime.riverine.core.EngLongPress
 import tt.ime.riverine.core.InputLog
+import tt.ime.riverine.core.KeyLayout
 import tt.ime.riverine.core.KeyPressEffect
 import tt.ime.riverine.core.PadFunc
 import tt.ime.riverine.core.PadGroup
@@ -95,6 +97,31 @@ class SettingsActivity : AppCompatActivity() {
          *  - 「英文鍵盤加一行數字」（永遠保持開啟，見 [Prefs.FORCE_LATIN_NUM_ROW]）
          */
         private const val SHOW_HIDDEN_OPTIONS = false
+
+        /**
+         * 已被「按鍵排位」那個拖放介面取代、**只隱藏沒有刪過 code** 的舊設定：
+         *
+         *  - 「按鍵功能」四個下拉式選單（左上角短／長按、「同音」長按、右上角長按）
+         *  - 「長按中文鍵盤的『Eng』」（換輸入法改為兩顆可自由擺位的按鍵）
+         *  - 「工具列常駐」（現在一律常駐，見 [Prefs.FORCE_BAR_PINNED]）
+         *
+         * 那四個舊 pref 仍然有用：舊裝置第一次執行新版時，`KeyLayout.load` 會讀
+         * 它們砌回一模一樣的排位（見 `KeyLayout.fromLegacyPrefs`），所以升級後
+         * 鍵盤不會走位。改成 true 就可以連同新介面一起顯示，方便對照除錯。
+         */
+        private const val SHOW_LEGACY_KEY_OPTIONS = false
+
+        /**
+         * 舊那四個下拉式選單列得出的功能 —— **只有 2.x 之前就有的那八個**。
+         *
+         * [PadFunc] 現在還裝著 `Eng`、`⏎`、「改變大小」這些只能靠新介面擺位的
+         * 按鍵（它們有「一定要用」「只能放短按」等規矩，舊選單完全沒有這套檢查），
+         * 所以不可以直接拿 `PadFunc.entries` 去填。
+         */
+        private val LEGACY_FUNCS = listOf(
+            PadFunc.SHORTCUT, PadFunc.SC_TOGGLE, PadFunc.RELATE, PadFunc.EMOJI,
+            PadFunc.PASTE, PadFunc.STT, PadFunc.AI, PadFunc.NONE,
+        )
     }
 
     private lateinit var content: LinearLayout
@@ -487,19 +514,56 @@ class SettingsActivity : AppCompatActivity() {
      * 如有重複，該位置只會顯示紅色外框和提示文字（見 [FuncPicker]），
      * 不會阻止儲存，四個位置仍會各自生效。
      */
+    /**
+     * 以前這裡有個「按鍵功能」節（四個下拉式選單）。四個選單已被「按鍵排位」
+     * 取代並隱藏之後，整節只剩下標題與幾段說明，看上去像個空欄，
+     * 所以 2026-09-09 把標題拆走 —— 剩下那顆掣與說明併進「按鍵排位」。
+     * 舊那四個選單的 code 沒有刪，見 [SHOW_LEGACY_KEY_OPTIONS]。
+     */
     private fun buildKeysSection() {
-        header("按鍵功能")
-        note("中文鍵盤有四個可自訂位置：左上角按鍵的短按與長按、「同音」鍵長按、" +
-            "右上角按鍵（☰／⇄）長按。")
-        note("同一功能可以用於多個位置，重複時該位置會顯示紅色外框和提示，" +
-            "但各位仍會照常生效，不會互相取消。只有左上角短按不可停用。")
+        buildLayoutSection()
+        buildPagerSection()
+    }
 
-        funcPicker("左上角按鍵 短按", Prefs.KEY_TL_TAP, allowNone = false)
-        funcPicker("左上角按鍵 長按", Prefs.KEY_TL_LONG, allowNone = true)
-        funcPicker("「同音」鍵 長按", Prefs.KEY_HOMO_LONG, allowNone = true)
-        funcPicker("右上角按鍵 長按", Prefs.KEY_TR_LONG, allowNone = true)
-        syncFuncPickers() // 四個位置建立後才能比對重複項目，並補上初始紅框狀態
-        note("鍵面左上角的小字就是長按會做的事。「同音」鍵左下角另有即時提示：" +
+    /**
+     * 「按鍵排位」：拖放砌左欄四顆、右欄四顆與整條工具列（見 [KeyLayoutEditor]）。
+     *
+     * 這裡只負責把編輯器放進頁面、把結果寫回 pref；甚麼放得下、甚麼放不下
+     * 全部由 [KeyLayout] 判斷，兩邊不會各有一套規則。
+     */
+    private fun buildLayoutSection() {
+        header("按鍵排位")
+        if (SHOW_LEGACY_KEY_OPTIONS) {
+            funcPicker("左上角按鍵 短按", Prefs.KEY_TL_TAP, allowNone = false)
+            funcPicker("左上角按鍵 長按", Prefs.KEY_TL_LONG, allowNone = true)
+            funcPicker("「同音」鍵 長按", Prefs.KEY_HOMO_LONG, allowNone = true)
+            funcPicker("右上角按鍵 長按", Prefs.KEY_TR_LONG, allowNone = true)
+            syncFuncPickers() // 四個位置建立後才能比對重複項目，並補上初始紅框狀態
+            val engOptions = EngLongPress.entries.toList()
+            enumPicker("長按中文鍵盤的「Eng」", engOptions.map { it.label },
+                engOptions.indexOf(Prefs.engLongPress(this))) { i ->
+                Prefs.setEngLongPress(this, engOptions[i])
+                rebuildPreview()
+            }
+        }
+        note("中文鍵盤左欄四顆、右欄四顆，以及上方工具列，每一顆的短按與長按都可以自己排。" +
+            "九宮格 1~9、兩格寬的 0 與「取消」是三三的打法本身，不能改動。")
+        note("由下面的按鍵池往上拖 = 加一顆（池裡不會減少）；格子與格子互拖 = 兩格對調；" +
+            "拖回池裡 = 清走那一格。格子太小拖不準，按一下它也可以直接選。")
+        note("Eng、空格、刪除、換行／送出、轉換工具列這五顆一定要留在左右兩欄，" +
+            "不能放進工具列；空格、刪除、換行只能放短按，放了之後同一格的長按會停用；" +
+            "「改變大小」相反，只能放在工具列（要在那顆按鍵上直接拖才拉得動鍵盤大小）。")
+        note("左右兩欄之間不可以有重複的按鍵，工具列本身也不可以；" +
+            "但同一顆可以同時出現在工具列與左右兩欄。")
+
+        val editor = KeyLayoutEditor(this, KeyLayout.load(this)) { l ->
+            KeyLayout.save(this, l)
+            rebuildPreview()
+        }
+        content.addView(editor, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+
+        note("鍵面左上角的小字（或小圖案）就是長按會做的事。「同音」鍵左下角另有即時提示：" +
             "正在輸入的字碼、正在查詢哪個字的同音，或該字本身的正常打法。")
 
         switch("顯示目前已輸入碼", Prefs.KEY_SHOW_CURR_CODE, true)
@@ -507,32 +571,37 @@ class SettingsActivity : AppCompatActivity() {
             "選完字或取消後就會消失。它與上述另外兩種提示共用同一位置，" +
             "極少同時出現，真的撞在一起時以正在輸入的字碼為準。")
 
-        val engOptions = EngLongPress.entries.toList()
-        enumPicker("長按中文鍵盤的「Eng」", engOptions.map { it.label },
-            engOptions.indexOf(Prefs.engLongPress(this))) { i ->
-            Prefs.setEngLongPress(this, engOptions[i])
-            rebuildPreview()
-        }
-        note("切換輸入法一律靠長按「Eng」：「直接切換」跳至下一個輸入法；" +
-            "輸入法多於兩個時，「彈出選單」較易找到想要的那個。")
-
         note("九宮格 1~9 按下即出碼，不必等放開手指，長按等於連按兩下。" +
             "選字狀態、以及關閉滑動輸入後開了「長按 1~9 開速選字表」而未輸入字碼時例外，" +
             "那兩種情況要放開手指才出碼。")
-
-        if (SHOW_HIDDEN_OPTIONS) {
-            switch("英文鍵盤上方加一行數字", Prefs.KEY_LATIN_NUM_ROW, false)
-        }
         note("英文鍵盤固定有一行數字：長按數字出對應符號（1 → !），4 另有各國貨幣符號；" +
             "長按字母可選大小寫與重音寫法；長按 , . / 可選其餘標點。")
         note("長按 ␣ 後不放手，上下左右拖動即可移動游標；長按 ?123 直接跳至純數字鍵盤。")
+        if (SHOW_HIDDEN_OPTIONS) {
+            switch("英文鍵盤上方加一行數字", Prefs.KEY_LATIN_NUM_ROW, false)
+        }
 
-        buildPagerSection()
+        row(button("還原預設排位") {
+            AlertDialog.Builder(this)
+                .setTitle("還原預設排位")
+                .setMessage("左右兩欄與工具列會回到出廠時的排法，目前的排位不會留底。")
+                .setPositiveButton("還原") { _, _ ->
+                    KeyLayout.reset(this)
+                    editor.setLayout(KeyLayout.load(this))
+                    rebuildPreview()
+                    toast("已還原預設排位")
+                }
+                .setNegativeButton("取消", null)
+                .show()
+        })
     }
 
     /**
      * 選字內容達兩頁時，底行佔兩格寬的 `0` 鍵會如何變化（見 [PagerLayout]）。
-     * 三種排法在 `ChinesePadView` 實作，此處只負責選擇。
+     * 四種排法在 `ChinesePadView` 實作，此處只負責選擇。
+     *
+     * 排在「按鍵排位」下面是有原因的：選了 [PagerLayout.NO_CHANGE]（0 鍵維持原樣）
+     * 之後，翻頁就要靠上面那個介面拖一顆「下頁」／「上頁」出來。
      */
     private fun buildPagerSection() {
         header("選字翻頁")
@@ -557,6 +626,10 @@ class SettingsActivity : AppCompatActivity() {
             PagerLayout.WIDE_NEXT ->
                 "0 鍵維持兩格寬，整顆是「下頁」（較容易按中），長按為「上頁」。" +
                 "選字期間長按 0 的成對標點會暫停，頁數改在右上角，離開選字即回復。"
+            PagerLayout.NO_CHANGE ->
+                "0 鍵完全不變樣：仍是兩格寬，長按仍是成對標點。選字時按下去照樣翻下一頁，" +
+                "只是不會為了翻頁而改動排位。想要一顆明確的「下頁」／「上頁」，" +
+                "請在上面的「按鍵排位」把它拖到左右兩欄。"
         }
     }
 
@@ -894,10 +967,12 @@ class SettingsActivity : AppCompatActivity() {
     private fun buildBehaviourSection() {
         header("其他")
         switch("輸出簡體字", Prefs.KEY_SC_OUTPUT, false)
-        switch("工具列常駐", Prefs.KEY_BAR_PINNED, true)
-        note("開啟（預設）：工具列固定顯示，九宮格右上角該按鍵變成 ⇄，" +
-            "負責關聯字與工具（大小位置、貼上、語音、表情符號、AI）的切換。")
-        note("關閉：右上角的 ☰ 改為開關整條工具列，切換關聯字與工具改按工具列最左的 ⇄。")
+        if (SHOW_LEGACY_KEY_OPTIONS) {
+            switch("工具列常駐", Prefs.KEY_BAR_PINNED, true)
+            note("關閉：右上角的 ☰ 改為開關整條工具列，切換關聯字與工具改按工具列最左的 ⇄。")
+        }
+        note("工具列固定顯示。切換「關聯字 ⇄ 工具」靠一顆「轉換工具列」按鍵，" +
+            "預設在鍵盤右欄最上，位置可以在「按鍵排位」自行調整。")
         val pressEffects = KeyPressEffect.entries.toList()
         enumPicker("按鍵按下時的效果", pressEffects.map { it.label },
             pressEffects.indexOf(Prefs.keyPressEffect(this))) { i ->
@@ -932,16 +1007,21 @@ class SettingsActivity : AppCompatActivity() {
         refreshLongPressShortcut()
 
         // 查「明明按了 793，為何出現了第二字」用的 —— 見 `core/InputLog`
-        // 與 `scripts/debug-input.sh`
-        switch("記錄輸入過程 (logcat)", Prefs.KEY_INPUT_LOG, false) {
-            // 設定頁與 IME service 同一個 process，寫一次立即生效 ——
-            // 不用等 `onStartInputView` 重新讀（那句照留，保持開啟鍵盤改設定時先要）
-            InputLog.pref = it
+        // 與 `scripts/debug-input.sh`。**只有 debug build 看得見**
+        // （2026-09-09 使用者要求）：正式版的人開了它只會白白把自己打的字寫進
+        // logcat。pref 與 `InputLog` 一行都沒有刪，release 版仍可以用
+        // `adb shell setprop log.tag.TTInput DEBUG` 打開，見 AGENTS.md。
+        if (BuildConfig.DEBUG) {
+            switch("記錄輸入過程 (logcat)", Prefs.KEY_INPUT_LOG, false) {
+                // 設定頁與 IME service 同一個 process，寫一次立即生效 ——
+                // 不用等 `onStartInputView` 重新讀（那句照留，保持開啟鍵盤改設定時先要）
+                InputLog.pref = it
+            }
+            note("除錯用，預設關閉。開啟後每按一鍵、每次滑動判定、每次選字都會寫進 " +
+                "Android logcat（標籤 TTInput），電腦端執行 scripts/debug-input.sh 即可" +
+                "在 terminal 看到「我按了什麼」與「輸入法收到什麼」的對照。")
+            note("紀錄內含你正在輸入的字碼與文字，查完問題請關閉。")
         }
-        note("除錯用，預設關閉。開啟後每按一鍵、每次滑動判定、每次選字都會寫進 " +
-            "Android logcat（標籤 TTInput），電腦端執行 scripts/debug-input.sh 即可" +
-            "在 terminal 看到「我按了什麼」與「輸入法收到什麼」的對照。")
-        note("紀錄內含你正在輸入的字碼與文字，查完問題請關閉。")
 
         buildVersionFooter()
     }
@@ -1283,7 +1363,7 @@ class SettingsActivity : AppCompatActivity() {
      * （見 [FuncPicker.refreshDuplicateState]）。[allowNone] = false 只左上角短按。
      */
     private fun availableFuncs(allowNone: Boolean): List<PadFunc> =
-        PadFunc.entries.filter { allowNone || it != PadFunc.NONE }
+        LEGACY_FUNCS.filter { allowNone || it != PadFunc.NONE }
 
     /**
      * 一個普通下拉式選單（[options] 是已經寫好的字，[onPick] 收第幾個）。

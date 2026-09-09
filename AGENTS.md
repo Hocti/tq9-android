@@ -107,22 +107,36 @@ log 由 `core/InputLog` 出，**兩個開關任選其一**（預設兩個都關�
 底行是 `[0 佔兩格][取消]`；選字達兩頁時兩格寬那顆 `0` 如何變化由設定決定
 （見下面「選字揭頁」）。改為電話排列就與原版打法完全不同。
 
-**右欄由上而下是 `☰／⇄`、`␣`、`⌫`、`⏎`**（2026-08-27 使用者要求，`␣` 與 `⌫`
+**左欄四顆、右欄四顆由使用者自己排**（2026-09-09 起，見下面「按鍵排位」）。
+`ChinesePadView.buildLayout()` 只砌中間三欄，兩側跟 `KeyLayout.load()` 出來的
+排位走 —— 想知道預設是甚麼樣，看 `KeyLayout.DEFAULT`，那就是 2026-09-09
+之前寫死的那個：左欄「關聯字／同音／`?123`／`Eng`」，
+**右欄由上而下 `⇄`、`␣`、`⌫`、`⏎`**（2026-08-27 使用者要求，`␣` 與 `⌫`
 對調了）—— 這樣中文都依照下面那條「`⏎` 上面那顆一定是 `⌫`」的規矩，
-四款鍵盤一致。最上那顆平時是 `☰`，工具列常駐時變 `⇄`（見「工具列常駐」）。
-左下角只保留 `🌐`（整格寬）—— 錄音已移至上工具列，在「貼上」旁邊，
-也是左上角那按鍵可選擇的其中一個 `PadFunc`。
+四款鍵盤一致。錄音已移至上工具列，在「貼上」旁邊。
+
+**不要再在 `buildLayout()` 寫死兩側任何一顆**。要改預設就改 `KeyLayout.DEFAULT`，
+要加一種可擺的功能就加落 `PadFunc`（順手在 `PadFuncKeys.kt` 補回它的
+`KeyAction` 與圖案）—— 兩處都改完，設定頁那個拖放介面自動就有得揀。
 
 ### 底行的規矩（英文／符號／純數字）
 
-- **左下兩個一定是「返回英文／中文」**（`Eng` 優先，然後才 `中`）—— 有兩個例外：
-  中文九宮格自己就是中文，左下角只保留 `Eng`；**純數字頁**兩個已移至**右上角**
-  （使用者要求，左下角讓了讓 `0` `.` `-`）。
+- **左下兩個一定是「返回英文／中文」**（`Eng` 在最下，`中` 在它上面）—— 一個例外：
+  中文九宮格自己就是中文，左下角只保留 `Eng`。
+  **純數字頁 2026-09-09 由右上角搬回左下角**（使用者要求）：這樣四款鍵盤一致，
+  而且 `Eng` 落在最左下，跟中文九宮格那顆站在同一個位。最左那欄的符號向上推
+  （`calc` 的 `* /` 上到頂），讓走那對（`+ -`）搬去右上角 —— 每種
+  `NumField` 都跟同一條規矩：**下面那對符號留在左邊往上推，上面那對搬去右上**。
   英文那顆**寫 `Eng` 不寫 `ABC`**（2026-08-25 使用者要求，全部頁一致）。
-  中文那顆**長按 = 換輸入法**，執行哪項功能由設定頁選（`Prefs.EngLongPress`）：
-  `NEXT_IME` → `KeyAction.IME_SWITCH`（跳去下一個，無法切換就轉到選單），
-  `PICKER` → `KeyAction.IME_PICKER`（直接彈系統選單）。🌐 已隱藏，
-  這按鍵是唯一入口，所以兩種做法都要有。
+  中文那顆預設**長按 = 下一個輸入法**，但 2026-09-09 起這不再是 `Eng` 專屬：
+  「下一個輸入法」（`PadFunc.IME_NEXT` → `KeyAction.IME_SWITCH`）與
+  「彈出輸入法選擇表」（`PadFunc.IME_PICKER` → `KeyAction.IME_PICKER`）
+  都是**可以自由擺位的按鍵**，兩顆的預設就是前者擺在左下角 `Eng` 的長按。
+  舊那個 `Prefs.EngLongPress` 只剩下升級時讀一次（`KeyLayout.fromLegacyPrefs`），
+  設定頁那個選單已隱藏（`SettingsActivity.SHOW_LEGACY_KEY_OPTIONS`）。
+  **純數字頁那顆 `Eng` 跟回中文九宮格那顆**（`KeyLayout.longFor`）——
+  排位改了兩頁一起變，不會一頁一個樣。那頁本來 `allowLongPress` 全部回 false
+  （打號碼按久一點就彈 popup 很煩），`Eng` 是唯一例外。
 - **`⏎` 上面那顆一定是 `⌫`**。所以符號頁的分頁按鍵（`€£¥`／`?123`）與 `⌫`
   都在倒數第二行的最左與最右，純數字頁的 `⌫` 也由右上角已移至 `⏎` 上面。
   第一頁那顆分頁按鍵**寫三個貨幣符號 `€£¥`**（第二頁頭一行就是貨幣符號），
@@ -688,22 +702,51 @@ emoji 表／剪貼簿跟 `forcedHeightPx`，不在此處計（`as? KeyboardBaseV
 
 `showOverlay()` / `hideOverlay()` 兩邊都會叫 `refreshBars()`。
 
-### 工具列常駐（`Prefs.barPinned`，2026-08-27 加，2026-08-28 起**預設開**）
+### 工具列常駐（`Prefs.barPinned`，2026-08-27 加，2026-09-09 起**一律開**）
 
-開啟後之後工具列 關不關閉得，而**九宮格右上角那按鍵已更換個意思**：
+2026-09-09 起 `Prefs.FORCE_BAR_PINNED = true`，設定頁那個開關已隱藏
+（`SettingsActivity.SHOW_LEGACY_KEY_OPTIONS`）—— **pref 與整條「關閉」那路
+一行都沒有刪**，把那個 const 改回 false 就全部回來。
+
+常駐即是「開／關整條工具列」沒有事可做，所以那顆按鍵一律是
+`PadFunc.BAR_SWITCH`（`⇄`＝關聯字 ⇄ 工具）。它是**必用鍵**
+（`PadFunc.required`），拖放介面不准把它拖走，否則就永遠進不了工具列。
 
 | | 按鍵 | 工具列 最左 |
 | --- | --- | --- |
-| 關閉 | `☰`＝開／關成工具列 | `⇄`＝關聯字 ⇄ 工具 |
-| 常駐（預設） | `⇄`＝關聯字 ⇄ 工具 | **沒有**（`setSwitchVisible(false)`） |
+| 關閉（已隱藏） | `☰`＝開／關成工具列 | `⇄`＝關聯字 ⇄ 工具 |
+| 常駐（現在一律） | `⇄`＝關聯字 ⇄ 工具 | **沒有**（`setSwitchVisible(false)`） |
 
 三處要一起夾：
 
 - `TTInputMethodService.toggleBar()` 第一句就分流去 `onSwitchView()`。
 - `refreshBars()` 開頭見到 `pinned && barMode == OFF` 就當場升做 `CANDIDATES`
   **而且寫回落 pref**（設定頁㩒按鍵不會 restart 個 service）。
-- `ChinesePadView.optionKey()` 換鍵面；`optionOn`（是否亮起）常駐時代表
+- 那顆鍵面來自 `PadFunc.BAR_SWITCH.face`；`optionOn`（是否亮起）常駐時代表
   「目前在工具那邊」，不是「工具列 保持開啟」—— 持續著住藍燈沒有資訊可言。
+
+### 工具列那行掣的闊度：`ToolStrip`
+
+**不用 `weight` 平分**（2026-09-09 使用者要求）：兩三顆的時候平分會闊到像個
+banner、按邊都按到嘢；八顆的時候窄機平分下來每顆三十幾 dp，細過隻手指。
+所以每顆鎖死在 `minW`（44dp）～`maxW`（76dp）之間，擺不下就交給外面那個
+`HorizontalScrollView` 打橫捲。
+
+⚠️ **加了那個 scroll view 就一定要處理「改變大小」那顆**：它左右拖 = 拉闊拉窄
+鍵盤，正正是 `HorizontalScrollView` 想搶的方向。`handleSizeDrag` 的 `ACTION_DOWN`
+一定要叫 `requestDisallowInterceptTouchEvent(true)`，否則闊度怎樣拖都不動，
+只會捲那條 bar（2026-09-09 使用者報）。**拉大小行先，捲讓路。**
+
+做法是**借 `fillViewport` 度兩次**，`ToolStrip.onMeasure` 分兩種 spec：
+
+| spec | 回甚麼 | 為甚麼 |
+| --- | --- | --- |
+| `UNSPECIFIED`（第一次） | 每顆 `minW`（**最窄**那個樣） | 「縮到最細都擺不下」才要捲 |
+| `EXACTLY`（第二次，只在上面那次比 viewport 窄時才有） | `clamp(avail / n, min, max)` | 有位就攤開，但封頂 |
+
+**次序不可以調轉**（`UNSPECIFIED` 回 `maxW`）—— 那樣八顆會用最闊的樣去捲，
+明明縮細一點就擺得下。外面那個 `HorizontalScrollView` 一定要開
+`isFillViewport = true`，否則第二次量度根本不會發生，那行掣永遠是最窄那個樣。
 
 **`setSwitchVisible` 只在中文九宮格中隱藏顆 `⇄`**：英文／符號頁根本沒有右上角
 那按鍵，已隱藏就永遠無法進入工具列。`✖`（emoji 表／剪貼簿）永遠優先，
@@ -746,8 +789,9 @@ drawable 永遠貼死 `paddingLeft`（只上下置中），上格那個就永遠
 兩個名是對調的，改時看清楚。
 
 `✖`（關閉）、`⇄`（切換）、`▼`（拉大候選）三個**沒有換** —— 它哋本身就是單色
-文字符號，不是彩色 emoji。`PadFunc.EMOJI` 按鍵面也由 `😀` 已改寫「表情」，
-目前整個 `PadFunc` 一個 icon 都沒有，全部寫中文。
+文字符號，不是彩色 emoji。`PadFunc.EMOJI` 按鍵面也由 `😀` 已改寫「表情」。
+`PadFunc.face` 全部寫中文，**只有三個例外是空的**：換輸入法那兩顆與
+「改變大小」—— 它們沒有字可寫，改為畫單色圖案（見上面「左上角 = 長按」）。
 
 ## `Spinner` 不可以用「跳過第一下 callback」那招
 
@@ -1058,6 +1102,15 @@ AI 語音輸入開著時，講一兩句都要等 upload + Gemini 回覆，而系
 82 文字（`ji`＋`zi`）。再放寬（例如連 `-m`/`-n`、`-p`/`-t` 都當一樣）
 就會多到揭幾頁都選不完，所以沒有加。
 
+### 工具列那幾顆掣的樣，跟鍵盤那些鍵一模一樣
+
+`chipBg()` 是**圓角 6dp、沒有邊框**，跟 `KeyboardBaseView.drawFace` 一樣；
+每顆四邊留 `Prefs.gapDp`（設定頁那條「邊框粗細」，跟鍵那個 `gapPx` 同一個數），
+不再是寫死的 3dp margin ＋ 一條 1px 灰邊。2026-09-09 之前兩截東西各有各的樣，
+拉大「邊框粗細」時只有鍵盤在變，工具列不動，看上去不像同一套。
+
+`OptionBarsView` 與 `SidePanelView` 兩邊都要一起改 —— 它們是同一批掣的兩個排法。
+
 ### 左上角 = 長按執行哪項功能，不要在此顯示即時狀態
 
 整個應用程式遵循一項規則：**按鍵左上角小字一律表示「長按會執行的操作」**（`drawCornerHint`）。
@@ -1065,7 +1118,7 @@ AI 語音輸入開著時，講一兩句都要等 upload + Gemini 回覆，而系
 
 | 位 | 放甚麼 | 對應程式碼 |
 |---|---|---|
-| 左上 | `Key.hint` ＝長按那個 `PadFunc.icon`（預設「關聯字」）| `ChinesePadView.funcLongKey` |
+| 左上 | `Key.hint` ＝長按那個 `PadFunc.face`（預設「關聯字」）| `PadFunc.toKey()` |
 | 左下 | 即時提示（`homoWord` / `homoCodeHint`）| `drawCornerHintBottom` |
 
 同一條規矩之下同時補回：`?123` 左上角寫 `123`（長按直入 numpad；2026-08-29 起
@@ -1074,26 +1127,90 @@ AI 語音輸入開著時，講一兩句都要等 upload + Gemini 回覆，而系
 顆獨立 🌐 按鍵已隱藏之後，沒有這個 icon 就沒有人知按得長按）。個地球是
 `drawCornerIcon` 畫的**單色** vector，不要改回寫 emoji 🌐（鍵面其餘全單色）。
 
-### 四個位置選功能，不得重複
+2026-09-09 這個地球**不再綁死在 `Eng` 那顆**：規矩改成「長按那個 `PadFunc`
+沒有字可寫（`face` 是空）就畫圖案」，見 `ChinesePadView.faceIconOf`。
+現在只有換輸入法那兩顆是這樣 —— 「下一個輸入法」是 `GLOBE`，
+「彈出輸入法選擇表」是 `GLOBE_LIST`（地球旁邊三條橫線）。兩顆可以同時擺在
+鍵盤上，單用個地球就分不出誰是誰，所以特意畫成兩個圖案。
+它們擺在正中（不是角落）時走 `drawCenterIcon`。
 
-`Prefs.FUNC_SLOTS` = 左上短按 → 左上長按 → 同音長按 → 右上長按，**列出的
-次序就是優先次序**。四個位置不得做同一件事（`PadFunc.NONE` 例外，可以全部停用），
-左上短按仍不得 `NONE`。
+### 按鍵排位：拖放砌左右欄與工具列（2026-09-09）
 
-- 讀：一律行 `Prefs.funcSlot(ctx, key)`（`topLeftTap` / `topLeftLong` /
-  `homoLong` / `topRightLong` 都是它的 wrapper）。與**排在前面**那位置就回
-  `NONE`。這段是處理舊 pref，正常情況下不會進入。
-- 選：**不得重複不是選完再提示不允許**，而是 `SettingsActivity.availableFuncs()`
-  一開始就不會將已經有人用那些放入個 spinner。試過「選選取重複功能後就 toast 重新顯示回」
-  以及「選選取重複功能後就無聲地關閉第二位置」，兩樣都差 —— 前者要嘗試後才能得知，
-  後者移動了 使用者沒有叫你移動的設定。所以 `FuncPicker` 個 options 是個 lambda，
-  每次 `sync()` 都重新問過。
-- 更換 adapter 時 `Spinner` 會 select 回第 0 個兼有機會立即 `onItemSelected`，
-  所以 `FuncPicker.fill()` **一定要**拆走個 listener 先，放回真正 selection 之後
-  先駁回，不是就會當了 使用者選了第 0 個。
+以前只有四個位置可以選功能（左上短／長按、同音長按、右上長按），
+其餘全部寫死。現在**左欄四顆、右欄四顆、工具列整條**，每顆的短按與長按
+都由使用者自己排：設定頁「一般 → 按鍵排位」（`ui/KeyLayoutEditor`）。
 
-同音鍵與右上角那顆**短按功能不可更改**（開關同音／開關上面工具列），只長按可選；
-兩個都是 `ChinesePadView.funcLongKey()` 幫按鍵補回 `hint` ＋ `longAction`。
+三個檔各管一件事，不要混在一起：
+
+| 檔 | 管甚麼 |
+| --- | --- |
+| `core/PadFunc.kt` | 有哪些功能、每個擺得去哪（`FuncPlace`）、是否必用、是否只能短按 |
+| `core/KeyLayout.kt` | 目前的排位、存／讀、**全部規矩**（`checkDrop` / `apply`） |
+| `ime/PadFuncKeys.kt` | 一個 `PadFunc` 對應哪個 `KeyAction`、畫甚麼圖案、砌成 `Key` |
+
+**規矩只有一個出處**：`KeyLayout.checkDrop()`。拖放與「按一下彈選單」兩條路
+都問它，所以擺不下的東西根本擺不到 —— 不會存了個殘廢排位落去，回到鍵盤才
+發現打不到字。加新規矩就加在那裡，不要在 UI 那邊補一層。五條規矩：
+
+0. **工具列沒有長按**（`KeyLayout.TOOLS_HAVE_LONG` = false）—— 那幾顆本來就有
+   自己的按住動作（「貼上」開剪貼簿歷史、🎤 一路錄、「改變大小」拉到最闊），
+   再讓人配一個上去一定撞。`normalise()` 會強行把 tools 的 `long` 清成 `NONE`
+1. **擺得去哪**：`Eng`／`␣`／`⌫`／`⏎`／`⇄` 只能在左右欄（條工具列會在窄螢幕
+   變側邊欄，那時找不到它們）；「改變大小」相反，只能在工具列（它不是按一下
+   就算，要**在那顆按鍵上直接拖**才拉得動鍵盤大小，九宮格那套沒有這種拖法）
+2. **`␣`／`⌫`／`⏎` 只能放短按**，放了之後同一格的長按強制停用
+   （`Slot.effectiveLong`）—— 它們自己的長按早有意思（拖游標、連續刪）
+3. **左右欄八個位置之間不准重複；工具列自己也不准** —— 但**兩邊各自計**，
+   所以「貼上」同時在工具列與左欄是可以的（預設就是這樣）
+4. **必用鍵不准在左右欄消失**（`PadFunc.required`）
+5. 短按那格空了，同一格的長按也一定是空（按鍵本身都沒有，長按誰？）
+
+由按鍵池拖上去 = **複製**（池永遠不會少）；格對格拖 = **兩格對調**；
+拖回池裡 = 清走那一格。三種都經 `checkDrop`，擋住時一定 toast 講回為甚麼
+（原句由 `KeyLayout` 出，UI 不要自己寫一套講法）。
+
+#### 拖不郁的那個坑：`requestDisallowInterceptTouchEvent`
+
+`KeyLayoutEditor.dragSource()` 在 `ACTION_DOWN` 那下**一定要**叫
+`requestDisallowInterceptTouchEvent(true)`。設定頁整版在一個 `ScrollView` 裡面，
+手指一向上／向下移夠 slop，`ScrollView.onInterceptTouchEvent` 就會搶走整串
+event 去捲版 —— 我們連 `ACTION_MOVE` 都收不到，`startDragAndDrop` 永遠不會叫。
+由按鍵池拖去上面工具列必定要向上走一大截，所以每次都撞正
+（2026-09-09 使用者報「拖時有時無效，變了捲整版」）。
+
+拖的影是自己那個 `ChipShadow`（放大 1.15 倍、半透明），不是 `DragShadowBuilder`
+的預設 —— 預設是把那顆掣原封不動再畫一次，跟底下那格一模一樣，看上去像沒有動過。
+
+#### 工具列在設定頁是 4×2，不捲
+
+一般手機的闊度，一行擺五顆已經嫌逼，八顆一行就一定要捲 —— 捲起來後面那幾顆
+根本沒有人見到，「最多八顆」變成講了等於沒講。所以設定頁那格是
+**兩行、一行四個**（`KeyLayoutEditor.TOOLS_PER_ROW`），一屏見晒，不捲。
+（鍵盤本身那條工具列是另一回事，見上面「工具列那行掣的闊度」。）
+
+空格自己就是「加一顆」的 drop target，加極都是加在最後
+（`KeyLayout.normalise` 本來就不准工具列中間有空格）。
+
+#### 排位跟足鍵盤的樣
+
+編輯器的排列是**上（工具列）、左、右**，跟鍵盤本身對得回。兩條側欄**左右鏡像**：
+左欄的短按貼實最左、右欄的短按貼實最右。長按那格**矮一截、貼實短按、底對底**
+（所以頂低過隔籬那顆），一眼看得出它是附屬，不是另一顆鍵。
+
+`␣`／`⌫`／`⏎`（`PadFunc.tapOnly`）與空的短按位**索性沒有長按格** ——
+畫個灰格在那裡只會引人去按。
+
+工具列**沒有 `＋` 掣**（2026-09-09 使用者要求）：加一顆就是由按鍵池拖上去，
+整條 strip 自己就是 drop target，跌在右邊空位 = 在尾加一顆（`onStripDrag`）。
+
+**升級不會走位**：舊裝置沒有 `Prefs.KEY_LAYOUT`，`KeyLayout.load()` 會讀回
+那四個舊 pref ＋ `KEY_ENG_LONG` 砌一個一模一樣的排位出來
+（`fromLegacyPrefs`）。舊版特意准四個位置選同一件事，新規矩不准，
+所以最後行一次 `dedupSide()` 清走重複 —— 不清的話排位一開始就是無效狀態。
+
+`KeyLayoutTest` 盯死上面五條。改規矩就同時改測試，不要只改一邊。
+
+每顆按鍵的 `hint` ＋ `longAction` 由 `PadFunc.toKey()` 一次過補上。
 長按住際如何運作完全靠 `TTInputMethodService.onLongPress` 開頭那句
 「`key.longAction != NOOP` 即呼叫一次 `onKey`」—— **不要**再在下方的 `when`
 為某個按鍵固定執行哪項功能（同音鍵以前固定為 `TTCmd.RELATE`，設定選「停用」仍會執行）。
@@ -1274,17 +1391,24 @@ reaccel = 出格速度 > 最慢速度 × REACCEL_RATIO(2)
 一套 `canFlick` / `onFlick`），2026-08-25 使用者表示「swipe 左變了下頁，很難用」，
 整套 flick 機制 連 `ChinesePadView` 那個 override 一起**已刪除**，不要再補回。
 
-目前改成排列方式上解決，而且**三種排法由設定頁選**（`Prefs.PagerLayout`，
-設定頁「一般 → 選字翻頁」）。三種都只在 `selectMode && totalPage > 1`
-（`ChinesePadView.paging()`）時先生效：
+目前改成排列方式上解決，而且**四種排法由設定頁選**（`Prefs.PagerLayout`，
+設定頁「一般 → 選字翻頁」，排在「按鍵排位」下面）。頭三種都只在
+`selectMode && totalPage > 1`（`ChinesePadView.paging()`）時先生效：
 
 | `PagerLayout` | 底行 |
 | --- | --- |
 | `PREV_NEXT` | 拆兩個正常寬：左「上頁」、右 `0`（＝「下頁」） |
 | `NEXT_PREV` | 拆兩個正常寬：左 `0`（＝「下頁」）、右「上頁」 |
 | `WIDE_NEXT`（**預設**） | 不拆，成兩格寬那顆 `0` 就是「下頁」，**長按 = 上頁** |
+| `NO_CHANGE` | 完全不變樣：兩格寬照舊，長按照舊是成對標點 |
 
-「上頁」是 `KeyAction.PREV_PAGE` → `TTCmd.PREV`。
+`NO_CHANGE`（2026-09-09 加）**不是「翻不到頁」**：`TTEngine.press(0)` 在選字
+模式收到 `0` 一律 `TTCmd.NEXT`，那是三三本身的打法，不關排位事。它只是不
+為了翻頁而改動排位 —— 想要一顆明確的翻頁鍵，就在「按鍵排位」把
+`PadFunc.NEXT_PAGE` / `PadFunc.PREV_PAGE` 拖去左右欄。
+
+「上頁」是 `KeyAction.PREV_PAGE` → `TTCmd.PREV`，「下頁」是
+`KeyAction.NEXT_PAGE` → `TTCmd.NEXT`。
 
 顆「下頁」**顯示 `1/10`**（`TTEngine.pageHint`，由 1 起計，不是 0）。
 與同音鍵一樣是在 `drawDigit` 中即時問 engine 取，不是 `Key.hint`（`boxes`
@@ -1293,7 +1417,7 @@ reaccel = 出格速度 > 最慢速度 × REACCEL_RATIO(2)
 
 `WIDE_NEXT` 有兩件事與其餘兩個不同，改時兩邊都要一起改：
 
-- **排位始終保持不變**（`wantSplitPager()` 見到 `WIDE_NEXT` 一律回 false），
+- **排位始終保持不變**（`wantSplitPager()` 只有拆兩個那兩種先回 true），
   所以按鍵的 `Key` object 不會重建 —— 「目前是否揭緊頁」一定要即時查詢
   `ChinesePadView.wideNextPage()`，不可以入 `Key` 度。
 - **長按的成對標點功能暫時讓位給「上頁」**：`TTInputMethodService.onLongPress` 的

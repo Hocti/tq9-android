@@ -44,6 +44,7 @@ import tt.ime.riverine.core.ClipHistory
 import tt.ime.riverine.core.EmojiDict
 import tt.ime.riverine.core.EnDict
 import tt.ime.riverine.core.InputLog
+import tt.ime.riverine.core.KeyLayout
 import tt.ime.riverine.core.NextWordModel
 import tt.ime.riverine.core.PadAlign
 import tt.ime.riverine.core.PadGroup
@@ -687,6 +688,7 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
             KeyAction.HOMO -> engine.cmd(TTCmd.HOMO)
             KeyAction.RELATE -> engine.cmd(TTCmd.RELATE)
             KeyAction.PREV_PAGE -> engine.cmd(TTCmd.PREV)
+            KeyAction.NEXT_PAGE -> engine.cmd(TTCmd.NEXT)
             KeyAction.TO_CHINESE -> switchMode(PadMode.CHINESE)
             KeyAction.TO_LATIN -> switchMode(PadMode.LATIN)
             KeyAction.TO_SYMBOL -> { switchMode(PadMode.SYMBOL); symbolPad?.page = 0 }
@@ -1232,6 +1234,8 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
         // setCandidates 之前做 —— 條 bar 幾高、啲 chip 幾大都係跟呢個組行
         bars.padGroup = padGroup
         bars.refreshFontScale()
+        // 設定頁改完「按鍵排位」返嚟：工具列有邊幾粒可能已經唔同咗
+        bars.refreshTools()
         bars.setMode(effective)
         bars.setCandidates(if (effective == BarMode.CANDIDATES) cands else emptyList())
         bars.setCloseVisible(specialPad)
@@ -1339,6 +1343,7 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
             panel.layoutParams = lp
         }
         panel.refreshFontScale()
+        panel.refreshTools()
         panel.setCandidates(cands)
         panel.setAiReady(aiUsable)
         panel.setAiVisible(aiKeySet)
@@ -1528,6 +1533,13 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
     }
 
     override fun onTool(action: KeyAction) = onKey(Key(action))
+
+    /**
+     * 工具列粒掣長撳 —— 直接掉返俾 [onLongPress]，同鍵盤上面啲鍵行同一套。
+     * 工具列冇得自己配長撳（[KeyLayout.TOOLS_HAVE_LONG]），所以一定係跌落
+     * 粒掣自己嗰個內置動作（「貼上」＝剪貼簿歷史、🎤 ＝撳實一路錄）。
+     */
+    override fun onToolLong(key: Key): Boolean = onLongPress(key)
 
     /**
      * 撳實 🎤 一路錄。淨係 AI 語音輸入做得到（系統嗰個 recognizer 冇呢個模式），

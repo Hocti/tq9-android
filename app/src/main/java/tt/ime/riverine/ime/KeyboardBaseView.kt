@@ -737,6 +737,25 @@ abstract class KeyboardBaseView(context: Context) : View(context) {
         d.draw(canvas)
     }
 
+    /**
+     * 粒鍵正中一個圖案，當 [drawLabel] 用（換輸入法嗰兩粒 —— 佢哋冇字好寫，
+     * 見 `PadFunc.faceIcon`）。
+     *
+     * 大細跟 [drawLabel] 嗰個 `sizeRatio` 嘅講法：短嗰邊乘個比例，
+     * 所以拉高拉窄粒鍵佢都一直塞得落。
+     */
+    protected fun drawCenterIcon(
+        canvas: Canvas, box: KeyBox, icon: ToolIcon, color: Int = theme.text,
+        sizeRatio: Float = 0.46f, scale: Float = fontScale
+    ) {
+        val d = cornerIcons.getOrPut(icon to color) { ToolIconDrawable(icon, color) }
+        val size = (min(box.w, box.h) * sizeRatio * scale).roundToInt().coerceAtLeast(1)
+        val l = (box.cx - size / 2f).roundToInt()
+        val t = (box.cy - size / 2f).roundToInt()
+        d.setBounds(l, t, l + size, t + size)
+        d.draw(canvas)
+    }
+
     private val cornerIcons = HashMap<Pair<ToolIcon, Int>, ToolIconDrawable>()
 
     /** 右上角細字（長撳彈得出嘅符號） */

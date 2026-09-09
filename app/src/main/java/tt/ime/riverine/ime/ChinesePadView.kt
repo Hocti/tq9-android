@@ -3,7 +3,7 @@ package tt.ime.riverine.ime
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.RectF
-import tt.ime.riverine.core.EngLongPress
+import tt.ime.riverine.core.KeyLayout
 import tt.ime.riverine.core.PadFunc
 import tt.ime.riverine.core.PagerLayout
 import tt.ime.riverine.core.Prefs
@@ -15,22 +15,28 @@ import kotlin.math.roundToInt
 /**
  * 三三中文輸入本體。
  *
- * 5 欄 × 4 行：
- *   [速選/簡]  1 2 3  [☰/⇄]
- *   [同音]     4 5 6  [␣]
- *   [?123]     7 8 9  [⌫]
- *   [Eng]      0 0 取消 [⏎]
+ * 5 欄 × 4 行。中間三欄（`1`~`9`、兩格闊嗰粒 `0`、「取消」）寫死，
+ * **左欄同右欄嗰八個位由 user 自己排**（設定頁「按鍵排位」，見 [KeyLayout]）：
  *
+ * ```
+ *   [左 0]  7 8 9    [右 0]
+ *   [左 1]  4 5 6    [右 1]
+ *   [左 2]  1 2 3    [右 2]
+ *   [左 3]  0 0 取消  [右 3]
+ * ```
+ *
+ * 預設排位（[KeyLayout.DEFAULT]）就係 2026-09-09 之前寫死嗰個：
+ * 左欄由上而下「關聯字／同音／?123／Eng」，右欄「⇄／␣／⌫／⏎」。
  * `␣` 同 `⌫` 喺 2026-08-27 對調咗（user 要求）—— 順帶令中文都跟返
- * 英文／符號／純數字嗰條「`⏎` 上面嗰粒一定係 `⌫`」嘅規矩。
+ * 英文／符號／純數字嗰條「`⏎` 上面嗰粒一定係 `⌫`」嘅規矩，
+ * 而家 user 自己拖散咗就當然唔關事。
  *
  * 選字夠兩頁嗰陣底行兩格闊嗰粒 `0` 點變，由設定頁嗰個 [PagerLayout] 話事
  * （以前係撳住「下頁」向左掃先返到上一頁，太難撳，收咗）：拆做「下頁」＋「上頁」
  * 兩粒正常闊（左右次序兩個選擇），或者唔拆、成兩格闊嗰粒做「下頁」＋長撳做「上頁」。
  *
- * 🎤 搬咗上面條工具 bar（貼上隔籬），左上角嗰粒都揀得。
- * 🌐（轉輸入法）粒獨立掣收埋咗，長撳「Eng」照樣叫得出嚟（見 [KeyAction.IME_SWITCH]）——
- * 所以粒「Eng」左上角畫住個地球，同其餘啲鍵一樣「左上角 = 長撳做乜」。
+ * 「左上角細字 = 長撳做乜」呢條規矩喺八個位全部照用。長撳嗰個功能冇字好寫
+ * （轉輸入法嗰兩粒）就改為喺左上角畫個圖案，見 [drawFunction]。
  */
 class ChinesePadView(context: Context, private val engine: TTEngine) : KeyboardBaseView(context) {
 
@@ -59,9 +65,13 @@ class ChinesePadView(context: Context, private val engine: TTEngine) : KeyboardB
     /** 而家係咪「選字、夠兩頁」——三個 [PagerLayout] 都係喺呢個狀態先變樣 */
     private fun paging() = engine.selectMode && engine.totalPage > 1
 
-    /** 拆兩粒嗰兩個選擇先至要重排；[PagerLayout.WIDE_NEXT] 排位由頭到尾唔郁 */
-    private fun wantSplitPager() =
-        paging() && Prefs.pagerLayout(context) != PagerLayout.WIDE_NEXT
+    /**
+     * 拆兩粒嗰兩個選擇先至要重排；[PagerLayout.WIDE_NEXT] 同
+     * [PagerLayout.NO_CHANGE] 排位由頭到尾唔郁。
+     */
+    private fun wantSplitPager() = paging() && Prefs.pagerLayout(context).let {
+        it == PagerLayout.PREV_NEXT || it == PagerLayout.NEXT_PREV
+    }
 
     /**
      * 大格「下頁」模式：兩格闊嗰粒 `0` 而家係「下頁」，長撳 = 上頁。
@@ -94,19 +104,10 @@ class ChinesePadView(context: Context, private val engine: TTEngine) : KeyboardB
             return b
         }
 
-        // 左欄（最上嗰粒短撳／長撳做乜，設定頁揀得）
-        add(topLeftKey(), 0f, 0)
-        // 短撳永遠都係開關同音，長撳做乜就設定頁揀（預設「關聯字」）——
-        // 左上角細字＝長撳做乜，左下角嗰段即時提示（打緊嘅碼／搵緊邊隻字嘅同音／
-        // 個字正路點打）喺 drawFunction 度問 engine 攞
-        add(funcLongKey(Key(KeyAction.HOMO, label = "同音"), Prefs.homoLong(context)), 0f, 1)
-        // 長撳 ?123 唔使經符號頁，直接跳去純數字 keypad（英文鍵盤嗰粒一樣）。
-        // 左上角寫住「123」＝長撳做乜，同其餘啲鍵一致
-        add(Key(KeyAction.TO_SYMBOL, label = "?123", hint = "123",
-            longAction = KeyAction.TO_NUMBER), 0f, 2)
-        // 🌐 收埋咗，換輸入法就淨係靠長撳「Eng」。跳去下一個定係彈個選單出嚟，
-        // 由設定頁話事（見 [EngLongPress]）——「地球」個 code 一路都冇刪
-        add(Key(KeyAction.TO_LATIN, label = "Eng", longAction = engLongAction()), 0f, 3)
+        // 左欄：由設定頁嗰個排位砌（見 [KeyLayout]）。以前八個位寫死喺呢度，
+        // 而家淨係 [KeyLayout.DEFAULT] 仲留住嗰個排法
+        val layout = KeyLayout.load(context)
+        for ((row, slot) in layout.left.withIndex()) add(slotKey(slot), 0f, row)
 
         // 九宮格 1~9：跟足 numpad 排法，7 8 9 喺最上面
         for (i in 1..9) {
@@ -132,61 +133,17 @@ class ChinesePadView(context: Context, private val engine: TTEngine) : KeyboardB
         }
         add(Key(KeyAction.CANCEL, label = "取消"), 3f, 3)
 
-        // 右欄。☰ 代表「揭開上面條 bar」，⚙ 太似「設定」，人哋撳落去唔知做乜
-        add(funcLongKey(optionKey(), Prefs.topRightLong(context)), 4f, 0)
-        // ␣ 同 ⌫ 對調咗：⌫ 落咗去 ⏎ 上面（同英文／符號／純數字一致）
-        add(Key(KeyAction.SPACE, label = "␣"), 4f, 1)
-        add(Key(KeyAction.BACKSPACE, label = "⌫", repeatable = true), 4f, 2)
-        add(Key(KeyAction.ENTER, label = "⏎", accent = true), 4f, 3)
-    }
-
-    /** 長撳 `Eng`：跳去下一個輸入法，定係彈個系統選單出嚟（設定頁揀） */
-    private fun engLongAction(): KeyAction = when (Prefs.engLongPress(context)) {
-        EngLongPress.NEXT_IME -> KeyAction.IME_SWITCH
-        EngLongPress.PICKER -> KeyAction.IME_PICKER
+        // 右欄，同左欄一樣跟排位砌
+        for ((row, slot) in layout.right.withIndex()) add(slotKey(slot), 4f, row)
     }
 
     /**
-     * 右上角嗰粒。平時係 `☰`＝開／關成條 bar；**條 bar 常駐**
-     * （[Prefs.barPinned]）就冇嘢好開關，改咗做 `⇄`＝關聯字 ⇄ 工具，
-     * 而條 bar 自己最左嗰粒 `⇄` 就收埋（見 `OptionBarsView.setSwitchVisible`）。
+     * 一個位（短撳＋長撳）→ 一粒 [Key]。
+     *
+     * `␣`／`⌫`／`⏎` 嗰類（[PadFunc.tapOnly]）冇長撳，`KeyLayout.Slot.effectiveLong`
+     * 已經幫手隔咗，呢度唔使再理。
      */
-    private fun optionKey(): Key =
-        Key(KeyAction.OPTION, label = if (Prefs.barPinned(context)) "⇄" else "☰")
-
-    /**
-     * 左上角嗰粒。預設短撳 = 速選字、長撳 = 簡體開關，
-     * 兩樣都可以喺設定頁換做 emoji／貼上／AI／無效。
-     */
-    private fun topLeftKey(): Key {
-        val tap = Prefs.topLeftTap(context)
-        val long = Prefs.topLeftLong(context)
-        return Key(
-            action = actionOf(tap),
-            label = tap.icon,
-            hint = long.icon,
-            longAction = actionOf(long),
-            enabled = tap != PadFunc.NONE
-        )
-    }
-
-    /**
-     * 粒鍵**短撳做乜換唔到**（同音、右上角嗰粒），但長撳一樣揀得
-     * （見 [Prefs.FUNC_SLOTS]）。冇揀（[PadFunc.NONE]）就連左上角細字都冇。
-     */
-    private fun funcLongKey(k: Key, f: PadFunc): Key =
-        if (f == PadFunc.NONE) k else k.copy(hint = f.icon, longAction = actionOf(f))
-
-    private fun actionOf(f: PadFunc): KeyAction = when (f) {
-        PadFunc.SHORTCUT -> KeyAction.SHORTCUT
-        PadFunc.SC_TOGGLE -> KeyAction.SC_TOGGLE
-        PadFunc.RELATE -> KeyAction.RELATE
-        PadFunc.EMOJI -> KeyAction.TO_EMOJI
-        PadFunc.PASTE -> KeyAction.PASTE
-        PadFunc.STT -> KeyAction.STT
-        PadFunc.AI -> KeyAction.AI
-        PadFunc.NONE -> KeyAction.NOOP
-    }
+    private fun slotKey(slot: KeyLayout.Slot): Key = slot.tap.toKey(slot.effectiveLong)
 
     override fun keyEnabled(k: Key): Boolean =
         k.enabled && (k.action != KeyAction.AI || chineseHost?.aiReady == true)
@@ -325,8 +282,18 @@ class ChinesePadView(context: Context, private val engine: TTEngine) : KeyboardB
         )
         // `on` 淨係同音／簡體／工具 bar 三粒先會 true，嗰陣粒鍵係 accent 色底
         val hintColor = if (on) theme.onAccentText else theme.textDim
-        // 左上角跟返成個 app 嘅規矩：**一律寫「長撳做乜」**
+        // 粒鍵冇字好寫（轉輸入法嗰兩粒）就改為喺正中畫個單色圖案 ——
+        // 唔用彩色 emoji，理由同 [ToolIcons] 嗰段一樣
+        if (k.label.isEmpty()) longIconOf(k.action)?.let {
+            drawCenterIcon(canvas, box, it,
+                if (usable) theme.text else theme.textDim, scale = funcFontScale)
+        }
+        // 左上角跟返成個 app 嘅規矩：**一律寫「長撳做乜」**。長撳嗰樣嘢冇字
+        // （轉輸入法）就畫個角落圖案代替，否則粒鍵就會完全睇唔出長撳得
         if (k.hint.isNotEmpty()) drawCornerHint(canvas, box, k.hint, hintColor, funcFontScale)
+        else longIconOf(k.longAction)?.let {
+            drawCornerIcon(canvas, box, it, hintColor, funcFontScale)
+        }
         if (k.action == KeyAction.HOMO) {
             // 同音鍵嘅即時提示喺**左下角**（左上角個位讓咗俾長撳）。三樣嘢輪住用
             // 呢個位，排住嘅次序就係優先次序：
@@ -343,12 +310,6 @@ class ChinesePadView(context: Context, private val engine: TTEngine) : KeyboardB
             val code = if (Prefs.showCurrCode(context)) engine.currCode else ""
             val tip = engine.homoWord.ifEmpty { code.ifEmpty { engine.homoCodeHint } }
             if (tip.isNotEmpty()) drawCornerHintBottom(canvas, box, tip, hintColor, funcFontScale)
-        }
-        // `Eng` 長撳 = 轉輸入法，所以左上角擺個地球（獨立嗰粒 🌐 收埋咗，
-        // 冇呢個 icon 就冇人知撳得長撳，見 [engLongAction]）
-        if (k.action == KeyAction.TO_LATIN &&
-            (k.longAction == KeyAction.IME_SWITCH || k.longAction == KeyAction.IME_PICKER)) {
-            drawCornerIcon(canvas, box, ToolIcon.GLOBE, hintColor, funcFontScale)
         }
     }
 }

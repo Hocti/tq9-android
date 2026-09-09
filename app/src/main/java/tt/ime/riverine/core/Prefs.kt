@@ -56,7 +56,17 @@ enum class BarMode(val label: String) {
 enum class PagerLayout(val label: String) {
     PREV_NEXT("拆兩粒：上頁、下頁"),
     NEXT_PREV("拆兩粒：下頁、上頁"),
-    WIDE_NEXT("大格「下頁」（長按 = 上頁）");
+    WIDE_NEXT("大格「下頁」（長按 = 上頁）"),
+
+    /**
+     * **粒 `0` 由頭到尾唔變樣**：兩格闊照舊，長撳照舊係成對標點（`「」`）。
+     *
+     * 選字模式撳落去一樣係揭下一頁（`TTEngine.press` 收到 `0` 就 `TTCmd.NEXT`，
+     * 呢個係三三本身嘅打法，唔關排位事），所以唔會揭唔到頁；淨係唔會為咗
+     * 揭頁而搶走個位。想要一粒實牙實齒嘅「下頁」／「上頁」，就喺設定頁
+     * 「按鍵排位」度拖 [PadFunc.NEXT_PAGE] / [PadFunc.PREV_PAGE] 落左右欄。
+     */
+    NO_CHANGE("無效果（0 鍵維持原樣）");
 }
 
 /**
@@ -76,27 +86,6 @@ enum class KeyPressEffect(val label: String) {
     LIGHTEN("變光"),
     DARKEN("變暗"),
     ENLARGE("略為放大");
-}
-
-/**
- * 可以喺設定度換走嘅鍵功能（左上角短撳／長撳、同音鍵長撳、右上角長撳）。
- * 粒面**全部寫中文**，一個 icon 都冇 —— [EMOJI] 本來寫住個 😀，
- * 但係鍵面其餘全部單色，一粒彩色 emoji 好突兀，而且好多機嘅 emoji 字型
- * 會畫到成粒鍵咁大。
- *
- * 設定頁用 spinner 揀 —— 四個位（[Prefs.FUNC_SLOTS]）**可以揀同一件事**，
- * 揀重複咗設定頁會有紅框同提示字，但唔會擋（見 `SettingsActivity.FuncPicker`）。
- */
-enum class PadFunc(val label: String, val icon: String) {
-    SHORTCUT("速選字", "速選"),
-    SC_TOGGLE("簡體開關", "简"),
-    /** 游標前面嗰隻字嘅關聯字（`TTCmd.RELATE`）—— 左上角短撳預設就係佢 */
-    RELATE("關聯字", "關聯字"),
-    EMOJI("表情符號", "表情"),
-    PASTE("貼上", "貼上"),
-    STT("語音輸入", "錄音"),
-    AI("AI 改寫", "AI改"),
-    NONE("停用", "");
 }
 
 object Prefs {
@@ -154,6 +143,16 @@ object Prefs {
     const val KEY_PAGER_LAYOUT = "pager_layout"    // PagerLayout.name（選字揭頁嗰兩粒點排）
     const val KEY_BAR_PINNED = "bar_pinned"        // 上面條 bar 常駐（右上角嗰粒改做 ⇄）
     const val KEY_ENG_LONG = "eng_long"            // EngLongPress.name（長撳 Eng 做乜）
+
+    /**
+     * 自由擺位嘅鍵盤排位（左欄四粒、右欄四粒、工具列成行，各分短撳／長撳），
+     * 存做一段 JSON —— 見 [KeyLayout]。
+     *
+     * 未寫過呢個 key 嘅舊裝機**唔會跌返做預設**：[KeyLayout.load] 會攞下面
+     * 五個舊 key（[KEY_TL_TAP]／[KEY_TL_LONG]／[KEY_HOMO_LONG]／[KEY_TR_LONG]／
+     * [KEY_ENG_LONG]）砌返個一模一樣嘅排位出嚟。
+     */
+    const val KEY_LAYOUT = "key_layout"
 
     // 揀得功能嗰四個位（見 [FUNC_SLOTS]）
     const val KEY_TL_TAP = "topleft_tap"
@@ -610,9 +609,21 @@ object Prefs {
      * 上面條 bar 常駐：關唔熄得。中文九宮格右上角嗰粒本來係「開／關成條 bar」，
      * 常駐之後冇嘢好開關，改咗做**關聯字 ⇄ 工具**嘅切換掣，而條 bar 自己最左
      * 嗰粒 `⇄` 就收埋（兩粒做同一件事冇意思）。見
-     * `TTInputMethodService.toggleBar` 同 `ChinesePadView.optionKey`。
+     * `TTInputMethodService.toggleBar` 同 [PadFunc.BAR_SWITCH]。
      */
-    fun barPinned(ctx: Context) = sp(ctx).getBoolean(KEY_BAR_PINNED, true)
+    /**
+     * 工具列常駐**永遠開住**（2026-09-09 user 要求）。設定頁嗰個掣收埋咗
+     * （見 `SettingsActivity.SHOW_LEGACY_KEY_OPTIONS`），個 pref 本身冇刪；
+     * 想再開返「熄得條 bar」呢個玩法，將呢個值改做 false 就得。
+     *
+     * 常駐即係話「開／關成條 bar」冇嘢好做，所以九宮格嗰粒 `☰` 一律變咗
+     * [PadFunc.BAR_SWITCH]（`⇄`＝關聯字 ⇄ 工具），而條 bar 自己最左嗰粒 `⇄`
+     * 就收埋（兩粒做同一件事冇意思，見 `OptionBarsView.setSwitchVisible`）。
+     */
+    const val FORCE_BAR_PINNED = true
+
+    fun barPinned(ctx: Context) =
+        if (FORCE_BAR_PINNED) true else sp(ctx).getBoolean(KEY_BAR_PINNED, true)
 
     /** 長撳中文九宮格粒 `Eng`（🌐 收埋咗之後唯一嘅換輸入法入口） */
     fun engLongPress(ctx: Context): EngLongPress =
