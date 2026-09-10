@@ -101,7 +101,7 @@ abstract class RowsPadView(context: Context) : KeyboardBaseView(context) {
             else -> theme.keyFace
         }
         drawFace(canvas, box, pressedFaceColor(face, isDown && keyEnabled(k)))
-        // 功能鍵（Eng／中／⌫／⏎／⇧／!@#…）唔跟設定頁條字體 slider ——
+        // 功能鍵（Eng／中／⌫／⏎／⇧／?123…）唔跟設定頁條字體 slider ——
         // 條 slider 淨係郁得到真係打得出嚟嗰啲字符（見 [Prefs.funcFontScale]）
         val scale = if (isFunctionKey(k)) funcFontScale else fontScale
         drawLabel(

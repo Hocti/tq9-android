@@ -30,6 +30,9 @@ fun PadFunc.action(): KeyAction = when (this) {
     PadFunc.IME_PICKER -> KeyAction.IME_PICKER
     PadFunc.NEXT_PAGE -> KeyAction.NEXT_PAGE
     PadFunc.PREV_PAGE -> KeyAction.PREV_PAGE
+    PadFunc.SELECT_ALL -> KeyAction.SELECT_ALL
+    PadFunc.UNDO -> KeyAction.UNDO
+    PadFunc.REDO -> KeyAction.REDO
     // 「改變大小」冇 [KeyAction]：佢唔係撳一下就算，而係喺粒掣度直接拖
     // （見 `OptionBarsView.handleSizeDrag`），所以淨係工具列擺得，
     // 亦都淨係喺嗰度接駁（見 `PadFunc.place`）

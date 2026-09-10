@@ -70,7 +70,7 @@ class EnDictTest {
     private val decoder = GestureDecoder(dict)
 
     private fun decode(word: String, prefix: String = "", suffix: String = "") =
-        decoder.decode(pathFor(word), ::keyCenter, w, prefix, suffix)
+        decoder.decode(pathFor(word), emptyList(), ::keyCenter, w, prefix, suffix)
 
     @Test
     fun `滑 hello 嘅完美軌跡搵到 hello`() {
@@ -95,7 +95,7 @@ class EnDictTest {
             val f = i / 8f
             pts.add(sx + (tx - sx) * f); pts.add(sy + (ty - sy) * f)
         }
-        val r = decoder.decode(pts, ::keyCenter, w)
+        val r = decoder.decode(pts, emptyList(), ::keyCenter, w)
         assertTrue(r.isNotEmpty())
         assertTrue(r.all { it.first() == 's' && it.last() == 't' })
         assertEquals("set", r.first())

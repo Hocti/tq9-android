@@ -695,6 +695,9 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
             KeyAction.TO_NUMBER -> switchMode(PadMode.NUMBER)
             KeyAction.TO_EMOJI -> openEmoji()
             KeyAction.PASTE -> paste()
+            KeyAction.SELECT_ALL -> selectAll()
+            KeyAction.UNDO -> undo(redo = false)
+            KeyAction.REDO -> undo(redo = true)
             KeyAction.AI -> runAi()
             KeyAction.SYM_PAGE -> symbolPad?.let { it.page = 1 - it.page }
             KeyAction.IME_SWITCH -> switchIme()
@@ -811,7 +814,7 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
         var s = raw
         val pad = latinPad
         if (emojiSearch) {
-            emojiQuery.append(s)
+            emojiQuery.append(s.filter { it != CARET })
             syncEmojiComposing()
             refreshEmojiResults()
             return
@@ -845,7 +848,19 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
         }
         finishLatinComposing()
         latinWordDone = false
-        currentInputConnection?.commitText(s, 1)
+        // 成對符號（長撳 `,` 頂行嗰啲）中間夾住個 [CARET]：斬開兩橛分開打，
+        // 第二橛用 `newCursorPosition = 0` commit —— 0 = caret 擺喺呢橛**前面**，
+        // 即係啱啱好停返兩個符號中間，跟住打嘅字自然落咗入去對括號／引號入面。
+        val caret = s.indexOf(CARET)
+        currentInputConnection?.let { ic ->
+            if (caret < 0) ic.commitText(s, 1)
+            else {
+                ic.beginBatchEdit()
+                ic.commitText(s.substring(0, caret), 1)
+                ic.commitText(s.substring(caret + 1), 0)
+                ic.endBatchEdit()
+            }
+        }
         if (mode == PadMode.CHINESE) engine.cancel().also { onStateChanged() }
         // 啱啱打咗個標點／符號：`. ` `!` 之後嗰個字母要自動大階
         clearShiftManual()
@@ -1065,6 +1080,61 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
         val text = runCatching { ClipHistory.current(this) }.getOrDefault("")
         if (text.isEmpty()) { toast("剪貼簿是空的"); return }
         commitPlain(text)
+    }
+
+    /**
+     * 全選：**唔係我哋自己數個欄有幾多隻字**（`getExtractedText` 攞到嗰段唔一定係
+     * 全部，長文會截），而係叫個欄自己做 —— `android.R.id.selectAll` 就係
+     * 揀字選單「全選」嗰一項，`TextView` 收到就自己揀晒。
+     *
+     * 打緊嘅碼要先清（中文 composing 段仲喺個欄度，唔清就會連埋佢一齊揀），
+     * 揀完再 [refreshBars]：AI 改寫嗰粒鍵係「有揀字先撳得」，全選之後就要著返。
+     */
+    private fun selectAll() {
+        val ic = currentInputConnection ?: return
+        finishLatinComposing()
+        if (mode == PadMode.CHINESE) engine.cancel()
+        ic.performContextMenuAction(android.R.id.selectAll)
+        onStateChanged()
+    }
+
+    /**
+     * 復原／重做：向個欄發 **Ctrl+Z**（[redo] = Ctrl+Shift+Z）。
+     *
+     * `InputConnection` 冇「undo」呢個 API，`android.R.id.undo` 亦都唔係公開嘅 id，
+     * 所以行硬件鍵盤嗰條路 —— `TextView` 自己就係咁認復原／重做
+     * （`Editor.UndoManager`），支援嘅欄（包括大部分 `EditText`）都食呢兩下。
+     *
+     * 個欄唔支援就乜都唔會發生（發咗個 key event 出去冇人理），呢個係冇辦法
+     * 事先問到嘅，所以唔出 toast 亂咁講「復原咗」。
+     */
+    private fun undo(redo: Boolean) {
+        val ic = currentInputConnection ?: return
+        finishLatinComposing()
+        if (mode == PadMode.CHINESE) engine.cancel()
+        var meta = KeyEvent.META_CTRL_ON or KeyEvent.META_CTRL_LEFT_ON
+        if (redo) meta = meta or KeyEvent.META_SHIFT_ON or KeyEvent.META_SHIFT_LEFT_ON
+        ic.beginBatchEdit()
+        // 有啲欄睇住真實嘅 Ctrl 撳咗未（唔止睇 event 個 metaState），
+        // 所以照住硬件鍵盤嗰個次序：Ctrl 落 → Z 落放 → Ctrl 起
+        sendMetaKey(KeyEvent.KEYCODE_CTRL_LEFT, KeyEvent.ACTION_DOWN, KeyEvent.META_CTRL_ON)
+        if (redo) sendMetaKey(KeyEvent.KEYCODE_SHIFT_LEFT, KeyEvent.ACTION_DOWN, meta)
+        sendMetaKey(KeyEvent.KEYCODE_Z, KeyEvent.ACTION_DOWN, meta)
+        sendMetaKey(KeyEvent.KEYCODE_Z, KeyEvent.ACTION_UP, meta)
+        if (redo) sendMetaKey(KeyEvent.KEYCODE_SHIFT_LEFT, KeyEvent.ACTION_UP, meta)
+        sendMetaKey(KeyEvent.KEYCODE_CTRL_LEFT, KeyEvent.ACTION_UP, 0)
+        ic.endBatchEdit()
+        // 復原咗之後個欄頭尾都可能變咗樣（例如剷返到句頭），大階要重算
+        clearShiftManual()
+        updateAutoCaps()
+        onStateChanged()
+    }
+
+    /** 一個帶 `metaState` 嘅 key event（[sendDpad] 嗰個唔帶 meta，行唔到 Ctrl 組合） */
+    private fun sendMetaKey(code: Int, action: Int, meta: Int) {
+        val ic = currentInputConnection ?: return
+        val now = android.os.SystemClock.uptimeMillis()
+        ic.sendKeyEvent(KeyEvent(now, now, action, code, 0, meta))
     }
 
     private fun commitPlain(text: String) {
@@ -1686,10 +1756,15 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
      *  3. 用 [GestureDecoder] 將條原始軌跡同字典做形狀比對，揀最夾嘅幾個字。
      *  4. 出候選欄畀 user 揀第二個字，就算條 bar 本身係關住。
      */
-    override fun onSwipePath(path: List<Float>, keyCenter: (Char) -> Pair<Float, Float>?, keyWidth: Float) {
+    override fun onSwipePath(
+        path: List<Float>,
+        times: List<Long>,
+        keyCenter: (Char) -> Pair<Float, Float>?,
+        keyWidth: Float
+    ) {
         val decoder = gestureDecoder() ?: return
         if (emojiSearch) {
-            val word = decoder.decode(path, keyCenter, keyWidth).firstOrNull() ?: return
+            val word = decoder.decode(path, times, keyCenter, keyWidth).firstOrNull() ?: return
             emojiQuery.append(word)
             syncEmojiComposing()
             refreshEmojiResults()
@@ -1712,12 +1787,12 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
         }
 
         // context 夾唔到就一步步放寬，唔好因為前後有嘢就一個字都出唔到
-        var words = decoder.decode(path, keyCenter, keyWidth, pre.lowercase(), suf.lowercase())
+        var words = decoder.decode(path, times, keyCenter, keyWidth, pre.lowercase(), suf.lowercase())
         if (words.isEmpty() && suf.isNotEmpty()) {
-            suf = ""; words = decoder.decode(path, keyCenter, keyWidth, pre.lowercase(), "")
+            suf = ""; words = decoder.decode(path, times, keyCenter, keyWidth, pre.lowercase(), "")
         }
         if (words.isEmpty() && pre.isNotEmpty()) {
-            pre = ""; words = decoder.decode(path, keyCenter, keyWidth, "", "")
+            pre = ""; words = decoder.decode(path, times, keyCenter, keyWidth, "", "")
         }
         if (words.isEmpty()) {
             // 乜都揾唔到，唔好屈硬出啲嘢 —— 當呢次滑冇發生過

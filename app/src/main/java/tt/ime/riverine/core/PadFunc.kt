@@ -73,7 +73,7 @@ enum class PadFunc(
     /** 短撳開關同音；長撳做乜就睇同一個位嘅長撳格 */
     HOMO("同音", "同音", FuncPlace.SIDE_ONLY),
     TO_LATIN("英文鍵盤", "Eng", FuncPlace.SIDE_ONLY, required = true),
-    TO_SYMBOL("符號鍵盤", "!@#", FuncPlace.SIDE_ONLY),
+    TO_SYMBOL("符號鍵盤", "?123", FuncPlace.SIDE_ONLY),
     TO_NUMBER("純數字鍵盤", "123", FuncPlace.SIDE_ONLY),
     SPACE("空格", "␣", FuncPlace.SIDE_ONLY, required = true, tapOnly = true),
     BACKSPACE("刪除", "⌫", FuncPlace.SIDE_ONLY, required = true, tapOnly = true),
@@ -84,6 +84,12 @@ enum class PadFunc(
     IME_PICKER("彈出輸入法選擇表", ""),
     NEXT_PAGE("下頁", "下頁"),
     PREV_PAGE("上頁", "上頁"),
+
+    // ---- 編輯個欄嗰批：唔關輸入法事，一律叫個欄自己做（見 `PadFuncKeys.action`）----
+    SELECT_ALL("全選", "全選"),
+    UNDO("復原", "復原"),
+    REDO("重做", "重做"),
+
     /** 撳一下轉顯示方式、喺粒掣度直接拖就拉大細（所以擺唔入九宮格，見 [FuncPlace]） */
     ALIGN("改變大小", "", FuncPlace.TOOL_ONLY);
 

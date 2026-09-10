@@ -20,6 +20,14 @@ enum class KeyAction {
     TO_NUMBER,
     TO_EMOJI,     // 開 emoji 表
     PASTE,        // 貼上（長撳 = clipboard 歷史）
+    /**
+     * 全選：叫個欄自己做（`android.R.id.selectAll`），唔係我哋自己數字數。
+     */
+    SELECT_ALL,
+    /** 復原：向個欄發 Ctrl+Z（見 `TTInputMethodService.undo`） */
+    UNDO,
+    /** 重做：向個欄發 Ctrl+Shift+Z（同上） */
+    REDO,
     AI,           // 用 AI 改寫揀咗嘅字
     IME_SWITCH,   // 地球：直接跳去下一個輸入法
     IME_PICKER,   // 彈出系統嘅輸入法選單（長撳 Eng 揀得，見 [tt.ime.riverine.core.EngLongPress]）
@@ -47,6 +55,13 @@ data class Key(
     val weight: Float = 1f,
     /** 長撳彈出嘅變體（數字、符號、重音字母…），空 = 冇 popup */
     val variants: List<String> = emptyList(),
+    /**
+     * 長撳 popup 最頂再加嗰行（成對符號，見 [CARET]）。空 = 冇。
+     *
+     * 唔併埋落 [variants] 度：呢行同下面嗰啲唔同類（一個係淨係打一個字元，
+     * 一個係開埋收），撈亂咗排就分唔出邊行係邊行。
+     */
+    val variantsTop: List<String> = emptyList(),
     /** 長撳做另一件事；[KeyAction.NOOP] = 用返 host 預設嗰個 */
     val longAction: KeyAction = KeyAction.NOOP,
     val repeatable: Boolean = false,
@@ -99,12 +114,23 @@ val PREV_GLYPH: String by lazy { glyphOr("⇤", "上一") }
 fun spacerKey(weight: Float) = Key(KeyAction.NOOP, weight = weight, spacer = true)
 
 /**
+ * 變體字串入面擺住呢個字元 = commit 完 caret 要停返喺嗰個位。
+ *
+ * 成對符號用得着：`'` + [CARET] + `'` 一下打晒開同收，caret 停返中間，
+ * 唔使打完再自己撳返轉頭。呢個字元本身**唔會**出街 —— 畫嗰陣
+ * [variantDisplay] 剷走佢，commit 嗰陣就喺佢度斬開兩橛
+ * （見 `TTInputMethodService.typeChar`）。
+ */
+const val CARET = '\u0000'
+
+/**
  * 變體 popup／角落提示要點寫。
  *
  * Tab（`\t`）冇字形，畫出嚟係一片空白，所以寫個 `⇥` 代替 ——
  * **真正 commit 出去嗰個仲係 `\t`**，淨係畫面換咗個樣。
  */
-fun variantDisplay(s: String): String = if (s == "\t") "⇥" else s
+fun variantDisplay(s: String): String =
+    if (s == "\t") "⇥" else s.filter { it != CARET }
 
 class KeyBox(val key: Key) {
     var left = 0f; var top = 0f; var right = 0f; var bottom = 0f

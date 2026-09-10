@@ -50,20 +50,41 @@ private val ACCENTS: Map<String, List<String>> = mapOf(
 )
 
 /**
- * 標點鍵長撳彈出嘅嘢。三粒都會喺左上角寫返個細字提示（見 [LatinPadView.punct]），
+ * 標點鍵長撳彈出嘅嘢。粒粒都會喺左上角寫返個細字提示（見 [LatinPadView.punct]），
  * 唔係冇人知撳實佢仲有嘢揀。
  *
- * 三粒都**唔跟**「第一個 = 自己本身」嗰個規矩 —— 每粒排頭嗰個係長撳一彈出嚟
+ * 全部都**唔跟**「第一個 = 自己本身」嗰個規矩 —— 每粒排頭嗰個係長撳一彈出嚟
  * 就已經停咗喺度嗰個（唔郁手指放開就出佢），粒鍵自己短撳就攞得返：
  *
  *  - `,` → **Tab**（`\t`，畫成 `⇥`）
- *  - `.` → `;`
+ *  - `.` → `/`（粒 `/` 冇咗，見下面）
  *  - `/` → `?`（`?` 打得多過 `/` 好多）
+ *
+ * 一般英文鍵盤（[LatinField.NORMAL]）已經冇咗粒 `/` —— 佢成條 list 併咗入
+ * `.` 度（見 [SLASH_VARIANTS] 同 [PUNCT_VARIANTS]），讓返個位出嚟俾 space bar
+ * 拉長。粒 `/` 淨係喺網址／電郵欄先仲喺度（嗰兩度真係逐個字都要撳到）。
  */
+private val SLASH_VARIANTS = listOf("?", "/", "\\", "|", "=", "_", "+", "-")
+
 private val PUNCT_VARIANTS: Map<String, List<String>> = mapOf(
-    "," to listOf("\t", ",", "<", ">", "[", "]", "{", "}"),
-    "." to listOf(";", ".", "'", "\"", ":", "`", "~"),
-    "/" to listOf("?", "/", "\\", "|", "=", "_", "+", "-")
+    "," to listOf(",","'","\"","`", "<", ">", "[", "]", "{", "}"),
+    // 排頭係 `/` 唔係 `;`：粒 `/` 掣冇咗，長撳 `.` 一彈出就停喺佢度（放手即出），
+    // 左上角個提示亦都寫住 `/`，睇一眼就知粒鍵搬咗去邊。
+    // `.drop(2)` = 剷走 `?` `/`，佢哋已經喺前面
+    "." to listOf("?","!", ";", ":", ",",".","/", "\\", "|", "=", "+", "-", "_",   "~","\t" ),
+    "/" to SLASH_VARIANTS
+)
+
+/**
+ * 長撳 `,` 最頂再加嘅一行：**開同收一次過打埋**，caret 停返兩者中間
+ * （`''` 打完個游標就喺兩粒引號之間，直接打得落內容）。
+ *
+ * 逐個都係下面 `,` 嗰行本身有嘅符號 —— 下面一行係「淨係打一個」，
+ * 上面一行就係「成對」，同一粒符號兩種打法排上下兩行對得返。
+ * 中間嗰個 [CARET] 唔會出街（見 [variantDisplay] 同 `TTInputMethodService.typeChar`）。
+ */
+private val PUNCT_PAIRS: Map<String, List<String>> = mapOf(
+    "," to listOf("'$CARET'", "\"$CARET\"", "`$CARET`", "<$CARET>", "[$CARET]", "{$CARET}")
 )
 
 /**
@@ -102,11 +123,20 @@ class LatinPadView(context: Context) : RowsPadView(context) {
 
     interface LatinHost {
         /**
-         * 滑完一次嘅原始軌跡（x,y 交替）連埋「邊個字母個鍵中心喺邊」一齊拋畀 host。
+         * 滑完一次嘅原始軌跡（x,y 交替）連埋每點嘅時間、同埋「邊個字母個鍵中心喺邊」
+         * 一齊拋畀 host。
          * **唔係**喺呢度查詞庫 —— host 要用 [tt.ime.riverine.swipe.GestureDecoder] 做形狀比對，
          * 仲要連 caret 前後已經打咗嘅字母一齊計（`dis|y` 滑 `pla` = `display`）。
+         *
+         * [times] 唔可以慳 —— 詞庫夾唔到嗰陣要靠佢搵返「特登停低／特登拗彎」嗰幾點，
+         * 砌返個唔喺詞庫嘅字出嚟（見 [tt.ime.riverine.swipe.GesturePivots]）。
          */
-        fun onSwipePath(path: List<Float>, keyCenter: (Char) -> Pair<Float, Float>?, keyWidth: Float)
+        fun onSwipePath(
+            path: List<Float>,
+            times: List<Long>,
+            keyCenter: (Char) -> Pair<Float, Float>?,
+            keyWidth: Float
+        )
     }
 
     var latinHost: LatinHost? = null
@@ -156,7 +186,8 @@ class LatinPadView(context: Context) : RowsPadView(context) {
         val tip = if (v.firstOrNull() != c) v.firstOrNull() else v.getOrNull(1)
         return Key(
             KeyAction.CHAR, label = c, text = c, weight = weight,
-            hint = tip?.let(::variantDisplay).orEmpty(), variants = v
+            hint = tip?.let(::variantDisplay).orEmpty(), variants = v,
+            variantsTop = PUNCT_PAIRS[c].orEmpty()
         )
     }
 
@@ -175,14 +206,15 @@ class LatinPadView(context: Context) : RowsPadView(context) {
         // 唔再將收邊嗰兩粒拉長）。空格唔會食掉掂觸 —— 撳落去會 snap 去隔籬粒鍵。
         val r1 = listOf(spacerKey(0.5f)) + "asdfghjkl".map { ch(it.toString()) } +
             listOf(spacerKey(0.5f))
-        // `/` 搬咗上呢行、擺喺 `m` 右面，⇧ 同 ⌫ 就縮返細少少讓位俾佢
+        // 冇咗粒 `/`（併咗入 `.`，見 [PUNCT_VARIANTS]），讓返嗰格出嚟俾 ⇧ 同 ⌫ 分。
+        // 1.5 + 7 + 1.5 = 10，啱啱同上面兩行嘅十個字母對得齊。
         val r2 = listOf(
-            Key(KeyAction.SHIFT, label = shiftLabel(), weight = 1.25f,
+            Key(KeyAction.SHIFT, label = shiftLabel(), weight = 1.5f,
                 accent = shift == ShiftState.LOCK)
-        ) + "zxcvbnm".map { ch(it.toString()) } + listOf(punct("/")) +
-            listOf(Key(KeyAction.BACKSPACE, label = "⌫", weight = 1.25f, repeatable = true))
+        ) + "zxcvbnm".map { ch(it.toString()) } +
+            listOf(Key(KeyAction.BACKSPACE, label = "⌫", weight = 1.5f, repeatable = true))
         val r3 = ArrayList<Key>()
-        // 搵 emoji 嗰陣底行淨係要「退出」同 ␣ 兩粒：`!@#`、`中`、`⏎`、標點喺呢頁
+        // 搵 emoji 嗰陣底行淨係要「退出」同 ␣ 兩粒：`?123`、`中`、`⏎`、標點喺呢頁
         // 一粒都用唔著（打嘅字淨係用嚟篩 emoji，唔會入落個欄）。粒退出掣**寫明幾隻字**
         // —— 以前淨係得個 😀，冇人知撳落去係唔搵住定係入咗個 emoji
         if (emojiSearchMode) {
@@ -190,14 +222,15 @@ class LatinPadView(context: Context) : RowsPadView(context) {
             r3.add(Key(KeyAction.SPACE, label = "␣", weight = 4f))
             return if (numRow) listOf(digits, r0, r1, r2, r3) else listOf(r0, r1, r2, r3)
         }
-        // `中` 同 `!@#` 呢兩粒字面本身短，唔使 bigLabel 都夠睇清楚 ——
-        // 用返正常字size，讓返嗰啖位出嚟俾 space bar 擺得更中、闊少少
-        r3.add(Key(KeyAction.TO_CHINESE, label = "中", weight = 1.3f))
-        // 長撳 !@# 唔使經符號頁，直接跳去純數字 keypad。
+        // `中` 同 `?123` 呢兩粒字面本身短，唔使 bigLabel 都夠睇清楚 ——
+        // 用返正常字size，讓返嗰啖位出嚟俾 space bar 擺得更中、闊少少。
+        // `中` 淨係一隻字，仲窄得過 `?123`（2026-09-11 user 要求：再縮，益返 space）
+        r3.add(Key(KeyAction.TO_CHINESE, label = "中", weight = 1f))
+        // 長撳 ?123 唔使經符號頁，直接跳去純數字 keypad。
         // **冇左上角提示字**（2026-08-29 user 要求）—— 呢粒鍵面本身已經四個字符，
         // 英文底行粒粒都窄，再喺左上角迫多個「123」就撞埋一舊。
         // 中文九宮格嗰粒地方鬆啲，個 hint 照留。
-        r3.add(Key(KeyAction.TO_SYMBOL, label = "!@#", weight = 1.3f,
+        r3.add(Key(KeyAction.TO_SYMBOL, label = "?123", weight = 1.3f,
             longAction = KeyAction.TO_NUMBER))
         when (fieldKind) {
             LatinField.EMAIL -> {
@@ -228,13 +261,15 @@ class LatinPadView(context: Context) : RowsPadView(context) {
                 r3.add(Key(KeyAction.CHAR, label = "_", text = "_"))
             }
             LatinField.NORMAL -> {
-                // `/` 搬咗上一行（`m` 右面），呢行淨剩 `.` 喺 space 左面、`,` 喺右面
-                r3.add(punct("."))
-                r3.add(Key(KeyAction.SPACE, label = "␣", weight = 3.4f))
+                // `,` 喺 space 左面、`.` 喺右面 —— `.` 貼實粒 ⏎，打完句號緊接住換行
+                // 嗰下手指唔使行過成條 space。粒 `/` 唔喺度，長撳 `.` 攞。
                 r3.add(punct(","))
+                r3.add(Key(KeyAction.SPACE, label = "␣", weight = 4f))
+                r3.add(punct("."))
             }
         }
-        r3.add(Key(KeyAction.ENTER, label = "⏎", weight = 1.7f, accent = true))
+        // ⏎ 減咗兩成闊（2026-09-11 user 要求）：慳落嘅位全部益咗 space bar
+        r3.add(Key(KeyAction.ENTER, label = "⏎", weight = 1.36f, accent = true))
         return if (numRow) listOf(digits, r0, r1, r2, r3) else listOf(r0, r1, r2, r3)
     }
 
@@ -293,7 +328,9 @@ class LatinPadView(context: Context) : RowsPadView(context) {
 
     override fun onSwipeEnd() {
         if (tracker.points.size < 4) return // 至少要有兩個點先夾到條軌跡
-        latinHost?.onSwipePath(ArrayList(tracker.points), ::keyCenter, avgLetterKeyWidth())
+        latinHost?.onSwipePath(
+            ArrayList(tracker.points), ArrayList(tracker.times), ::keyCenter, avgLetterKeyWidth()
+        )
     }
 
     /** 邊個字母個鍵中心喺邊，畀 [tt.ime.riverine.swipe.GestureDecoder] 砌「理想路徑」用 */

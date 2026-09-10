@@ -77,7 +77,8 @@ class GestureKeyTracker(
     private var lastY = 0f
 
     val points = ArrayList<Float>(256)   // x,y 交替，畫線用
-    private val times = ArrayList<Long>(128)
+    /** [points] 每一點嘅時間，`times.size == points.size / 2`。英文滑動靠佢搵停留（[GesturePivots]） */
+    val times = ArrayList<Long>(128)
     var active = false; private set
 
     /**

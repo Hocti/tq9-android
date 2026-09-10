@@ -11,13 +11,15 @@ import android.content.Context
  * 底行嘅規矩（同英文鍵盤一樣，全部鍵盤都跟）：
  *
  *  - **左下兩粒一定係 `Eng` 同 `中`**（英行先），即係「返去英文／中文」，唔使兜圈。
- *  - **`⏎` 上面嗰粒一定係 `⌫`**，所以 `⌫` 同分頁掣（`€£¥`／`!@#`）都搬咗上
+ *  - **`⏎` 上面嗰粒一定係 `⌫`**，所以 `⌫` 同分頁掣（`€£¥`／`?123`）都搬咗上
  *    倒數第二行嘅最左同最右，底行淨返轉鍵盤、space、標點同 `⏎`。
  *
  * 第一頁底行 space 右邊順住排 `, . ? ; /` 五粒（都係打字最常用嗰啲），
  * 呢五粒本來喺上面兩行，讓返位出嚟畀分頁掣（`€£¥`）同 `⌫`。
- * 第二頁就唔要標點（space 同 `⏎` 拉長），純數字 keypad 擺喺 numpad 掣（
- * [KeyAction.TO_NUMBER]），又再向上升多一行，個位留返俾 `⌫`。
+ * 第二頁就唔要標點（space 同 `⏎` 拉長），個位留返俾 `⌫`。
+ * 第二頁本來有粒 numpad 掣，2026-09-11 user 要求剷咗佢 —— 純數字 keypad
+ * 長撳 `?123` 就去到（見 [LatinPadView] 同 [tt.ime.riverine.core.PadFunc.TO_NUMBER]），
+ * 唔使喺符號頁再擺多粒。
  *
  * 上面第一行係數字，長撳會出返 shift 嗰個符號（`1` → `!`），同英文鍵盤一樣。
  */
@@ -38,7 +40,7 @@ class SymbolPadView(context: Context) : RowsPadView(context) {
         val r4: List<Key>
         if (page == 0) {
             r0 = "1234567890".map { digitKey(it.toString()) }
-            r1 = row("!@#$%^&*()")
+            r1 = row("?123$%^&*()")
             r2 = row("`~-_=+[]{}")
             // `/ ? ;` 搬咗落底行 space 隔籬，呢行兩頭讓咗位出嚟畀分頁掣同 ⌫
             // 分頁掣寫住 `€£¥` —— 第二頁頭一行就係啲銀紙符號，寫 `=\<` 冇人知係乜
@@ -53,12 +55,13 @@ class SymbolPadView(context: Context) : RowsPadView(context) {
                 Key(KeyAction.ENTER, label = "⏎", weight = 1.5f, accent = true)
             )
         } else {
-            r0 = row("€£¥¢₩₹₱¤฿₫")
-            r1 = row("•√π÷×¶∆°±≠")
-            // 最唔常用嗰個（∞）減咗，讓位俾由下面升上嚟嘅 numpad 掣
-            r2 = listOf("©", "®", "™", "✓", "§", "¡", "¿", "…", "‰").map { ch(it) } +
-                listOf(Key(KeyAction.TO_NUMBER, label = "numpad", weight = 1.6f))
-            r3 = listOf(Key(KeyAction.SYM_PAGE, label = "!@#", weight = 1.4f)) +
+            // 錢銀淨係留返香港真係會打嗰五隻，跟住同一行接住排數學符號
+            r0 = row("€£¥¢₩°±×÷≠")
+            r1 = row("•√π∆‰§©®™✓")
+            // 圖形符號（圈、方、啤牌花色、星）—— 2026-09-11 user 要求加，
+            // 位係由粒 numpad 掣同幾乎冇人打嘅 `₫ ฿ ₱ ₹ ¤ ¶ ¡ ¿` 度讓出嚟
+            r2 = row("○●□■♤♡◇♧☆…")
+            r3 = listOf(Key(KeyAction.SYM_PAGE, label = "?123", weight = 1.4f)) +
                 listOf("«", "»", "\u201c", "\u201d", "\u2018", "\u2019", "–", "—").map { ch(it) } +
                 listOf(Key(KeyAction.BACKSPACE, label = "⌫", weight = 1.4f, repeatable = true))
             r4 = listOf(

@@ -33,6 +33,9 @@ abstract class KeyboardBaseView(context: Context) : View(context) {
         private const val SNAP_DP = 14f
         private const val PRESS_SCALE = 1.06f
         private const val DARKEN_RATIO = 0.76f
+
+        /** 長撳彈出嘅變體最多一行擺幾多個，多過就拆上下兩行（見 [openVariantPopup]） */
+        private const val MAX_POPUP_COLS = 10
     }
 
     interface Host {
@@ -121,12 +124,15 @@ abstract class KeyboardBaseView(context: Context) : View(context) {
     // 長撳變體 popup
     private var popupBox: KeyBox? = null
     private var popupItems: List<String> = emptyList()
+    /** [popupItems] 點樣拆行（由上至下），一行嗰陣就得一個 list */
+    private var popupRows: List<List<String>> = emptyList()
     private var popupIndex = 0
     private var popupLeft = 0f
     private var popupTop = 0f
     private var popupItemW = 0f
     private var popupItemH = 0f
     private var popupAnchorX = 0f
+    private var popupAnchorY = 0f
     /** 手指行夠 [slop] 之後先至跟住揀，之前一律當第一個（見 [updateVariantPopup]） */
     private var popupMoved = false
 
@@ -272,25 +278,40 @@ abstract class KeyboardBaseView(context: Context) : View(context) {
      * 所以唔使再夾硬 `max(0f, …)` 頂住鍵盤個頂同粒鍵疊埋一舊。
      */
     private fun openVariantPopup(box: KeyBox) {
-        val items = box.key.variants
+        val raw = box.key.variants
+        // 多過 [MAX_POPUP_COLS] 個就拆上下兩行（長撳 `.` 有十五個）—— 齋擠埋一行
+        // 每格得返幾 mm 闊，手指根本停唔準。
+        //
+        // **排頭嗰批擺落面嗰行**：popup 彈喺粒鍵上面，手指本身就喺最底嗰行嗰個高度，
+        // 常用嗰幾個唔使抬手就拉得到，要後面嗰啲先向上拉多一格。
+        val cols = if (raw.size > MAX_POPUP_COLS) (raw.size + 1) / 2 else raw.size
+        val base = if (cols >= raw.size) listOf(raw) else listOf(raw.drop(cols), raw.take(cols))
+        // 成對符號（`''`）自己再霸多一行喺最頂，見 [Key.variantsTop]
+        val rows = if (box.key.variantsTop.isEmpty()) base
+                   else listOf(box.key.variantsTop) + base
+        val items = rows.flatten()
+        val gridCols = rows.maxOf { it.size }
         popupBox = box
         popupItems = items
+        popupRows = rows
         popupItemW = maxOf(box.w * 1.1f, dp(50f))
-        // 格多過螢幕裝得落（`/` 有八個）就一齊迫窄，剛剛好一行鋪滿成個闊度 ——
-        // 情願粒粒細啲，都好過有幾個推咗出螢幕外面永遠揀唔到。
+        // 格多過螢幕裝得落就一齊迫窄，剛剛好鋪滿成個闊度 —— 情願粒粒細啲，
+        // 都好過有幾個推咗出螢幕外面永遠揀唔到。
         // 字太大 KeyPopup 自己會縮返（見 Content.onDraw 嗰句 avail / need）。
-        if (popupItemW * items.size > width) popupItemW = width.toFloat() / items.size
+        if (popupItemW * gridCols > width) popupItemW = width.toFloat() / gridCols
         popupItemH = box.h
-        val total = popupItemW * items.size
+        val total = popupItemW * gridCols
         popupLeft = (box.cx - popupItemW / 2f).coerceIn(0f, maxOf(0f, width - total))
-        popupTop = box.top - popupItemH - dp(8f)
+        popupTop = box.top - popupItemH * rows.size - dp(8f)
         popupAnchorX = downX
-        popupIndex = 0
+        popupAnchorY = downY
+        // 唔郁手指放開要出返 raw[0]：佢實喺最底嗰行排頭（頂行嗰啲全部都係後加嘅）
+        popupIndex = items.size - rows.last().size
         popupMoved = false
         dismissHover()
         variantPopup.setStyle(theme, fontScale)
         // 畫用 variantDisplay（Tab → ⇥），commit 就照用返 popupItems 入面嗰個真字元
-        variantPopup.showRow(this, items.map(::variantDisplay), popupIndex,
+        variantPopup.showGrid(this, rows.map { row -> row.map(::variantDisplay) }, popupIndex,
             popupLeft, popupTop, popupItemW, popupItemH)
     }
 
@@ -302,13 +323,25 @@ abstract class KeyboardBaseView(context: Context) : View(context) {
      * 但係「長撳完唔郁直接放手 = 打返粒鍵本身」呢個習慣要保住：手指未行夠
      * 一個 [slop] 之前一律當第一個（＝粒鍵自己），行夠先至跟手指走。
      */
-    private fun updateVariantPopup(x: Float) {
+    private fun updateVariantPopup(x: Float, y: Float) {
         if (popupItems.isEmpty()) return
+        val rows = popupRows
         if (!popupMoved) {
-            if (abs(x - popupAnchorX) < slop) return
+            // 一行嗰陣淨係計左右（上下郁咗都唔應該換格）；兩行就要連上下一齊計，
+            // 唔係齋抬高手指（左右冇郁）就永遠揀唔到頂行
+            val moved = if (rows.size > 1) hypot(x - popupAnchorX, y - popupAnchorY)
+                        else abs(x - popupAnchorX)
+            if (moved < slop) return
             popupMoved = true
         }
-        popupIndex = ((x - popupLeft) / popupItemW).toInt().coerceIn(0, popupItems.size - 1)
+        // 手指仲喺粒鍵度（popup 喺佢上面）就當係最底嗰行 —— coerceIn 自然夾到
+        val ri = ((y - popupTop) / popupItemH).toInt().coerceIn(0, rows.size - 1)
+        val row = rows[ri]
+        val cols = rows.maxOf { it.size }
+        // 短嗰行喺 KeyPopup 度擺咗中間，計返個 offset 先夾得返個高亮
+        val rowLeft = popupLeft + popupItemW * (cols - row.size) / 2f
+        val ci = ((x - rowLeft) / popupItemW).toInt().coerceIn(0, row.size - 1)
+        popupIndex = (0 until ri).sumOf { rows[it].size } + ci
         variantPopup.highlight(popupIndex)
     }
 
@@ -317,6 +350,7 @@ abstract class KeyboardBaseView(context: Context) : View(context) {
         val box = popupBox
         popupBox = null
         popupItems = emptyList()
+        popupRows = emptyList()
         variantPopup.dismiss()
         if (commit && box != null && popupIndex in items.indices) {
             val v = items[popupIndex]
@@ -375,7 +409,7 @@ abstract class KeyboardBaseView(context: Context) : View(context) {
             MotionEvent.ACTION_MOVE -> {
                 if (cursorMode) { dragCursor(x, y); return true }
                 if (popupItems.isNotEmpty()) {
-                    updateVariantPopup(x)
+                    updateVariantPopup(x, y)
                     invalidate()
                     return true
                 }

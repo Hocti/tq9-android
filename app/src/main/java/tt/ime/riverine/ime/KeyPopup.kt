@@ -45,21 +45,27 @@ class KeyPopup(context: Context) {
         content.fontScale = fontScale
     }
 
-    /** 長撳彈出嗰行變體。[left]／[top] 係 [anchor] 入面嘅座標，負數 = 彈出鍵盤外面 */
-    fun showRow(
-        anchor: View, items: List<String>, index: Int,
+    /**
+     * 長撳彈出嘅變體。[rows] 由上至下一行行，[index] 係成個 grid 拉直之後嘅位置
+     * （即係 `rows.flatten()` 嗰個 list 嘅 index）。
+     * [left]／[top] 係 [anchor] 入面嘅座標，負數 = 彈出鍵盤外面。
+     *
+     * 兩行嘅時候上下行格數可以爭一格（奇數個變體），短嗰行會擺中間。
+     */
+    fun showGrid(
+        anchor: View, rows: List<List<String>>, index: Int,
         left: Float, top: Float, itemW: Float, itemH: Float
     ) {
-        content.items = items
+        content.rows = rows
         content.index = index
         content.itemW = itemW
         content.itemH = itemH
-        show(anchor, left, top, itemW * items.size, itemH)
+        show(anchor, left, top, itemW * content.cols, itemH * rows.size)
     }
 
     /** 淨係一格（滑動時嘅 hover 提示）。[cx] 係中心 x */
     fun showOne(anchor: View, label: String, cx: Float, top: Float, w: Float, h: Float) {
-        content.items = listOf(label)
+        content.rows = listOf(listOf(label))
         content.index = 0
         content.itemW = w
         content.itemH = h
@@ -99,38 +105,49 @@ class KeyPopup(context: Context) {
         val pad = context.resources.displayMetrics.density * 4f
         var theme: Theme = Theme.of(context)
         var fontScale = 1f
-        var items: List<String> = emptyList()
+        var rows: List<List<String>> = emptyList()
         var index = 0
         var itemW = 0f
         var itemH = 0f
+
+        /** 最闊嗰行有幾多格 —— 成個窗嘅闊度就係佢 */
+        val cols: Int get() = rows.maxOfOrNull { it.size } ?: 0
 
         private val bg = Paint(Paint.ANTI_ALIAS_FLAG)
         private val tp = Paint(Paint.ANTI_ALIAS_FLAG).apply { textAlign = Paint.Align.CENTER }
         private val r = RectF()
 
         override fun onDraw(canvas: Canvas) {
-            if (items.isEmpty() || itemW <= 0f || itemH <= 0f) return
+            if (cols == 0 || itemW <= 0f || itemH <= 0f) return
             val radius = pad * 1.6f
             r.set(0f, 0f, width.toFloat(), height.toFloat())
             bg.color = theme.keyFaceAlt
             bg.style = Paint.Style.FILL
             canvas.drawRoundRect(r, radius, radius, bg)
-            for (i in items.indices) {
-                val l = pad + i * itemW
-                r.set(l + 1f, pad + 1f, l + itemW - 1f, pad + itemH - 1f)
-                bg.color = if (i == index) theme.keyAccent else theme.keyFace
-                canvas.drawRoundRect(r, radius, radius, bg)
-                tp.isFakeBoldText = i == index
-                tp.color = if (i == index) theme.onAccentText else theme.text
-                tp.textSize = itemH * TEXT_RATIO * fontScale
-                val avail = itemW - pad * 2
-                val need = tp.measureText(items[i])
-                if (need > avail) tp.textSize *= avail / need
-                val fm = tp.fontMetrics
-                canvas.drawText(
-                    items[i], (r.left + r.right) / 2f,
-                    (r.top + r.bottom) / 2f - (fm.ascent + fm.descent) / 2f, tp
-                )
+            val gridW = itemW * cols
+            var i = 0
+            for ((ri, row) in rows.withIndex()) {
+                // 短嗰行擺中間，唔好齋靠左歪咗一邊
+                val rowLeft = pad + (gridW - itemW * row.size) / 2f
+                val rowTop = pad + ri * itemH
+                for ((ci, s) in row.withIndex()) {
+                    val l = rowLeft + ci * itemW
+                    r.set(l + 1f, rowTop + 1f, l + itemW - 1f, rowTop + itemH - 1f)
+                    bg.color = if (i == index) theme.keyAccent else theme.keyFace
+                    canvas.drawRoundRect(r, radius, radius, bg)
+                    tp.isFakeBoldText = i == index
+                    tp.color = if (i == index) theme.onAccentText else theme.text
+                    tp.textSize = itemH * TEXT_RATIO * fontScale
+                    val avail = itemW - pad * 2
+                    val need = tp.measureText(s)
+                    if (need > avail) tp.textSize *= avail / need
+                    val fm = tp.fontMetrics
+                    canvas.drawText(
+                        s, (r.left + r.right) / 2f,
+                        (r.top + r.bottom) / 2f - (fm.ascent + fm.descent) / 2f, tp
+                    )
+                    i++
+                }
             }
         }
     }

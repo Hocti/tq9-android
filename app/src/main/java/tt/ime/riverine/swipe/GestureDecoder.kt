@@ -20,9 +20,35 @@ class GestureDecoder(private val dict: EnDict) {
         private const val RESAMPLE_N = 32
         /** 淨係頭幾多個字（已經按常用度排好）入 fallback pool，太多會拖慢又冧巴少見字 */
         private const val FUZZY_POOL = 20_000
-        private const val SPATIAL_WEIGHT = 1f
+        /**
+         * 形狀夾唔夾，比「呢個字常唔常用」重要得多。
+         *
+         * 本來係 1f，而 `ln(頻率)` 嘅範圍係 5.5（罕見字）到 17.3（`the`），
+         * 乘 [LM_WEIGHT] 之後有成 1.9 分嘅落差；但形狀夾唔夾，好極同差極
+         * 之間先得 0.7 分左右 —— 即係詞頻嘅影響力係形狀嘅兩倍幾，
+         * 結果**滑得幾準都好，都會輸畀一個順路而又更常用嘅字**：
+         * 滑 `there` 出 `the`、滑 `forget` 出 `first`、滑 `sorry` 出 `story`。
+         * 調到 3f 之後，詞頻淨係喺形狀夾到差唔多嗰陣先拆得郁（`swipe` / `swope`）。
+         */
+        private const val SPATIAL_WEIGHT = 3f
         private const val ENDPOINT_WEIGHT = 0.6f
         private const val LM_WEIGHT = 0.16f
+
+        /**
+         * [GesturePivots] 砌出嚟嗰個「唔喺詞庫嘅字」當幾常用。
+         *
+         * 詞庫入面 `LM_WEIGHT * ln(頻率)` 嘅範圍係 0.96（最罕見嗰個）到 2.77（`the`），
+         * 呢個值**特登低過最罕見嗰個** —— 形狀夾成點都好，只要有個詞庫字夾得
+         * 差唔多咁貼，都應該出詞庫嗰個（滑 `hello` 唔可以因為抽多咗粒字母
+         * 就出 `hjello`）。要贏就一定要形狀明顯夾得好過所有詞庫字，
+         * 即係「呢串字母真係唔屬任何字」嗰種情況。
+         */
+        private const val LITERAL_LM = 0.8f
+
+        /** 排行榜嘅空位 */
+        private const val EMPTY = -1
+        /** 排行榜入面代表「[GesturePivots] 砌嗰個字」，唔係詞庫 index */
+        private const val LITERAL = -2
     }
 
     private val byFirstLast: Array<IntArray>
@@ -46,6 +72,9 @@ class GestureDecoder(private val dict: EnDict) {
 
     /**
      * @param path 原始軌跡，x,y 交替（[tt.ime.riverine.ime.KeyboardBaseView] 個 tracker 出嗰種格式）
+     * @param times [path] 每一點嘅時間，數目 = `path.size / 2`。有嘅話就會用
+     *   [GesturePivots] 多砌一個「唔喺詞庫嘅字」候選出嚟鬥（見 [LITERAL_LM]）；
+     *   冇（或者對唔上數）就淨係查詞庫，行為同以前一樣。
      * @param keyCenter 邊個字母個鍵中心喺邊 —— 用嚟砌「理想路徑」
      * @param keyWidth 一粒鍵大概幾闊，用嚟將距離正規化（唔同螢幕、唔同鍵盤大細都夾到）
      * @param prefix caret 前面已經打咗嘅字母（`dis|y` 滑 `pla` 嘅 `dis`）
@@ -53,6 +82,7 @@ class GestureDecoder(private val dict: EnDict) {
      */
     fun decode(
         path: List<Float>,
+        times: List<Long> = emptyList(),
         keyCenter: (Char) -> Pair<Float, Float>?,
         keyWidth: Float,
         prefix: String = "",
@@ -69,11 +99,15 @@ class GestureDecoder(private val dict: EnDict) {
             ?: nearestKey(path[path.size - 2], path[path.size - 1], keyCenter)
             ?: return emptyList()
 
+        val literal = if (times.size * 2 == path.size) {
+            GesturePivots.letters(path, times, keyCenter, keyWidth).takeIf { it.length >= 2 }
+        } else null
+
         val strictPool = bucketOf(headChar, tailChar)
-        var result = score(strictPool, userPath, keyCenter, keyWidth, prefix, suffix, limit)
+        var result = score(strictPool, userPath, keyCenter, keyWidth, prefix, suffix, limit, literal)
         if (result.isEmpty() && headChar in 'a'..'z') {
             // 精準桶夾唔到 → 淨係信第一個字母，喺常用字入面搵形狀最似嗰個
-            result = score(byFirst[headChar - 'a'], userPath, keyCenter, keyWidth, prefix, suffix, limit)
+            result = score(byFirst[headChar - 'a'], userPath, keyCenter, keyWidth, prefix, suffix, limit, literal)
         }
         return result
     }
@@ -91,11 +125,11 @@ class GestureDecoder(private val dict: EnDict) {
         keyWidth: Float,
         prefix: String,
         suffix: String,
-        limit: Int
+        limit: Int,
+        literal: String?
     ): List<String> {
-        val bestIdx = IntArray(limit) { -1 }
+        val bestIdx = IntArray(limit) { EMPTY }
         val bestScore = FloatArray(limit) { Float.NEGATIVE_INFINITY }
-        val n = RESAMPLE_N
 
         for (idx in pool) {
             val len = dict.wordLength(idx)
@@ -106,22 +140,31 @@ class GestureDecoder(private val dict: EnDict) {
             if (suffix.isNotEmpty() && !matchesSuffix(idx, suffix, len)) continue
 
             val ideal = idealPath(idx, bodyStart, bodyEnd, keyCenter) ?: continue
-            val idealResampled = resample(ideal, n)
-
-            val spatial = pathCost(userPath, idealResampled) / keyWidth
-            val endCost = (
-                hypot((userPath[0] - idealResampled[0]).toDouble(), (userPath[1] - idealResampled[1]).toDouble()) +
-                hypot(
-                    (userPath[(n - 1) * 2] - idealResampled[(n - 1) * 2]).toDouble(),
-                    (userPath[(n - 1) * 2 + 1] - idealResampled[(n - 1) * 2 + 1]).toDouble()
-                )
-            ).toFloat() / keyWidth
-
-            val geoScore = -(spatial + ENDPOINT_WEIGHT * endCost) * SPATIAL_WEIGHT
-            val score = geoScore + LM_WEIGHT * dict.weightAt(idx)
-            insert(bestIdx, bestScore, idx, score)
+            insert(bestIdx, bestScore, idx, geoScore(userPath, ideal, keyWidth) + LM_WEIGHT * dict.weightAt(idx))
         }
-        return bestIdx.filter { it >= 0 }.map { dict.word(it) }
+
+        // 唔喺詞庫嗰個 —— 形狀照計，但當佢罕見過詞庫任何一個字（見 [LITERAL_LM]）
+        if (literal != null) {
+            idealPathOf(literal, keyCenter)?.let {
+                insert(bestIdx, bestScore, LITERAL, geoScore(userPath, it, keyWidth) + LITERAL_LM)
+            }
+        }
+
+        return bestIdx.filter { it != EMPTY }
+            .map { if (it == LITERAL) prefix + literal + suffix else dict.word(it) }
+            .distinct()
+    }
+
+    /** 兩條軌跡夾唔夾：逐點距離＋首尾點嘅額外罰分，全部用 [keyWidth] 正規化 */
+    private fun geoScore(userPath: FloatArray, ideal: FloatArray, keyWidth: Float): Float {
+        val n = RESAMPLE_N
+        val r = resample(ideal, n)
+        val spatial = pathCost(userPath, r) / keyWidth
+        val endCost = (
+            hypot(userPath[0] - r[0], userPath[1] - r[1]) +
+            hypot(userPath[(n - 1) * 2] - r[(n - 1) * 2], userPath[(n - 1) * 2 + 1] - r[(n - 1) * 2 + 1])
+        ) / keyWidth
+        return -(spatial + ENDPOINT_WEIGHT * endCost) * SPATIAL_WEIGHT
     }
 
     private fun matchesPrefix(idx: Int, prefix: String): Boolean {
@@ -134,6 +177,20 @@ class GestureDecoder(private val dict: EnDict) {
         if (offset < 0) return false
         for (k in suffix.indices) if (dict.charAt(idx, offset + k) != suffix[k]) return false
         return true
+    }
+
+    /**
+     * 同 [idealPath] 一樣，但係由 [GesturePivots] 出嗰個字砌。
+     * 唔使似 [idealPath] 咁隔走疊字 —— 條軌跡上面一個停留就一粒字母，
+     * 出嚟嗰串本身已經冇連續重複。
+     */
+    private fun idealPathOf(word: String, keyCenter: (Char) -> Pair<Float, Float>?): FloatArray? {
+        val pts = ArrayList<Float>(word.length * 2)
+        for (c in word) {
+            val p = keyCenter(c) ?: return null
+            pts.add(p.first); pts.add(p.second)
+        }
+        return if (pts.isEmpty()) null else pts.toFloatArray()
     }
 
     /** 逐個字母嘅鍵中心連成線，重複嘅字母（`hello` 嘅 `ll`）淨係算一格 */
