@@ -78,7 +78,10 @@ enum class PadFunc(
     SPACE("空格", "␣", FuncPlace.SIDE_ONLY, required = true, tapOnly = true),
     BACKSPACE("刪除", "⌫", FuncPlace.SIDE_ONLY, required = true, tapOnly = true),
     ENTER("換行／送出", "⏎", FuncPlace.SIDE_ONLY, required = true, tapOnly = true),
-    /** `⇄`：關聯字 ⇄ 工具，即係入工具列嘅唯一入口 */
+    /**
+     * `⇄`：上面條 bar 三段循環 —— 關聯字 → 工具 → 兩行一齊，
+     * 即係入工具列嘅唯一入口（見 [BarMode]）
+     */
     BAR_SWITCH("轉換工具列", "⇄", FuncPlace.SIDE_ONLY, required = true),
     IME_NEXT("下一個輸入法", ""),
     IME_PICKER("彈出輸入法選擇表", ""),

@@ -39,9 +39,16 @@ class ToolStrip(context: Context) : LinearLayout(context) {
 
     /** 一粒最窄幾多（撳得中嘅下限） */
     var minW = dp(44f)
+        set(v) { if (field != v) { field = v; requestLayout() } }
 
-    /** 一粒最闊幾多。預設五粒嘅時候，窄機本來就係差唔多咁闊，所以個樣冇變 */
+    /**
+     * 一粒最闊幾多。**由外面跟住中文九宮格一粒鍵幾闊擺落嚟**
+     * （見 `OptionBarsView.refreshToolWidth`）—— 擺一至五粒嗰陣，
+     * 條 bar 啲掣就同下面啲鍵一樣闊，唔會闊過佢哋。
+     * 呢個預設值淨係喺未度過之前頂住檔。
+     */
     var maxW = dp(76f)
+        set(v) { if (field != v) { field = v; requestLayout() } }
 
     init { orientation = HORIZONTAL }
 

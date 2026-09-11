@@ -23,15 +23,25 @@ object AiRewrite {
 
     private val ui = Handler(Looper.getMainLooper())
 
-    /** [done] 一定喺 main thread 叫；失敗就 `Result.failure` */
-    fun rewrite(ctx: Context, selected: String, done: (Result<String>) -> Unit) {
+    /**
+     * [template] 係要用邊個 prompt 範本（`%text%` 會換成 [selected]）——
+     * 唔畀就用返名單第一個（＝短撳工具列粒「AI改」嗰個，見 [Prefs.aiPrompt]）；
+     * 長撳粒掣揀第二個 prompt 嗰陣就由 caller 傳入。
+     *
+     * [done] 一定喺 main thread 叫；失敗就 `Result.failure`。
+     */
+    fun rewrite(
+        ctx: Context,
+        selected: String,
+        template: String = Prefs.aiPrompt(ctx),
+        done: (Result<String>) -> Unit
+    ) {
         val key = Prefs.aiApiKey(ctx)
         if (key.isBlank()) {
             done(Result.failure(IllegalStateException("尚未設定 API key")))
             return
         }
         val model = Prefs.aiModel(ctx)
-        val template = Prefs.aiPrompt(ctx)
         val prompt =
             if (template.contains("%text%")) template.replace("%text%", selected)
             else "$template\n$selected"

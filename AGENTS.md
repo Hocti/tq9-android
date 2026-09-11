@@ -162,10 +162,16 @@ log 由 `core/InputLog` 出，**兩個開關任選其一**（預設兩個都關�
   `中` 由 1.3 收到 1、`⏎` 減兩成（1.7 → 1.36），慳下的位全數給 space
   （3.4 → 4，佔整行由 35% 變 41%）—— 全部都是為了 space bar 更長。
   網址欄（`textUri`）與電郵欄那顆 `/` 照留，那兩處逐個字元都要按得到。
-- **長按字母大小寫兩樣都可選**：`ch()` 會按目前個 `ShiftState` 建立 variants ——
-  排頭那個是按鍵目前顯示那個（按住不移動後放手 = 輸入它），第二個是另一個大小寫。
+- **長按字母大小寫兩樣都可選**：`ch()` 會按目前個 `ShiftState` 建立 variants。
+  **2026-09-11 起排頭那個是「另一個」大小寫**（使用者要求）—— 按鍵寫住細階就排頭
+  出大階、寫住大階就排頭出細階（按住不移動放手 = 輸入它），按鍵自己那個排第二，
+  之後才是重音字母。短按本來就取得到按鍵自己那個，長按那下想要的一定是另一個。
   popup 選回來那按鍵帶 `Key.literal = true`，`typeChar()` 見到就**不會**再套 shift
   （不是特意選個小寫 `a` 會讓 shift 強行恢復 `A`）。
+- **長按數字排頭是符號**（`digitKey()`，2026-09-11 使用者要求）：`1` → `!` 排頭、
+  `1` 自己排第二，之後才是 `¡` `¹` `½`。同樣道理 —— 數字短按已經打得到。
+  `DIGIT_SYMBOLS` 本身的次序沒有改，右上角那個小字提示照舊是 `syms[0]`。
+  `SymbolPadView` 那行數字同樣用 `digitKey()`，所以兩處一致。
 - 標點（`,` `.`，網址／電郵欄再加 `/`）長按有 `PUNCT_VARIANTS`，左上角顯示小字提示。
   **全部都不跟「第一個 = 自己」規矩** —— 排頭那個是長按彈出時就已經停了
   在此那個（手指不移動放開就出它），按鍵自己短按取得：
@@ -192,6 +198,29 @@ log 由 `core/InputLog` 出，**兩個開關任選其一**（預設兩個都關�
   **英文那顆沒有左上角提示字**（2026-08-29 使用者要求）：鍵面本身已經四文字符，
   底行每顆都窄，再擠壓個 `123` 落左上角就擠在一起。中文九宮格那顆空間較寬鬆，
   個 `hint` 照留 —— 兩處不一致是特意的。
+- **`?123` 右邊那顆只在寬 keyboard 出現**（2026-09-11 使用者要求）：它是上面那條
+  bar 的**四段循環**（`KeyAction.BAR_HIDE` → `TTInputMethodService.cycleBarWithHide`）——
+  關聯字 → 工具 → 兩行一齊 → **收起**，然後從頭再來。即是與切換掣（`⇄`）走同一個
+  圈，只是多了「收起」那一段，而**收起只有這顆做得到**。
+
+  個字面講的一律是「按完會怎樣」（`LatinPadView.barCycleGlyph()`）：
+  `⇄` 轉去工具、`⇅` 兩行一齊、`▴` 收上去、`▾` 拉回來。每按一下都要
+  `latinPad?.rebuild()`，否則字面停在上一段。
+
+  「寬」＝ `Prefs.barToggleAllowed()`，與「左右拆開」揀不揀得到是同一條線
+  （`SPLIT_MIN_WIDTH_DP`，500dp）。窄機**不會**出現這顆，條 bar 收不起 ——
+  打字提示、滑出來那個字、關聯字全部在那條 bar 上，窄機收起了就等於打盲舖。
+
+  **收起了是四款鍵盤一起收**（2026-09-11 起，以前只有英文頁理會）：
+  `Prefs.barHidden()` 每個螢幕尺寸各自存（`Prefs.screenKey()`），所以打橫收起了
+  轉回打直不會一起收埋。**打橫未按過就預設收起** —— 打橫本來就矮，首次開鍵盤
+  連條 bar 遮住整個螢幕（使用者報）。叫得回來的入口有兩個：這顆鍵，以及**任何一顆
+  切換掣**（`onSwitchView()` 見到收起了就先放回來再走第一段，否則中文頁那顆 `⇄`
+  按極都沒有反應——中文頁沒有「收起」那顆鍵）。
+
+  搜尋 emoji、滑完等揀字、emoji 表／剪貼簿三種情況一律越過它（見
+  `refreshBars()` 中的 `mustShow`）—— 那幾下不見到條 bar 就選不到東西。
+  符號頁在那裏收不起也開不回（沒有那兩顆鍵），要轉回英文／中文頁才叫得回來。
 
 ### 英文句首自動大階（2026-09-05 加）
 
@@ -331,6 +360,23 @@ URL／email／密碼／篩選欄（`textFilter`）不會自動大階（`autoCaps
 用 `String.length` / `toCharArray` 會拆分損壞 emoji 與香港增補字符集。
 判斷「是否單一個字」要用 `codePointCount`，不是 `length`。
 
+**剷字（⌫）也是同一條規矩**（2026-09-11 使用者報「`👾` 要按兩次 backspace」）。
+`InputConnection.deleteSurroundingText` 收的單位是 **UTF-16 char**，收那邊
+（`BaseInputConnection`，即一般 `EditText`）**不會**自己補回個 surrogate pair，
+所以寫死 `1` 就會每次只剷半隻字：
+
+| 打的內容 | 佔幾多 char | 寫死 `1` 要按幾多次 ⌫ |
+| --- | --- | --- |
+| `字` / `a` | 1 | 1 |
+| `👾`（`assets/emoji.txt` 1416 個中有 1248 個是這樣） | 2 | 2 |
+| `🇭🇰`（兩個 regional indicator） | 4 | 4 |
+| `👨‍👩‍👧`（ZWJ 串起一家人） | 8 | 8 |
+
+`TTInputMethodService.deleteOneElement()` 先取回游標前面那段字，行
+`TextEdit.lastClusterLength()`（`BreakIterator`，有 `TextEditTest`）計出實際
+要剷幾多個 char。加新的剷字路徑一定要行它，不可以再寫 `deleteSurroundingText(1, 0)`
+—— 只有「剷一個英文字母」（`latinComposing`）那條路確定是 1 才可以寫死。
+
 ### 按鍵之間不可以有死位
 
 畫面上可見的隙是 `drawFace()` 縮了 `gapPx` 畫出來的，`KeyBox` 本身要貼近
@@ -424,6 +470,8 @@ ime/    TTInputMethodService   IME 主體，所有 view 的 host
         RowsPadView             一行行按 weight 分寬度的底
         LatinPadView / SymbolPadView / NumberPadView（RowsPadView）
         EmojiPadView            emoji grid（ViewGroup，不是 KeyboardBaseView）
+        QuickEmoji              長按「表情」彈出的速選那行（見下面那節）：
+                                條件 `appliesTo()` 加 工具列那顆的 `QuickEmojiPopup`
         ClipboardListView       長按「貼上」之後蓋在 padHolder 上面的 overlay
         PadMetrics              尺寸與顯示方式計算
         OptionBarsView          上面工具列（三段：關／關聯字／工具）
@@ -446,16 +494,38 @@ ui/     SettingsActivity / MicPermissionActivity
 `padGroup`（`PadGroup.CJK` / `LATIN`）話讓它知取哪套大小 —— 見「大小設定分組存」。
 `RowsPadView` 預設 `LATIN`，`NumberPadView` override 回做 `CJK`（跟中文九宮格）。
 
-### 上面工具列 三段都是一行
+### 上面工具列：每段一行，`BOTH` 就兩行
 
-`OptionBarsView` 三段（`BarMode`）每段都是只有**一行**。以前有條「狀態」小字
+`OptionBarsView` 是**兩個 view 疊起**：`candLine`（關聯字）在上、`toolLine`（工具）
+在下，`BarMode` 四段就是這兩個 `visibility` 的組合（`CANDIDATES` / `TOOLS` /
+`BOTH` 兩行一起 / `OFF` 整條 `GONE`，見 `setMode()`）。`BOTH` 是 2026-09-11
+使用者要求加的，那陣條 bar **真的高一倍**，不是把兩樣塞進同一行。
+
+那顆 `⇄`（與 `✖`）**放在最底那行的最左**：有工具那行就跟工具那行走，只得關聯字
+那段才搬去關聯字那行（`refreshLeftBtn()` 靠 `mode.hasTools` 分）。兩行一起那陣
+關聯字那行就沒有那顆掣，整行讓給那些字。兩行的高度、`setContentInsets()` 的
+padding **一定要一起改**（`lines`），否則兩行一起出的時候上下不對稱。
+
+每段本身仍然只有**一行**。以前有條「狀態」小字
 （字碼、`[同音]`、頁數）放在最上面，一出現就整個鍵盤高了一截，已經**移除**——
 `TTEngine.status` 仍在計算，但沒有人畫。要出 message 就用 `toast()`，
 不要再在工具列 上面加行。
 
 高度**不再是固定為 42dp**（2026-08-29 使用者要求）：根據 `CandChip` 中關聯字實際
 要幾高，再加上下 3dp margin，最矮 42dp。100% 之下實測 47dp。
-**三段共用同一高度**，轉段一樣不會跳。
+**兩行共用同一高度**，在 `CANDIDATES` 與 `TOOLS` 之間轉一樣不會跳
+（`BOTH` 當然會高一倍，那是使用者自己按出來的）。
+
+**但再粗都不可以粗過下面一行鍵**（2026-09-11 使用者要求：「打橫縮到很小時，
+功能 bar 還是很粗」）。`refreshBars()` 每次將
+`TTInputMethodService.keyRowHeightPx()`（＝`PadMetrics.padHeightPx` ÷ 現在那塊
+pad 的 `rowCount`）放入 `OptionBarsView.keyRowHeightPx`，
+`CandChip.barHeightPx(ctx, chip, rowH)` 就按它封頂（底線 28dp，再矮就按不中）。
+封了頂那陣**關聯字要跟着縮細**（`OptionBarsView.applyBarSize()`，最細 60%）——
+不縮就會被 `AT_MOST` 迫窄，個字裁頂兼且上下不對稱（見 `CandChip` 那個 doc）。
+
+一組之內 `rowCount` 是固定的（中文與純數字都是 4 行、英文與符號都是 5 行），
+所以轉頁一樣不會跳高跳低。加新版面時要留意這點。
 
 改完字體要行 `bars.refreshFontScale()`（`refreshBars()` 內，在
 `setCandidates` 之前）—— 它見到 sp 沒有變就立即返回，所以即使逐個按鍵呼叫也不會有額外開銷。
@@ -521,6 +591,9 @@ gravity 跟 `PadAlign` 反過來放置）：上面一（兩）行功能按鍵，
 
 入口是 `refreshBars()` 開頭那句 `if (refreshSidePanel(cands)) { … return }`。
 
+**`PadAlign.CENTER`（置中）沒有側邊欄**（`sideGeom()` 與 `STRETCH` 一起回 `null`）：
+空出來那些位置一開二，兩邊各一半，哪邊都窄過放得下工具按鍵，所以照用回上面工具列。
+
 **高度一定要固定為 `PadMetrics.totalHeight`（＝中文九宮格幾高），
 不可以用 `MATCH_PARENT`。** `padHolder` 是 `wrap_content` 的 `FrameLayout`：
 `MATCH_PARENT` 的子視圖會取到 `AT_MOST(全部可用高度)`，而 `SidePanelView` 內
@@ -537,8 +610,8 @@ gravity 跟 `PadAlign` 反過來放置）：上面一（兩）行功能按鍵，
 
 `PadMetrics` 沒有 `extraBottom`／`Prefs.floatY`。`PadAlign.FLOATING` 已刪除
 （自由移動那顆無效，`Prefs.floatX`／`ChinesePadView.nudgeFloat` 一起清了）——
-目前 `PadAlign` 只有 `STRETCH`／`LEFT_GAP`／`RIGHT_GAP` 三個，
-`OptionBarsView` 個 sizeBtn 只轉這三個。拖動**兩個方向都都有對應功能**
+目前 `PadAlign` 有 `STRETCH`／`LEFT_GAP`／`RIGHT_GAP`／`CENTER`／`SPLIT`，
+`OptionBarsView` 個 sizeBtn 按一下就轉下一個（可選哪幾個見 `Prefs.alignOptions`）。拖動**兩個方向都都有對應功能**
 （拖動超過 8dp 就鎖定方向，不會輕微斜向移動就兩樣一起改）：
 
 - **上下** = `Prefs.heightScale`（0.6~1.8）。`PadMetrics.cellH` 與
@@ -644,9 +717,12 @@ key 照留回做預設值**（`sp.getFloat(profKey(...), sp.getFloat(舊 key, 1f
 
 `Prefs.alignOptions(ctx, group)` 提示知**目前可選邊多個**顯示方式：
 
-- `LATIN` + 螢幕寬過 `Prefs.SPLIT_MIN_WIDTH_DP`（500dp）→ 只有 `STRETCH` 與 `SPLIT`
+- `LATIN` + 螢幕寬過 `Prefs.SPLIT_MIN_WIDTH_DP`（500dp）→ `STRETCH`、`SPLIT`、`CENTER`
   （靠左／靠右時收合 —— 這麼寬的螢幕靠近一邊，另一邊那部分空間就是浪費了）
-- 其餘（`CJK`、或者窄螢幕）→ 原本三個，沒有 `SPLIT`
+- 其餘（`CJK`、或者窄螢幕）→ `STRETCH`、`LEFT_GAP`、`RIGHT_GAP`、`CENTER`，沒有 `SPLIT`
+
+`CENTER`（置中，2026-09-11 使用者要求）**兩邊都可以選**：它不佔一邊，純粹是
+「拉窄之後站中間」，寬螢幕與窄螢幕一樣用得著。
 
 三樣內容然後這資料表行，加新 mode 記得三樣一起改：
 
@@ -723,6 +799,39 @@ emoji 表／剪貼簿跟 `forcedHeightPx`，不在此處計（`as? KeyboardBaseV
 
 `showOverlay()` / `hideOverlay()` 兩邊都會叫 `refreshBars()`。
 
+### 功能表（emoji 表／剪貼簿／AI prompt 名單／拉大了的候選字）跟顯示方式放位
+
+2026-09-11 使用者要求：鍵盤本體靠左／靠右／置中，**攤開在鍵盤位置那些表也要跟著放**。
+不是就會「鍵盤縮窄靠著一邊單手打字，長按『貼上』彈出來那張表卻鋪滿成行」，
+手指夠不到另一邊。
+
+`TTInputMethodService.panelLayoutParams(height)` 一個地方計完：寬度 =
+`PadMetrics.contentW`，`gravity` 跟 `PadAlign`（`RIGHT_GAP` → `START`、
+`LEFT_GAP` → `END`、`CENTER` → `CENTER_HORIZONTAL`）。`STRETCH` 與 `SPLIT`
+本來就用盡成行，回 `MATCH_PARENT`。四個入口：`showOverlay()`（剪貼簿、
+AI prompt 名單）、`switchMode()` 加 view 那句（emoji 表）、`onExpandChanged()`
+（拉大了的候選字），以及 `relayoutPads()` 尾那幾句 `refreshPanelLayout()`。
+
+兩個陷阱：
+
+- **鍵盤本體不可以走這條路**（`switchMode()` 那句 `if (v is KeyboardBaseView)`）：
+  它自己在 `PadMetrics.offsetX` 排位，而且空出來那邊要留給側邊欄（`SidePanelView`
+  是 `padHolder` 的另一個 child），本體一縮窄側邊欄就沒有位置放。
+- **改了顯示方式／拉過寬窄，要重新 set `layoutParams`**，`requestLayout()` 沒有用 ——
+  寬度記在 `LayoutParams` 裡面，不重新 set 就會維持上一次那個寬度。
+  `relayoutPads()` 因此同時 `refreshPanelLayout(overlay)` / `emojiPad` /
+  `bars.expandedView`（只在 `candidatesExpanded` 時）。
+
+### 上面那條 bar 裡面的內容也跟著縮進來
+
+同一個要求（2026-09-11）：鍵盤站一邊，上面那條 bar 的**按鍵**不可以仍然鋪滿成行。
+`TTInputMethodService.padInsets()` 算出左右各留多少白（`STRETCH` / `SPLIT` 回
+`0 to 0`），`refreshBars()` 交給 `OptionBarsView.setContentInsets()`，它**只加
+`barRow` 的 padding**：工具按鍵、`⇄`／`✖`、候選字與顆 `▼` 一起縮進來站在鍵盤上面，
+而條 bar 自己的底色照舊鋪滿成行，看起來仍然是一條完整的 bar，高度也不受影響。
+
+側邊欄（`SidePanelView`）不用理它 —— 它本來就住在空出來那邊。
+
 ### 工具列常駐（`Prefs.barPinned`，2026-08-27 加，2026-09-09 起**一律開**）
 
 2026-09-09 起 `Prefs.FORCE_BAR_PINNED = true`，設定頁那個開關已隱藏
@@ -735,8 +844,11 @@ emoji 表／剪貼簿跟 `forcedHeightPx`，不在此處計（`as? KeyboardBaseV
 
 | | 按鍵 | 工具列 最左 |
 | --- | --- | --- |
-| 關閉（已隱藏） | `☰`＝開／關成工具列 | `⇄`＝關聯字 ⇄ 工具 |
-| 常駐（現在一律） | `⇄`＝關聯字 ⇄ 工具 | **沒有**（`setSwitchVisible(false)`） |
+| 關閉（已隱藏） | `☰`＝開／關成工具列 | `⇄`＝三段循環 |
+| 常駐（現在一律） | `⇄`＝三段循環 | **沒有**（`setSwitchVisible(false)`） |
+
+切換掣走的圈是 `BarMode.nextVisible()`：關聯字 → 工具 → 兩行一齊 → 關聯字，
+**永遠不會走到 `OFF`** —— 收起只有寬螢幕英文底行那顆做得到（見上面）。
 
 三處要一起夾：
 
@@ -746,12 +858,34 @@ emoji 表／剪貼簿跟 `forcedHeightPx`，不在此處計（`as? KeyboardBaseV
 - 那顆鍵面來自 `PadFunc.BAR_SWITCH.face`；`optionOn`（是否亮起）常駐時代表
   「目前在工具那邊」，不是「工具列 保持開啟」—— 持續著住藍燈沒有資訊可言。
 
+### 寬螢幕未調過高度：鍵盤最多佔螢幕一半
+
+2026-09-11 使用者報「首次打橫時經常高到遮住整個screen」。`PadMetrics.autoCapped()`
+因此在寬螢幕（`> SPLIT_MIN_WIDTH_DP`）而使用者**未自己調過高度**
+（`Prefs.heightScaleSet()`）時，把每行封頂在 `螢幕高 × AUTO_HEIGHT_RATIO(0.5) ÷ rows`。
+
+為甚麼不直接改細預設倍數：倍數是乘在 `unit` 上，而 `unit` 跟「最大寬度／最大高度」
+兩條 slider 走，與螢幕幾高完全無關 —— 打橫那陣 300dp 的 `maxH` 夾 4 行，
+出來就已經超過半個螢幕。要**量回真螢幕幾高**才封得到頂。
+
+一調過（設定頁條 slider、或工具列那顆掣上下拖）就完全聽使用者那個數，不再封頂。
+所以 `onSizeDrag()` 的起點是 `PadMetrics(...).heightScale`（**實際用了那個**），
+不是 `Prefs.heightScale()` —— 由封了頂的 0.8 拖，不會第一下就彈回 100%。
+
 ### 工具列那行掣的闊度：`ToolStrip`
 
 **不用 `weight` 平分**（2026-09-09 使用者要求）：兩三顆的時候平分會闊到像個
 banner、按邊都按到嘢；八顆的時候窄機平分下來每顆三十幾 dp，細過隻手指。
-所以每顆鎖死在 `minW`（44dp）～`maxW`（76dp）之間，擺不下就交給外面那個
+所以每顆鎖死在 `minW`（44dp）～`maxW` 之間，擺不下就交給外面那個
 `HorizontalScrollView` 打橫捲。
+
+`maxW` **不是寫死的數**（2026-09-11 使用者要求）：由 `OptionBarsView.refreshToolWidth()`
+跟住**中文九宮格一顆鍵的闊度**放下來，一至五顆的時候條 bar 那幾顆掣就與下面那些鍵
+一樣闊、對得正。那個數 = `PadMetrics(…, group = CJK).cellW` 減兩浸 `gap()` ——
+`cellW` 是**連埋兩邊那浸罅**的格子闊度（顆鍵畫的時候自己縮了 `gapPx`），
+而 `maxW` 不計 margin。鍵的闊度會跟住拉大細（`Prefs.widthScale` 那些）走，
+所以每次 `refreshTools()`（即每按一顆鍵）都量多次；`ToolStrip.maxW` 的 setter
+見到沒有變就不 `requestLayout`。
 
 ⚠️ **加了那個 scroll view 就一定要處理「改變大小」那顆**：它左右拖 = 拉闊拉窄
 鍵盤，正正是 `HorizontalScrollView` 想搶的方向。`handleSizeDrag` 的 `ACTION_DOWN`
@@ -807,7 +941,9 @@ drawable 永遠貼死 `paddingLeft`（只上下置中），上格那個就永遠
 **一條牆 + 一支箭嘴指住埋去**（`ALIGN_LEFT` / `ALIGN_RIGHT`）；
 「拉寬」（`STRETCH`）就兩邊都有牆、箭嘴向外撐開（`ALIGN_WIDE`）。
 留意 `PadAlign.LEFT_GAP` 是「**左**邊留白」＝ 內容貼**右**，所以它配 `ALIGN_RIGHT`，
-兩個名是對調的，改時看清楚。
+兩個名是對調的，改時看清楚。`CENTER`（置中）與 `SPLIT`（左右拆開）兩個都是
+**兩邊牆**加實心方塊：置中一塊站中間（`ALIGN_CENTER`），拆開兩塊各貼一邊
+（`ALIGN_SPLIT`），所以一眼分得開。
 
 `✖`（關閉）、`⇄`（切換）、`▼`（拉大候選）三個**沒有換** —— 它哋本身就是單色
 文字符號，不是彩色 emoji。`PadFunc.EMOJI` 按鍵面也由 `😀` 已改寫「表情」。
@@ -912,6 +1048,27 @@ app 內所有 使用者見到的字（設定頁、toast、鍵面、空狀態提�
   灰了那個狀態留回讓「有 key 但欄位空了」。
 - 按不按得由 `applyAiState()` 決定，`onUpdateSelection` 每次都會重新計
   （不可以好似以前這樣「選的狀態沒有變就 return」—— 目前欄位有沒有字都影響到）。
+
+### Prompt 是一張**有名的清單**，不是一段字
+
+`Prefs.KEY_AI_PROMPTS` 存一個 JSON array（`[{"name":…,"text":…}]`，
+讀回來就是 `List<AiPrompt>`）。**次序有意思**：
+
+- **短按** `✨` → 用第一個（`Prefs.aiPrompt()` 就是 `aiPrompts().first().text`）
+- **長按** `✨` → `openAiPrompts()` 攤開 `AiPromptListView`（與長按「貼上」開剪貼簿
+  歷史同一招：`showOverlay()` 在 `padHolder` 加塊 view），選了哪個就
+  `runAi(它的 text)`。**那塊 overlay 不搶 focus 也不碰 selection**，所以選完
+  使用者本來選取那段字仍在。
+
+內置三個是 `Prefs.defaultAiPrompts()`：`英譯`（＝以前那個 `DEFAULT_AI_PROMPT`）、
+`回答`、`修飾`。**名稱必須唯一** —— 長按那張清單只靠名字認人，所以
+`parseAiPrompts()` 讀的時候撞名只留頭一個，設定頁儲存時也擋住。
+`aiPrompts()` **保證不會回空 list**（壞 JSON／空 array 一律跌回預設那批），
+所以 `first()` 安全。
+
+⚠️ **`KEY_AI_PROMPT`（單數，舊 key）不要拿來讀**：它只剩下兩個用途 ——
+未寫過 `KEY_AI_PROMPTS` 的裝置從它身上砌回清單（升級上來自訂過的 prompt
+會變成清單第一個，不會不見了），以及 profile 仍然存一份給舊版讀。
 
 ## AI 語音輸入：頂走系統那個 `SpeechRecognizer`
 
@@ -1294,6 +1451,41 @@ event 去捲版 —— 我們連 `ACTION_MOVE` 都收不到，`startDragAndDrop`
 `db.getHomo()`），也一樣會 set `afterHomo`，所以選完仍然在同音鍵左下角
 寫回文字正確如何輸入。`homoAt()` 不會接觸 `homo` 個 flag 以外的內容，
 開關標點模式（`openclose`）就直接不做 —— 時資料表是「」這些一對對的標點。
+那個模式下長按那格有另一個意思（彈出「左／右」選單只輸入單邊），
+見「開關標點」一節，而且它比 `onLongPress` 更早截住（`variantsOf` 先行）。
+
+## 長按「表情」＝彈出最近用過那十個速選
+
+按一下「表情」照舊開整個 emoji 表；**按住**就在按鍵上面彈出一行最多十個
+（`QuickEmoji.MAX`，2026-09-11 使用者要求）—— 不要放手，拉去揀，放手才輸入，
+與英文鍵盤長按彈變體完全同一套手勢。按住了不動就放手 ＝ 最近用過那個
+（排頭那個），等於「再打多一次上次那個 emoji」。
+
+那行的內容是 `EmojiDict.quick()`：**最近用過**（`KEY_EMOJI_RECENT`，與 emoji 表
+第一個分類同一條 list）排先，不夠十個就由 `EmojiDict.COMMON` 那十個補回尾，
+所以新裝機未用過 emoji 也彈得出東西。故意不查 `emoji.txt` —— 長按那一刻要即刻
+彈出，不可以在那時才載入整個表。速選揀了也會 `addRecent()`，與在 emoji 表揀一樣。
+
+**只在那顆按鍵本身的長按空著時才生效**（`QuickEmoji.appliesTo()`：
+`action == TO_EMOJI && longAction == NOOP`）。使用者特意配了長按就一定不可以吃掉它：
+
+- 九宮格左右欄那個位配了長按功能（`KeyLayout.Slot.long`，例如短按表情、長按速選字）：
+  長按照做那個功能，`variantsOf()` 回空，跌回 `Host.onLongPress()`。
+- 「表情」擺在**另一顆按鍵的長按格**（短按關聯字、長按才開表情表）：那顆的
+  `action` 根本不是 `TO_EMOJI`，長按照樣開整個表。
+- 工具列／側邊欄那顆沒有得配長按（`KeyLayout.TOOLS_HAVE_LONG = false`），所以一定有。
+
+兩個地方走兩條路，改一邊記住另一邊：
+
+| 在哪 | 怎樣做 |
+| --- | --- |
+| 九宮格左右欄 | 借鍵盤本體那套長按變體 popup：`ChinesePadView.variantsOf()` 餵一行 emoji 進去，`commitVariant()` 只負責 `addRecent()`（回 `false`，出字照走 `KeyAction.CHAR`） |
+| 工具列／側邊欄 | 那些是 `TextView`，沒有那套，所以 `QuickEmojiPopup` 用同一個 `KeyPopup` 砌多次：`setOnLongClickListener` 彈出、`setOnTouchListener`（**永遠回 `false`**，不吃掉按鍵本身的短按／長按）跟手指移動，放手 `Listener.onQuickEmoji()` 輸出 |
+
+`QuickEmojiPopup.open()` 有兩處易漏：那行比按鍵闊很多，座標要夾回螢幕之內
+（用 anchor 那套座標，負數 ＝ 出了按鍵左邊）；而且手指一橫拉就離開了按鍵，
+要 `requestDisallowInterceptTouchEvent(true)` 頂住外面那個 `HorizontalScrollView`
+（工具列擺滿按鍵就捲得動），不是拉一下就被它搶走變 `ACTION_CANCEL`。
 
 ## 搜尋 emoji 不會實際將文字寫入欄位，但會 set 做 composing text
 
@@ -1532,6 +1724,8 @@ per-key 判斷）連與 `keyCenter` 傳送給 IME service，放手之後**由 IM
   **不用先按「同音」按鍵**。就算無法查詢同音字（多字詞、標點、`word_meta` 沒有記錄）
   `onLongPress` 都要回 `true` 已處理此操作 —— 回退至連按就會立即選取一個字，
   然後放手那次又將數字作為新字碼，一次按鍵產生兩項結果。
+  **開關標點那個表例外**：`onLongPress` 根本不會收到那次長按，`ChinesePadView`
+  已經用 `variantsOf()` 彈了「左／右」選單出來（見「開關標點」一節）。
 
 ## 開關標點（長按 `0`）：包住 vs 移 caret
 
@@ -1546,6 +1740,30 @@ per-key 判斷）連與 `keyCenter` 傳送給 IME service，放手之後**由 IM
 
 長按 `0` 那次（`onLongPress` → `TTCmd.OPENCLOSE`）只改 engine 狀態，
 不會 commit 任何內容，所以 app 那邊選取的字持續留到選完標點先有用。
+
+### 在那個表長按一格 = 只輸入單邊（`「` 或者 `」`）
+
+成對是常態，但有時就只要一邊（例如「補返個收的引號」）。2026-09-11 使用者要求：
+**開關標點那個表攤開後，長按任何一格都會彈出一個只有兩格的 popup ——
+左邊那隻、右邊那隻，選哪個就只輸入那一隻**，不用轉去符號頁找。
+
+走的是既有的長按變體 popup（`KeyPopup`，見下一節），只是兩個位置改成問實時狀態：
+
+| 位置 | 做甚麼 |
+| --- | --- |
+| `KeyboardBaseView.variantsOf(k)` | 哪幾個變體。預設 `Key.variants`（英文／符號鍵盤寫死在按鍵上），`ChinesePadView` override 成 `TTEngine.pairSidesAt(digit)` |
+| `KeyboardBaseView.commitVariant(key, v)` | 選完那次。回 `false` 就照行 `Host.onKey(CHAR)`；`ChinesePadView` 回 `TTEngine.pickPairSide()` |
+
+**不可以讓它跌回 `typeChar()`**：那條路只 commit 文字，不會清走選字狀態，
+個表會留在畫面上，下一個數字鍵又變了選標點。`pickPairSide()` 是
+`host.commitText()` ＋ 清 `bigramPrev` ＋ `cancel()`，與選一對標點
+（`selectWord()` 那個 `openclose` 分支）完全同一套，只差不行 `commitPair()`
+那個「移 caret 回中間」。
+
+`pairSidesAt()` 只在 `pairMode`（＝ `selectMode && openclose`）回東西，
+所以其餘字表（速選字、同音字、關聯字）長按一格照舊是開同音字表，
+`0` 也照舊（`pairSidesAt(0)` 回空，`slot` 只收 `1..9`）。
+次序跟資料表那一對本身，左邊那隻排頭 —— 所以「長按完不移動直接放手」＝ 輸入左邊那隻。
 
 ### 長按變體 popup：PopupWindow，永遠向上彈 + 絕對位置選
 
@@ -1568,6 +1786,8 @@ window 範圍，彈上 app 那邊；`isTouchable = false`，所以 touch 一直�
   看到的高亮與手指位置完全對不上，變成無論如何拖動都無法選擇。
 - 但「長按後不移動而直接放手 = 輸入按鍵本身」必須保留：`popupMoved` 尚未移動超過一個
   `slop` 之前一律當第一個（`variants` 第一個永遠是按鍵自己）。
+- **哪幾個變體一律問 `variantsOf(k)`，不要直接讀 `Key.variants`**：`boxes` 不會逐次
+  重建，跟實時狀態變那些（開關標點表的「左／右」）只能在長按那一刻問 engine。
 
 ### 滑動 hover 提示
 
@@ -1604,6 +1824,17 @@ window 範圍，彈上 app 那邊；`isTouchable = false`，所以 touch 一直�
 
 URL／email／密碼／`TYPE_TEXT_FLAG_NO_SUGGESTIONS` 的欄再加多重保險：
 `noAutoSpaceField` 會令整個 auto-space 完全關閉。
+
+### 選「下一個字」要補回前面那個空格（2026-09-11 加）
+
+候選欄那些「下一個字」預測（`latinComposing` 是空、又未 swipe 過）是接在前面
+那個字後面的，所以 `onPickCandidate()` 在 `commitText(w)` **之前**要補個空格 ——
+在候選欄選完一個完整的字（`wasTypedPrefix`）那條路不會補尾隨空格，跟着再選一個
+預測字就會變成 `helpthere`（使用者 2026-09-11 報）。
+
+補不補看 `needSpaceBeforeWord()`：游標前面**貼住**英文字（字母／數字／`'`）才補。
+空格、標點、換行、中文字、或者整個欄都是空的就不補 —— 那些位置本來就是一個字的
+開頭。與 `autoSpaceAfterPunct()` 是兩件事：那個是「標點後面」，這個是「字與字之間」。
 
 ## 英文詞庫
 

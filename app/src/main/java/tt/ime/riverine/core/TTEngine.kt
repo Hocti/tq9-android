@@ -232,10 +232,7 @@ class TTEngine(val db: TTDb) {
      */
     fun homoAt(slot: Int): Boolean {
         if (!selectMode || openclose || slot !in 1..9) return false
-        val idx = currPage * 9 + rankAt(slot)
-        if (idx >= selectWords.size) return false
-        val word = selectWords[idx]
-        if (word.isEmpty()) return false
+        val word = wordAt(slot) ?: return false
         val list = db.getHomo(word)
         if (list.isEmpty()) return false
         homo = false
@@ -244,6 +241,36 @@ class TTEngine(val db: TTDb) {
         statusPrefix = "同音[$word]"
         homoWord = word   // 同音鍵左上角要寫住而家搵緊邊隻字嘅同音
         startSelectWord(list)
+        changed()
+        return true
+    }
+
+    /** 而家攤開緊嘅係成對標點表（長撳 `0` 出嗰個，見 [TTCmd.OPENCLOSE]） */
+    val pairMode: Boolean get() = selectMode && openclose
+
+    /**
+     * 成對標點表嗰陣，[slot] 格坐住嗰對標點拆開做左、右兩隻（已經套埋簡體輸出）。
+     * 回空 list = 唔喺成對標點表、嗰格係吉位、或者嗰格根本唔係一對嘢。
+     */
+    fun pairSidesAt(slot: Int): List<String> {
+        if (!pairMode || slot !in 1..9) return emptyList()
+        val word = wordAt(slot) ?: return emptyList()
+        val parts = TTDb.splitGraphemes(out(word))
+        if (parts.size < 2) return emptyList()
+        return listOf(parts.first(), parts.drop(1).joinToString(""))
+    }
+
+    /**
+     * 成對標點表長撳一格，揀咗其中**一邊**（[side] 0 = 左、1 = 右）：
+     * 淨係打嗰一隻，唔會出成對、唔會郁 caret（`Host.commitPair` 嗰套唔關事），
+     * 打完一樣收返個表，同正路揀一對標點一模一樣。
+     */
+    fun pickPairSide(slot: Int, side: Int): Boolean {
+        val one = pairSidesAt(slot).getOrNull(side) ?: return false
+        InputLog.log { "成對標點長撳揀咗一邊：出「$one」" }
+        host?.commitText(one)
+        bigramPrev = "" // 標點打斷咗連續兩個中文字嘅組合（同 [selectWord] 嗰邊一樣）
+        cancel()
         changed()
         return true
     }
@@ -378,6 +405,15 @@ class TTEngine(val db: TTDb) {
     /** 而家攤開緊嗰個表：[slot] 格坐住嘅係排第幾（由 0 起，唔喺表入面就 -1） */
     private fun rankAt(slot: Int, page: Int = currPage): Int =
         if (slot !in 1..9) -1 else slotOrder(page).indexOf(slot)
+
+    /** 而家攤開緊嗰個表：[slot] 格坐住嘅字（吉位／唔喺表入面就 null） */
+    private fun wordAt(slot: Int): String? {
+        val rank = rankAt(slot)
+        if (rank < 0) return null
+        val idx = currPage * 9 + rank
+        if (idx >= selectWords.size) return null
+        return selectWords[idx].ifEmpty { null }
+    }
 
     private fun addPage(delta: Int) {
         val p = currPage + delta

@@ -49,6 +49,9 @@ enum class ToolIcon {
     /** 顯示方式「左右拆開」：兩邊都有牆，兩橛鍵盤各自貼實，中間裂開 */
     ALIGN_SPLIT,
 
+    /** 顯示方式「置中」：兩邊都有牆，一橛鍵盤企喺正中間，兩邊各留一條罅 */
+    ALIGN_CENTER,
+
     /**
      * 地球：轉輸入法。畫喺 `Eng` 粒鍵左上角（＝長撳做乜），
      * 所以特登畫得簡單 —— 一個圓、一條赤道、一個經線橢圓，
@@ -103,6 +106,7 @@ class ToolIconDrawable(private val icon: ToolIcon, color: Int) : Drawable() {
             ToolIcon.ALIGN_RIGHT -> drawAlign(canvas, left = false, both = false)
             ToolIcon.ALIGN_WIDE -> drawAlign(canvas, left = true, both = true)
             ToolIcon.ALIGN_SPLIT -> drawSplit(canvas)
+            ToolIcon.ALIGN_CENTER -> drawCenter(canvas)
             ToolIcon.GLOBE -> drawGlobe(canvas)
             ToolIcon.GLOBE_LIST -> drawGlobeList(canvas)
         }
@@ -212,6 +216,20 @@ class ToolIconDrawable(private val icon: ToolIcon, color: Int) : Drawable() {
         rect.set(4.9f, 7.4f, 10.6f, 16.6f)
         canvas.drawRoundRect(rect, 1.5f, 1.5f, fill)
         rect.set(13.4f, 7.4f, 19.1f, 16.6f)
+        canvas.drawRoundRect(rect, 1.5f, 1.5f, fill)
+    }
+
+    /**
+     * 「置中」：一樣跟返兩邊牆嘅講法 —— 兩邊都有牆，一橛鍵盤企喺兩條牆中間，
+     * 左右各留一條罅。同 [ToolIcon.ALIGN_SPLIT] 分得開（嗰個係兩橛貼實兩邊）。
+     */
+    private fun drawCenter(canvas: Canvas) {
+        val wall = stroke.strokeWidth
+        stroke.strokeWidth = wall * 1.35f
+        canvas.drawLine(2.6f, 3.6f, 2.6f, 20.4f, stroke)
+        canvas.drawLine(21.4f, 3.6f, 21.4f, 20.4f, stroke)
+        stroke.strokeWidth = wall
+        rect.set(7.4f, 7.4f, 16.6f, 16.6f)
         canvas.drawRoundRect(rect, 1.5f, 1.5f, fill)
     }
 

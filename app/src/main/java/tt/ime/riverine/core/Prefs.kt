@@ -2,6 +2,8 @@ package tt.ime.riverine.core
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.content.res.Configuration
+import org.json.JSONArray
 import org.json.JSONObject
 import kotlin.math.roundToInt
 
@@ -29,6 +31,16 @@ enum class PadAlign(val label: String) {
     RIGHT_GAP("靠左（右邊留白）"),
 
     /**
+     * 置中：本體一樣拉得窄，但係**兩邊各留一半白**（2026-09-11 user 要求）。
+     * 靠一邊係為咗單手，置中就係為咗打字企中間唔歪 —— 闊 screen（平板／打橫）
+     * 尤其啱用。拉闊拉窄一樣係拖粒大細掣（[Prefs.widthScale] 照用）。
+     *
+     * 呢個顯示方式**冇側邊欄**：空出嚟嗰啲位一開二，兩邊都窄過擺得落工具掣，
+     * 所以照用返上面條 bar（見 `TTInputMethodService.sideGeom`）。
+     */
+    CENTER("置中（兩邊留白）"),
+
+    /**
      * 左右拆開：一行鍵拆做兩橛，一橛貼實左邊、一橛貼實右邊，中間裂開條罅
      * （闊 screen 打橫捧住部機，兩隻姆指各顧一邊）。
      * 兩橛都係 `contentW / 2` 咁闊，所以拉闊拉窄一樣係拖粒大細掣。
@@ -36,13 +48,40 @@ enum class PadAlign(val label: String) {
     SPLIT("左右拆開")
 }
 
-/** 上面條 bar 嘅三段：關 → 關聯字 → 工具 */
+/**
+ * 上面條 bar 而家出緊乜。
+ *
+ * [CANDIDATES]／[TOOLS]／[BOTH] 係切換掣（`⇄`）一路撳落去嗰個圈 ——
+ * 關聯字 → 工具 → **兩行一齊**（2026-09-11 user 要求，關聯字嗰行喺工具嗰行上面）。
+ *
+ * [OFF]（收起成條 bar）**淨係闊 screen 入得到**：英文底行嗰粒 `▴` 撳到第四下先至
+ * 收起（見 [barHidden] 同 `TTInputMethodService.toggleLatinBar`）。窄機收唔起 ——
+ * 打字提示、滑出嚟嗰個字、關聯字全部喺條 bar 度，收起咗就等於打盲舖。
+ *
+ * enum 個 `name` 存落 SharedPreferences（[Prefs.KEY_BAR_MODE]），改名等於現有
+ * user 嗰個狀態失效；加喺最後就冇所謂。
+ */
 enum class BarMode(val label: String) {
     OFF("關閉"),
     CANDIDATES("關聯字"),
-    TOOLS("工具");
+    TOOLS("工具"),
+    BOTH("關聯字＋工具");
 
-    fun next(): BarMode = entries[(ordinal + 1) % entries.size]
+    /** 而家有冇關聯字嗰行 */
+    val hasCands: Boolean get() = this == CANDIDATES || this == BOTH
+
+    /** 而家有冇工具嗰行 */
+    val hasTools: Boolean get() = this == TOOLS || this == BOTH
+
+    /**
+     * 切換掣撳落去下一段。**永遠唔會行到 [OFF]** —— 收起淨係闊 screen 嗰粒
+     * `▴` 做得到（見上面）。
+     */
+    fun nextVisible(): BarMode = when (this) {
+        CANDIDATES -> TOOLS
+        TOOLS -> BOTH
+        else -> CANDIDATES
+    }
 }
 
 /**
@@ -87,6 +126,12 @@ enum class KeyPressEffect(val label: String) {
     DARKEN("變暗"),
     ENLARGE("略為放大");
 }
+
+/**
+ * 一個有名嘅 AI 改寫 prompt。**個名要唯一**（長撳個表就係靠個名認人），
+ * 存喺 [Prefs.KEY_AI_PROMPTS] 嗰個 JSON array 入面。
+ */
+data class AiPrompt(val name: String, val text: String)
 
 object Prefs {
 
@@ -142,6 +187,14 @@ object Prefs {
     const val KEY_USAGE_REORDER = "usage_reorder"  // 打得多嘅字推前（usage_stats.db）
     const val KEY_PAGER_LAYOUT = "pager_layout"    // PagerLayout.name（選字揭頁嗰兩粒點排）
     const val KEY_BAR_PINNED = "bar_pinned"        // 上面條 bar 常駐（右上角嗰粒改做 ⇄）
+    /**
+     * 闊 keyboard 收起咗上面條 bar（英文底行嗰粒 `▴`／`▾` 掣話事，見 [barHidden]）。
+     *
+     * **個字串仲叫 `latin_bar_hidden`** —— 2026-09-11 之前呢個狀態淨係英文頁理，
+     * 而家四款鍵盤都跟。改字串等於現有 user 收起咗嘅狀態失效，冇必要。
+     * 真正存落去嗰個 key 仲會加埋螢幕尺寸（見 [screenKey]）。
+     */
+    const val KEY_BAR_HIDDEN = "latin_bar_hidden"
     const val KEY_ENG_LONG = "eng_long"            // EngLongPress.name（長撳 Eng 做乜）
 
     /**
@@ -167,12 +220,37 @@ object Prefs {
     const val KEY_AI_MODEL = "ai_model"
     const val KEY_AI_PROMPT = "ai_prompt"
 
-    const val DEFAULT_AI_MODEL = "gemini-3.7-flash"
+    const val DEFAULT_AI_MODEL = "gemini-3.8-flash"
     const val DEFAULT_AI_PROMPT =
         "Rewrite the following text in natural B2-C1 level English " +
         "(if it is already English, just fix the grammar). " +
         "Output ONLY the rewritten text itself - no preamble, no explanation, " +
         "no quotation marks, no comments, nothing else.\n\n%text%"
+
+    /**
+     * 多個有名嘅改寫 prompt（短撳工具列粒「AI改」用第一個，長撳就彈個表揀）。
+     *
+     * 存法係 JSON array：`[{"name":"英譯","text":"…"}]`，**次序有意思** ——
+     * 第一個就係短撳直接用嗰個（見 [aiPrompt]）。個名要唯一，讀嗰陣
+     * 撞名嘅淨係留頭一個（見 [parseAiPrompts]）。
+     *
+     * 舊版淨係得 [KEY_AI_PROMPT] 一個 prompt。未寫過呢個 key 嘅裝置會即場
+     * 攞返嗰個舊值砌個名單出嚟（[defaultAiPrompts]），所以升級上嚟
+     * 自訂咗嘅 prompt 唔會唔見咗，照樣係第一個。
+     */
+    const val KEY_AI_PROMPTS = "ai_prompts"
+
+    /** 「回答」：當原文係個問題，答完**取代**原文，所以要夾硬要求簡短、可以直接貼出街 */
+    const val DEFAULT_AI_ANSWER_PROMPT =
+        "以下是一個問題或訊息，請直接回答。答案要簡短（最多兩三句），" +
+        "用正體中文，語氣自然，適合直接貼在聊天程式裡發出。\n" +
+        "只輸出答案本身 —— 不要前言、不要解釋、不要引號、不要 markdown 標記。\n\n%text%"
+
+    /** 「修飾」：改寫成辦公室通告嗰種語氣 */
+    const val DEFAULT_AI_POLISH_PROMPT =
+        "請將以下文字改寫成正體中文的辦公室通告：用字流暢、典雅、得體，" +
+        "語氣正式而不生硬，保留原意與所有事實細節，不要自行增加內容。\n" +
+        "只輸出改寫後的文字本身 —— 不要前言、不要解釋、不要引號、不要 markdown 標記。\n\n%text%"
 
     /**
      * 自訂 API（Gemini 以外嘅簡單 provider）。預設關閉 = 用返 Gemini。
@@ -276,10 +354,18 @@ object Prefs {
      * 用 dp 嘅螢幕闊高做名，一次過分開晒摺機嘅外／內屏（尺寸唔同）同打直打橫
      * （闊高調轉）。舊版嗰個冇螢幕名嘅 key 照留返做預設值，升級之後大細唔會走位。
      */
-    private fun profKey(ctx: Context, base: String, g: PadGroup): String {
+    private fun profKey(ctx: Context, base: String, g: PadGroup): String =
+        "${screenKey(ctx, base)}_${g.name}"
+
+    /**
+     * 淨係分螢幕尺寸、唔分 [PadGroup] 嗰啲設定（而家得 [KEY_BAR_HIDDEN] 一個）。
+     * 打直打橫闊高調轉，出嚟就係兩個唔同嘅 key —— 打橫收起咗條 bar，
+     * 轉返打直唔會連埋收埋。
+     */
+    private fun screenKey(ctx: Context, base: String): String {
         val dm = ctx.resources.displayMetrics
         val h = (dm.heightPixels / dm.density).roundToInt()
-        return "${base}_${screenWidthDp(ctx)}x${h}_${g.name}"
+        return "${base}_${screenWidthDp(ctx)}x${h}"
     }
 
     fun screenWidthDp(ctx: Context): Int {
@@ -293,14 +379,17 @@ object Prefs {
     /**
      * 呢組鍵盤而家揀得邊幾個顯示方式。
      *
-     * 闊 screen（`> [SPLIT_MIN_WIDTH_DP]`）嘅**英數鍵盤**淨係得「拉闊」同
-     * 「左右拆開」兩個：咁闊嘅螢幕再靠實一邊，另一邊嗰大橛位就係嘥咗，
-     * 拆開兩橛兩隻姆指啱用好多。其餘情況（中文那組、或者窄螢幕）就係原本三個。
+     * 闊 screen（`> [SPLIT_MIN_WIDTH_DP]`）嘅**英數鍵盤**冇「靠左／靠右」：
+     * 咁闊嘅螢幕再靠實一邊，另一邊嗰大橛位就係嘥咗，拆開兩橛兩隻姆指啱用好多。
+     * 其餘情況（中文那組、或者窄螢幕）就係「拉闊／靠右／靠左」。
+     *
+     * [PadAlign.CENTER]（置中）**兩邊都揀得到** —— 拉窄咗企中間，
+     * 闊 screen 同窄 screen 一樣用得着。
      */
     fun alignOptions(ctx: Context, g: PadGroup): List<PadAlign> =
         if (g == PadGroup.LATIN && screenWidthDp(ctx) > SPLIT_MIN_WIDTH_DP)
-            listOf(PadAlign.STRETCH, PadAlign.SPLIT)
-        else listOf(PadAlign.STRETCH, PadAlign.LEFT_GAP, PadAlign.RIGHT_GAP)
+            listOf(PadAlign.STRETCH, PadAlign.SPLIT, PadAlign.CENTER)
+        else listOf(PadAlign.STRETCH, PadAlign.LEFT_GAP, PadAlign.RIGHT_GAP, PadAlign.CENTER)
 
     /** 撳一下粒大細掣：喺 [alignOptions] 入面轉去下一個 */
     fun nextAlign(ctx: Context, g: PadGroup): PadAlign {
@@ -375,6 +464,15 @@ object Prefs {
     fun heightScale(ctx: Context, g: PadGroup = PadGroup.CJK) =
         sp(ctx).getFloat(profKey(ctx, KEY_HEIGHT_SCALE, g), sp(ctx).getFloat(KEY_HEIGHT_SCALE, 1.0f))
 
+    /**
+     * User 自己校過高度未（設定頁條 slider、或者工具列粒掣上下拖）。
+     *
+     * 未校過嘅闊 screen 有個「最多佔螢幕一半」嘅封頂（見 [PadMetrics]）——
+     * 一校過就淨係聽 user 嗰個數，唔再封。舊版嗰個冇螢幕名嘅 key 都算數。
+     */
+    fun heightScaleSet(ctx: Context, g: PadGroup = PadGroup.CJK) =
+        sp(ctx).contains(profKey(ctx, KEY_HEIGHT_SCALE, g)) || sp(ctx).contains(KEY_HEIGHT_SCALE)
+
     fun setHeightScale(ctx: Context, v: Float, g: PadGroup = PadGroup.CJK) =
         sp(ctx).edit()
             .putFloat(profKey(ctx, KEY_HEIGHT_SCALE, g), v.coerceIn(MIN_HEIGHT_SCALE, MAX_HEIGHT_SCALE))
@@ -384,8 +482,9 @@ object Prefs {
     const val MAX_HEIGHT_SCALE = 1.8f
 
     /**
-     * 鍵盤本體闊度倍數。淨係 [PadAlign.LEFT_GAP] / [PadAlign.RIGHT_GAP] 有用
-     * （[PadAlign.STRETCH] 本來就用盡成行），喺工具 bar 最左嗰粒掣左右拖就改到。
+     * 鍵盤本體闊度倍數。[PadAlign.LEFT_GAP] / [PadAlign.RIGHT_GAP] /
+     * [PadAlign.CENTER] / [PadAlign.SPLIT] 有用（[PadAlign.STRETCH] 本來就用盡成行），
+     * 喺工具 bar 最左嗰粒掣左右拖就改到。
      */
     fun widthScale(ctx: Context, g: PadGroup = PadGroup.CJK) =
         sp(ctx).getFloat(profKey(ctx, KEY_WIDTH_SCALE, g), sp(ctx).getFloat(KEY_WIDTH_SCALE, 1.0f))
@@ -628,6 +727,40 @@ object Prefs {
     fun barPinned(ctx: Context) =
         if (FORCE_BAR_PINNED) true else sp(ctx).getBoolean(KEY_BAR_PINNED, true)
 
+    /**
+     * 英文鍵盤收唔收得起上面條 bar —— **淨係闊 screen（打橫／摺機內屏／平板）先得**。
+     *
+     * 窄機收起咗就等於打盲舖：打字提示、滑出嚟嗰個字、關聯字全部喺條 bar 度，
+     * 所以窄嗰陣條 bar 常駐，底行嗰粒切換掣亦都唔會出現（見 `LatinPadView.rows`）。
+     * 用返 [SPLIT_MIN_WIDTH_DP] 嗰條線 —— 同「左右拆開」揀唔揀得係同一個意思嘅「闊」。
+     */
+    fun barToggleAllowed(ctx: Context) = screenWidthDp(ctx) > SPLIT_MIN_WIDTH_DP
+
+    /**
+     * 而家收起咗條 bar 未。要 [barToggleAllowed] 先算數 —— 窄機根本冇粒掣好撳，
+     * 打橫收起咗再轉返打直，條 bar 自己會出返嚟，唔使 user 摸黑撳返。
+     *
+     * **打橫未撳過就預設收起**（2026-09-11 user 要求）：打橫個螢幕本來就矮，
+     * 首次開鍵盤成塊連條 bar 遮到成個螢幕。撳返英文底行嗰粒 `▾`、或者中文
+     * 右上角嗰粒 `⇄`（切換掣一定行去有嘢見嘅一段）就出返嚟，而且嗰下會寫低
+     * 呢個螢幕尺寸嘅選擇（[screenKey]），之後打橫都聽返 user 嗰下。
+     *
+     * 舊版嗰個冇螢幕名嘅 key 照留返做預設，升級之後打直嗰邊唔會走位。
+     */
+    fun barHidden(ctx: Context): Boolean {
+        if (!barToggleAllowed(ctx)) return false
+        val sp = sp(ctx)
+        val key = screenKey(ctx, KEY_BAR_HIDDEN)
+        if (sp.contains(key)) return sp.getBoolean(key, false)
+        return landscape(ctx) || sp.getBoolean(KEY_BAR_HIDDEN, false)
+    }
+
+    fun setBarHidden(ctx: Context, v: Boolean) =
+        sp(ctx).edit().putBoolean(screenKey(ctx, KEY_BAR_HIDDEN), v).apply()
+
+    fun landscape(ctx: Context) =
+        ctx.resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+
     /** 長撳中文九宮格粒 `Eng`（🌐 收埋咗之後唯一嘅換輸入法入口） */
     fun engLongPress(ctx: Context): EngLongPress =
         runCatching { EngLongPress.valueOf(sp(ctx).getString(KEY_ENG_LONG, EngLongPress.NEXT_IME.name)!!) }
@@ -641,8 +774,48 @@ object Prefs {
     fun aiApiKey(ctx: Context): String = sp(ctx).getString(KEY_AI_KEY, "")!!
     fun aiModel(ctx: Context): String =
         sp(ctx).getString(KEY_AI_MODEL, DEFAULT_AI_MODEL)!!.ifBlank { DEFAULT_AI_MODEL }
-    fun aiPrompt(ctx: Context): String =
-        sp(ctx).getString(KEY_AI_PROMPT, DEFAULT_AI_PROMPT)!!.ifBlank { DEFAULT_AI_PROMPT }
+    /** 短撳「AI改」用嘅 prompt ＝ 名單第一個（見 [KEY_AI_PROMPTS]） */
+    fun aiPrompt(ctx: Context): String = aiPrompts(ctx).first().text
+
+    /**
+     * 內置嗰三個 prompt。[first] ＝第一個（「英譯」）用邊段字 —— 由舊版
+     * [KEY_AI_PROMPT] 升上嚟嗰陣就係嗰個舊值，唔會冚咗 user 改過嘅嘢。
+     */
+    fun defaultAiPrompts(first: String = DEFAULT_AI_PROMPT): List<AiPrompt> = listOf(
+        AiPrompt("英譯", first.ifBlank { DEFAULT_AI_PROMPT }),
+        AiPrompt("回答", DEFAULT_AI_ANSWER_PROMPT),
+        AiPrompt("修飾", DEFAULT_AI_POLISH_PROMPT),
+    )
+
+    /** 一定**唔會空**：讀唔到／讀出嚟係空就跌返落 [defaultAiPrompts] */
+    fun aiPrompts(ctx: Context): List<AiPrompt> =
+        parseAiPrompts(sp(ctx).getString(KEY_AI_PROMPTS, null))
+            ?: defaultAiPrompts(sp(ctx).getString(KEY_AI_PROMPT, DEFAULT_AI_PROMPT)!!)
+
+    fun setAiPrompts(ctx: Context, list: List<AiPrompt>) {
+        sp(ctx).edit().putString(KEY_AI_PROMPTS, aiPromptsJson(list).toString()).apply()
+    }
+
+    private fun aiPromptsJson(list: List<AiPrompt>): JSONArray {
+        val arr = JSONArray()
+        for (p in list) arr.put(JSONObject().put("name", p.name).put("text", p.text))
+        return arr
+    }
+
+    /** 壞 JSON／空 array／全部係空白，一律回 null（＝叫個 caller 用返預設嗰批） */
+    private fun parseAiPrompts(json: String?): List<AiPrompt>? {
+        val arr = runCatching { JSONArray(json ?: return null) }.getOrNull() ?: return null
+        val out = ArrayList<AiPrompt>()
+        for (i in 0 until arr.length()) {
+            val o = arr.optJSONObject(i) ?: continue
+            val name = o.optString("name").trim()
+            val text = o.optString("text")
+            if (name.isEmpty() || text.isBlank()) continue
+            // 撞名嘅留頭一個：個表淨係靠個名分得出邊個係邊個
+            if (out.none { it.name == name }) out.add(AiPrompt(name, text))
+        }
+        return out.ifEmpty { null }
+    }
 
     fun aiUseCustom(ctx: Context) = sp(ctx).getBoolean(KEY_AI_USE_CUSTOM, false)
 
@@ -730,7 +903,10 @@ object Prefs {
             put("useCustom", aiUseCustom(ctx))
             put("key", aiApiKey(ctx))
             put("model", aiModel(ctx))
+            // "prompt" 留返俾舊版讀（降級返去都仲有返個 prompt 用）；
+            // 新版讀 "prompts" 嗰個名單，見 [loadAiProfile]
             put("prompt", aiPrompt(ctx))
+            put("prompts", aiPromptsJson(aiPrompts(ctx)))
             put("url", aiCustomUrl(ctx))
             put("headers", aiCustomHeaders(ctx))
             put("body", aiCustomBody(ctx))
@@ -753,6 +929,11 @@ object Prefs {
             .putString(KEY_AI_KEY, p.optString("key", ""))
             .putString(KEY_AI_MODEL, p.optString("model", DEFAULT_AI_MODEL))
             .putString(KEY_AI_PROMPT, p.optString("prompt", DEFAULT_AI_PROMPT))
+            // 舊 profile 冇 "prompts"：攞佢嗰個單一 prompt 砌返成個名單
+            .putString(KEY_AI_PROMPTS, aiPromptsJson(
+                parseAiPrompts(p.optJSONArray("prompts")?.toString())
+                    ?: defaultAiPrompts(p.optString("prompt", DEFAULT_AI_PROMPT))
+            ).toString())
             .putString(KEY_AI_URL, p.optString("url", DEFAULT_AI_URL))
             .putString(KEY_AI_HEADERS, p.optString("headers", DEFAULT_AI_HEADERS))
             .putString(KEY_AI_BODY, p.optString("body", DEFAULT_AI_BODY))

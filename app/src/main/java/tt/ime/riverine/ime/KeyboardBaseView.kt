@@ -146,7 +146,7 @@ abstract class KeyboardBaseView(context: Context) : View(context) {
             cursorY = downY
             host?.feedback(b.key)
             invalidate()
-        } else if (b.key.variants.isNotEmpty()) {
+        } else if (variantsOf(b.key).isNotEmpty()) {
             openVariantPopup(b)
             longFired = true
             host?.feedback(b.key)
@@ -188,6 +188,19 @@ abstract class KeyboardBaseView(context: Context) : View(context) {
      * 純數字頁成頁 false —— 打號碼撳耐咗少少就彈嘢出嚟好煩（見 [NumberPadView]）。
      */
     protected open fun allowLongPress(k: Key): Boolean = true
+
+    /**
+     * 粒鍵長撳要彈邊幾個變體。預設就係 [Key.variants]（英文／符號鍵盤寫死喺粒鍵度），
+     * 跟實時狀態變嗰啲就 override 佢 —— 見 [ChinesePadView.variantsOf]
+     * （成對標點表長撳一格，彈「左、右」兩隻畀人揀淨打一隻）。
+     */
+    protected open fun variantsOf(k: Key): List<String> = k.variants
+
+    /**
+     * 變體 popup 揀完嗰一下。回 true = 子類自己出咗嘢，唔使再行返平時嗰條路
+     * （[Host.onKey] 一粒 [KeyAction.CHAR]）。
+     */
+    protected open fun commitVariant(key: Key, variant: String): Boolean = false
 
     /**
      * 撳落去（ACTION_DOWN）就即刻出鍵，唔等放手 —— 打字反應快好多。
@@ -278,7 +291,7 @@ abstract class KeyboardBaseView(context: Context) : View(context) {
      * 所以唔使再夾硬 `max(0f, …)` 頂住鍵盤個頂同粒鍵疊埋一舊。
      */
     private fun openVariantPopup(box: KeyBox) {
-        val raw = box.key.variants
+        val raw = variantsOf(box.key)
         // 多過 [MAX_POPUP_COLS] 個就拆上下兩行（長撳 `.` 有十五個）—— 齋擠埋一行
         // 每格得返幾 mm 闊，手指根本停唔準。
         //
@@ -355,7 +368,9 @@ abstract class KeyboardBaseView(context: Context) : View(context) {
         if (commit && box != null && popupIndex in items.indices) {
             val v = items[popupIndex]
             // literal：個 list 本身已經有大細階揀，唔好再俾 shift 覆寫返
-            host?.onKey(Key(KeyAction.CHAR, label = v, text = v, literal = true))
+            if (!commitVariant(box.key, v)) {
+                host?.onKey(Key(KeyAction.CHAR, label = v, text = v, literal = true))
+            }
         }
     }
 

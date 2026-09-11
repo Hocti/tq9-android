@@ -3,6 +3,7 @@ package tt.ime.riverine.ime
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.RectF
+import tt.ime.riverine.core.EmojiDict
 import tt.ime.riverine.core.KeyLayout
 import tt.ime.riverine.core.PadFunc
 import tt.ime.riverine.core.PagerLayout
@@ -189,6 +190,36 @@ class ChinesePadView(context: Context, private val engine: TTEngine) : KeyboardB
         k.action == KeyAction.DIGIT && k.digit in 1..9 &&
             !engine.selectMode &&
             !(Prefs.longPressShortcut(context) && engine.currCode.isEmpty())
+
+    /**
+     * 成對標點表（長撳 `0` 出嗰個，見 [tt.ime.riverine.core.TTCmd.OPENCLOSE]）
+     * 長撳其中一格 → 彈「左、右」兩隻出嚟，**淨係打一隻**：
+     * 打 `「` 或者 `」` 之類單邊標點唔使去符號頁揀。
+     *
+     * 次序跟返成對本身（左嗰隻排頭），所以長撳完唔郁直接放手 = 出左邊嗰隻
+     * （同英文鍵盤嘅變體 popup 一樣，見 [KeyboardBaseView.openVariantPopup]）。
+     * 其餘字表長撳一格照舊係開同音字表（`TTEngine.homoAt`）。
+     * 左右欄嗰粒「表情」就借同一套彈速選 emoji（見 [QuickEmoji]）——
+     * 粒掣本身個長撳吉住嗰陣先至有。
+     */
+    override fun variantsOf(k: Key): List<String> = when {
+        k.action == KeyAction.DIGIT -> engine.pairSidesAt(k.digit)
+        QuickEmoji.appliesTo(k) -> QuickEmoji.items(context)
+        else -> k.variants
+    }
+
+    /** 揀咗邊一邊就交返俾 engine 出字兼收表（唔好行 `typeChar`，嗰條路唔會清選字狀態） */
+    override fun commitVariant(key: Key, variant: String): Boolean {
+        // 速選咗個 emoji：記返落「最近用過」（同喺 emoji 表揀嗰下一樣），
+        // 出字就照行返平時嗰條路（回 false = base 出返粒 [KeyAction.CHAR]）
+        if (key.action == KeyAction.TO_EMOJI) {
+            EmojiDict.addRecent(context, variant)
+            return false
+        }
+        if (key.action != KeyAction.DIGIT) return false
+        val side = engine.pairSidesAt(key.digit).indexOf(variant)
+        return side >= 0 && engine.pickPairSide(key.digit, side)
+    }
 
     override fun swipeKeyAt(x: Float, y: Float): Int {
         for (d in 0..9) {

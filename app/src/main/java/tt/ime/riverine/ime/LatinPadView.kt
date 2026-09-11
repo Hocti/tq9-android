@@ -1,6 +1,7 @@
 package tt.ime.riverine.ime
 
 import android.content.Context
+import tt.ime.riverine.core.BarMode
 import tt.ime.riverine.core.Prefs
 import tt.ime.riverine.swipe.GestureKeyTracker
 import kotlin.math.max
@@ -15,6 +16,17 @@ enum class ShiftState { OFF, ON, LOCK }
  * `textUri`，在那裏搜尋中文非常普遍），收起了就整個欄位都打不到中文。
  */
 enum class LatinField { NORMAL, EMAIL, URI, PASSWORD }
+
+/**
+ * 英文底行嗰粒 [KeyAction.BAR_HIDE] 而家寫乜。四段各有各字面，
+ * 講嘅係**撳完會點**（見 [BAR_HIDE_GLYPH] 嗰段 doc）。
+ */
+private fun LatinPadView.barCycleGlyph(): String = when {
+    Prefs.barHidden(context) -> BAR_SHOW_GLYPH
+    Prefs.barMode(context) == BarMode.CANDIDATES -> BAR_TOOLS_GLYPH
+    Prefs.barMode(context) == BarMode.TOOLS -> BAR_BOTH_GLYPH
+    else -> BAR_HIDE_GLYPH
+}
 
 /**
  * 長撳字母彈出嘅變體：淨係各國重音寫法。
@@ -107,14 +119,17 @@ val DIGIT_SYMBOLS: Map<String, List<String>> = mapOf(
 
 /**
  * 一粒數字鍵：中間大字、右上角細字寫住長撳會出咩符號。
- * 長撳彈出嘅 list 第一個要係自己本身 —— 好似一般 keyboard 咁，
- * 唔郁手指直接放手就係打返個數字，唔係跳咗去第一個符號。
+ *
+ * 長撳彈出嘅 list **排頭係符號**（`1` → `!`），數字自己排第二（2026-09-11 user 要求）
+ * —— 短撳已經打得到個數字，長撳嗰下十之八九係想要粒符號，所以長撳一彈出就
+ * 停咗喺符號度（唔郁手指放開即出 `!`），要個數字就向右拉一格。
  */
 fun digitKey(d: String, weight: Float = 1f, bigLabel: Boolean = false): Key {
     val syms = DIGIT_SYMBOLS[d].orEmpty()
     return Key(
         KeyAction.CHAR, label = d, text = d, weight = weight, bigLabel = bigLabel,
-        hintRight = syms.firstOrNull().orEmpty(), variants = listOf(d) + syms
+        hintRight = syms.firstOrNull().orEmpty(),
+        variants = syms.take(1) + listOf(d) + syms.drop(1)
     )
 }
 
@@ -153,8 +168,9 @@ class LatinPadView(context: Context) : RowsPadView(context) {
         set(v) { if (field != v) { field = v; rebuild() } }
 
     /**
-     * 長撳彈出嘅變體 list，第一個一定係 [c] 自己本身 —— 撳實唔郁直接放手
-     * 就係打返個字，跟一般 keyboard 嘅習慣（唔係跳咗去第一個口音字）。
+     * 長撳彈出嘅變體 list，**排頭係另一個大細階**（2026-09-11 user 要求）——
+     * 而家寫住細階就排頭出大階、寫住大階就排頭出細階，撳實唔郁放手即刻攞到
+     * （打一個大階字母唔使再撳 ⇧）。粒鍵自己嗰個排第二，跟住先至係口音字。
      */
     private fun ch(
         c: String, hint: String = "", hintRight: String = "", extra: List<String> = emptyList(),
@@ -162,11 +178,11 @@ class LatinPadView(context: Context) : RowsPadView(context) {
     ): Key {
         val letter = c.length == 1 && c[0] in 'a'..'z'
         val upper = letter && shift != ShiftState.OFF
-        // 大細階兩樣都要揀得到：排頭嗰個係而家粒鍵寫住嗰個（撳實唔郁放手 = 打返佢），
-        // 第二個就係另一個大細階，跟住先至係口音字（一樣跟返而家嘅大細階）
+        // 大細階兩樣都要揀得到：排頭嗰個係**另一個**大細階（撳實唔郁放手 = 打佢），
+        // 第二個先至係粒鍵而家寫住嗰個，跟住係口音字（一樣跟返而家嘅大細階）
         val base = if (upper) c.uppercase() else c
-        val head = if (!letter) listOf(c)
-                   else listOf(base, if (upper) c.lowercase() else c.uppercase())
+        val other = if (upper) c.lowercase() else c.uppercase()
+        val head = if (!letter) listOf(c) else listOf(other, base)
         // "ß".uppercase() 會變兩個字母 "SS" —— 變咗長度就唔換，照出返細階嗰個
         val accents = ACCENTS[c].orEmpty().let { list ->
             if (!upper) list
@@ -232,6 +248,14 @@ class LatinPadView(context: Context) : RowsPadView(context) {
         // 中文九宮格嗰粒地方鬆啲，個 hint 照留。
         r3.add(Key(KeyAction.TO_SYMBOL, label = "?123", weight = 1.3f,
             longAction = KeyAction.TO_NUMBER))
+        // 闊 keyboard（打橫／摺機內屏／平板）先有：上面條 bar 嘅四段循環（見
+        // [barCycleGlyph] 同 `TTInputMethodService.cycleBarWithHide`）。
+        // 打橫本來就矮，條 bar 佔嗰橛位好肉赤，但係窄機收起咗就等於打盲舖
+        // （打字提示同滑出嚟嗰個字全部喺條 bar 度），所以窄嗰陣粒掣唔會出現
+        // ——窄機得返條 bar 自己嗰粒 `⇄`，三段循環，收唔起。
+        if (Prefs.barToggleAllowed(context)) {
+            r3.add(Key(KeyAction.BAR_HIDE, label = barCycleGlyph(), weight = 1f))
+        }
         when (fieldKind) {
             LatinField.EMAIL -> {
                 // 長撳 @：可以揀常用信箱域名，第一個照舊係 @ 本身

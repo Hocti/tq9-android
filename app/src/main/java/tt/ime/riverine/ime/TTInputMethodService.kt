@@ -27,6 +27,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.ExtractedTextRequest
+import android.view.inputmethod.InputConnection
 import android.view.inputmethod.InputMethodManager
 import android.widget.FrameLayout
 import android.widget.LinearLayout
@@ -51,6 +52,7 @@ import tt.ime.riverine.core.PadGroup
 import tt.ime.riverine.core.PagerLayout
 import tt.ime.riverine.core.Prefs
 import tt.ime.riverine.core.TTDb
+import tt.ime.riverine.core.TextEdit
 import tt.ime.riverine.core.TTCmd
 import tt.ime.riverine.core.TTEngine
 import tt.ime.riverine.core.UsageStats
@@ -59,6 +61,7 @@ import tt.ime.riverine.core.VoiceRecorder
 import tt.ime.riverine.swipe.GestureDecoder
 import tt.ime.riverine.ui.MicPermissionActivity
 import kotlin.math.abs
+import kotlin.math.max
 import kotlin.math.roundToInt
 
 enum class PadMode { CHINESE, LATIN, SYMBOL, NUMBER, EMOJI }
@@ -204,11 +207,12 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
 
     /**
      * 九宮格右上角嗰粒要唔要著燈。平時 = 條 bar 開住；條 bar 常駐嗰陣粒鍵已經
-     * 唔再係開關，而係關聯字 ⇄ 工具嘅切換掣，所以改為代表「而家喺工具嗰邊」——
-     * 一路著住藍燈冇資訊可言。
+     * 唔再係開關，而係關聯字 ⇄ 工具嘅切換掣，所以改為代表「而家見到工具嗰行」——
+     * 一路著住藍燈冇資訊可言。收起咗成條 bar（闊 screen）就梗係唔著。
      */
     override val optionOn: Boolean
-        get() = if (Prefs.barPinned(this)) barMode == BarMode.TOOLS else barMode != BarMode.OFF
+        get() = if (Prefs.barPinned(this)) barMode.hasTools && !Prefs.barHidden(this)
+                else barMode != BarMode.OFF
     override val aiReady: Boolean get() = aiUsable
 
     // ---- lifecycle --------------------------------------------------------
@@ -501,8 +505,12 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
             }
         }
         (v.parent as? ViewGroup)?.removeView(v)
-        padHolder.addView(v, FrameLayout.LayoutParams(
-            FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT))
+        // 鍵盤本體自己喺 `PadMetrics.offsetX` 度排位（仲要留位俾側邊欄），所以鋪滿成行；
+        // emoji 表嗰類「功能表」就跟住顯示方式擺位（見 [panelLayoutParams]）
+        padHolder.addView(v, if (v is KeyboardBaseView)
+            FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT)
+        else panelLayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT))
         (v as? KeyboardBaseView)?.enterLabel = enterLabel
         (v as? RowsPadView)?.rebuild()
         (v as? ChinesePadView)?.onSettingsChanged()
@@ -527,6 +535,11 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
         padHeightPx = 0
         emojiPad?.forcedHeightPx = 0
         overlay?.requestLayout()
+        // 改咗顯示方式／拉過闊窄：攤開住嗰張功能表要即刻跟住搬位（闊度喺
+        // LayoutParams 度，齋 requestLayout 係唔會變嘅）
+        refreshPanelLayout(overlay)
+        refreshPanelLayout(emojiPad)
+        if (candidatesExpanded) refreshPanelLayout(bars.expandedView)
     }
 
     // ---- 開鍵盤嗰下再度多次尺寸 --------------------------------------------
@@ -704,6 +717,7 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
             KeyAction.IME_PICKER -> showImePicker()
             KeyAction.STT -> toggleStt()
             KeyAction.OPTION -> toggleBar()
+            KeyAction.BAR_HIDE -> cycleBarWithHide()
             KeyAction.BACKSPACE -> backspace()
             KeyAction.SPACE -> space()
             KeyAction.ENTER -> enter()
@@ -743,6 +757,7 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
                 if (Prefs.longPressShortcut(this) && engine.shortcutDigit(key.digit)) return true
             }
             KeyAction.PASTE -> { onPasteHistory(); return true }
+            KeyAction.AI -> { openAiPrompts(); return true }
             KeyAction.IME_SWITCH -> { showImePicker(); return true }
             KeyAction.SHIFT -> {
                 latinPad?.let { it.shift = ShiftState.LOCK; it.rebuild() }
@@ -970,10 +985,25 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
         val ic = currentInputConnection ?: return
         val sel = ic.getSelectedText(0)
         if (sel != null && sel.isNotEmpty()) ic.commitText("", 1)
-        else ic.deleteSurroundingText(1, 0)
+        else deleteOneElement(ic)
         // 剷返到句尾／欄位開頭就要即刻著返大階
         clearShiftManual()
         updateAutoCaps()
+    }
+
+    /**
+     * 剷走游標前面**一個文字元素**（唔係一個 `char`）。
+     *
+     * `deleteSurroundingText` 數嘅係 UTF-16 char，一個 emoji 通常佔兩個 ——
+     * 寫死 `1` 就要撳兩下 ⌫ 先剷得走，中間嗰下仲會喺個欄度留低半隻（豆腐字）。
+     * 旗（`🇭🇰`）四個、一家人（`👨‍👩‍👧`）成八個，情況一樣。所以要問個欄攞返前面
+     * 嗰段字，用 [TextEdit.lastClusterLength] 計啱條數先剷（`assets/emoji.txt`
+     * 入面 1416 個 emoji 有 1248 個中招，唔止 `👾` 一個）。
+     */
+    private fun deleteOneElement(ic: InputConnection) {
+        val before = ic.getTextBeforeCursor(TextEdit.LOOKBEHIND, 0)
+        val n = TextEdit.lastClusterLength(before ?: "")
+        ic.deleteSurroundingText(max(1, n), 0)
     }
 
     private fun space() {
@@ -1144,6 +1174,15 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
         onStateChanged()
     }
 
+    /**
+     * 長撳工具列／側邊欄嗰粒「表情」，喺彈出嗰行速選揀咗個（見 [QuickEmoji]）。
+     * 同喺 emoji 表揀一模一樣：記低「最近用過」，再直接打出嚟。
+     */
+    override fun onQuickEmoji(emoji: String) {
+        EmojiDict.addRecent(this, emoji)
+        commitPlain(emoji)
+    }
+
     override fun onPasteHistory() {
         rememberPadHeight()
         runCatching { ClipHistory.current(this) }
@@ -1154,12 +1193,63 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
         })
     }
 
+    /**
+     * 攤開喺鍵盤位置嗰啲「功能表」（emoji 表、剪貼簿歷史、AI prompt 名單、
+     * 拉大咗嘅關聯字）**擺位要跟鍵盤本體**：靠左貼左、靠右貼右、置中居中，
+     * 闊度亦都跟 [PadMetrics.contentW]（2026-09-11 user 要求）。
+     *
+     * 冇呢樣嘢就會：鍵盤縮窄靠住一邊單手打，一長撳「貼上」彈出嚟嗰張表
+     * 又鋪滿成行，隻手夠唔到另一邊。
+     *
+     * 「拉闊」同「左右拆開」本來就用盡成行，照用 `MATCH_PARENT`。
+     * **鍵盤本體唔行呢條路**：佢哋自己喺 `PadMetrics.offsetX` 度排位，
+     * 而且空出嚟嗰邊要留返俾側邊欄（見 [refreshSidePanel]）。
+     */
+    private fun panelLayoutParams(height: Int): FrameLayout.LayoutParams {
+        val w = if (padHolder.width > 0) padHolder.width else resources.displayMetrics.widthPixels
+        val m = if (w > 0) PadMetrics(this, w, group = padGroup) else null
+        val gravity = when (m?.align) {
+            PadAlign.RIGHT_GAP -> Gravity.START   // 右邊留白 → 貼左
+            PadAlign.LEFT_GAP -> Gravity.END      // 左邊留白 → 貼右
+            PadAlign.CENTER -> Gravity.CENTER_HORIZONTAL
+            else -> return FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, height)
+        }
+        return FrameLayout.LayoutParams(m.contentW.roundToInt(), height).also { it.gravity = gravity }
+    }
+
+    /**
+     * 鍵盤本體左右兩邊各留幾多白（px）。上面條 bar 入面啲嘢跟呢兩個數縮返入嚟
+     * （見 [OptionBarsView.setContentInsets]），咁啲掣就企喺鍵盤上面。
+     *
+     * 「拉闊」同「左右拆開」用盡成行，兩邊都係 0。
+     */
+    private fun padInsets(): Pair<Int, Int> {
+        if (!::padHolder.isInitialized) return 0 to 0
+        val w = if (padHolder.width > 0) padHolder.width else resources.displayMetrics.widthPixels
+        if (w <= 0) return 0 to 0
+        val m = PadMetrics(this, w, group = padGroup)
+        val slack = (w - m.contentW).roundToInt().coerceAtLeast(0)
+        return when (m.align) {
+            PadAlign.RIGHT_GAP -> 0 to slack              // 右邊留白
+            PadAlign.LEFT_GAP -> slack to 0               // 左邊留白
+            PadAlign.CENTER -> slack / 2 to slack - slack / 2
+            else -> 0 to 0
+        }
+    }
+
+    /** 功能表已經攤開住，而家改咗顯示方式／拉過闊窄：重新擺位（高度唔變） */
+    private fun refreshPanelLayout(v: View?) {
+        if (v == null || v.parent !== padHolder) return
+        val h = (v.layoutParams as? FrameLayout.LayoutParams)?.height
+            ?: FrameLayout.LayoutParams.WRAP_CONTENT
+        v.layoutParams = panelLayoutParams(h)
+    }
+
     private fun showOverlay(v: View) {
         if (!::padHolder.isInitialized) return
         hideOverlay()
         overlay = v
-        padHolder.addView(v, FrameLayout.LayoutParams(
-            FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT))
+        padHolder.addView(v, panelLayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT))
         refreshBars()
     }
 
@@ -1240,10 +1330,52 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
         chinesePad?.invalidate()
     }
 
-    /** 條 bar 最左嗰粒：喺關聯字／工具兩個 view 之間切 */
+    /**
+     * 英文底行嗰粒（淨係闊 keyboard 先有，見 [Prefs.barToggleAllowed]）：
+     * **四段循環**（2026-09-11 user 要求）——
+     * 關聯字 → 工具 → 兩行一齊 → **收起**，跟住由頭嚟過。
+     *
+     * 即係話佢同切換掣（[onSwitchView]）行同一個圈，淨係多咗「收起」嗰段。
+     * **收起淨係呢粒做得到** —— 窄機根本冇呢粒鍵，收起咗就等於打盲舖。
+     *
+     * 粒掣自己個字面每段都唔同（見 `LatinPadView.barCycleGlyph`），所以要重砌塊英文 pad。
+     */
+    private fun cycleBarWithHide() {
+        when {
+            // 收起咗 → 出返嚟，由第一段（關聯字）開始
+            Prefs.barHidden(this) -> {
+                Prefs.setBarHidden(this, false)
+                barMode = BarMode.CANDIDATES
+                Prefs.setBarMode(this, barMode)
+            }
+            // 行完三段 → 收起
+            barMode == BarMode.BOTH -> Prefs.setBarHidden(this, true)
+            else -> {
+                barMode = barMode.nextVisible()
+                Prefs.setBarMode(this, barMode)
+            }
+        }
+        latinPad?.rebuild()
+        refreshBars()
+        chinesePad?.invalidate()
+    }
+
+    /**
+     * 切換掣（條 bar 最左嗰粒 `⇄`、中文九宮格右上角嗰粒）：
+     * 關聯字 → 工具 → 兩行一齊 → 關聯字，一路撳落去。
+     *
+     * **永遠行去有嘢見嘅一段** —— 條 bar 收起咗（闊 screen 嗰粒 `▾` 做嘅）就
+     * 即刻出返嚟，唔係中文頁嗰粒 `⇄` 撳極都冇反應（中文頁冇「收起」嗰粒鍵）。
+     */
     override fun onSwitchView() {
-        barMode = if (barMode == BarMode.TOOLS) BarMode.CANDIDATES else BarMode.TOOLS
+        if (Prefs.barHidden(this)) {
+            Prefs.setBarHidden(this, false)
+            barMode = BarMode.CANDIDATES
+        } else {
+            barMode = barMode.nextVisible()
+        }
         Prefs.setBarMode(this, barMode)
+        latinPad?.rebuild() // 英文底行嗰粒個字面跟住而家喺邊段行
         refreshBars()
         chinesePad?.invalidate() // 常駐模式：右上角嗰粒著燈與否跟住呢個狀態行
     }
@@ -1260,9 +1392,11 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
             barMode = BarMode.CANDIDATES
             Prefs.setBarMode(this, barMode)
         }
-        // 搵 emoji 嗰陣一定要見到啲結果，就算條 bar 本身係關住
-        var effective = if (emojiSearch || (forceCandidates && latinSuggestions.isNotEmpty()))
-            BarMode.CANDIDATES else barMode
+        // 搵 emoji 嗰陣一定要見到啲結果，就算條 bar 本身係關住。
+        // 滑出咗個字都一樣 —— 唔見到啲候選就揀唔到第二個字。
+        val mustShow = emojiSearch || (forceCandidates && latinSuggestions.isNotEmpty())
+        // 本來就有關聯字嗰行（[BarMode.BOTH]）就唔使郁，工具嗰行照留返
+        var effective = if (mustShow && !barMode.hasCands) BarMode.CANDIDATES else barMode
         // 英文／符號頁夾硬開返條 bar：呢兩頁靠佢出打字提示同滑動出嚟嘅字，
         // 冇咗就等於打盲舖。**唔會改到 [barMode] 本身** —— 返到中文頁
         // 照樣跟返 user 設定嘅開關。
@@ -1271,11 +1405,16 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
         }
         // emoji 表／剪貼簿嗰陣冇關聯字可以出，索性成行出工具，唔好淨係得粒 ✖ 吉住
         if (specialPad) effective = BarMode.TOOLS
+        // 闊 keyboard 收起咗成條 bar（英文底行嗰粒，見 [cycleBarWithHide]；
+        // 打橫仲要係預設收起，見 [Prefs.barHidden]）。**四款鍵盤都跟**：
+        // 出返嚟嘅入口除咗嗰粒鍵，仲有任何一粒切換掣（見 [onSwitchView]）。
+        // 擺喺最後 —— 上面三條（搵 emoji／滑完揀字／emoji 表同剪貼簿）都要越過佢。
+        if (!mustShow && !specialPad && Prefs.barHidden(this)) effective = BarMode.OFF
 
         // 中文本體窄到夠位喺隔籬擺嘢 → 條 bar 收埋，功能掣同關聯字全部搬去側邊欄。
         // 一早計定：側邊欄兩樣（關聯字＋工具）一次過見晒，所以佢出咗嚟就一定要有關聯字
-        val geom = if (barMode == BarMode.OFF || overlay != null) null else sideGeom()
-        val wantCands = geom != null || effective == BarMode.CANDIDATES
+        val geom = if (effective == BarMode.OFF || overlay != null) null else sideGeom()
+        val wantCands = geom != null || effective.hasCands
 
         showingContextPicks = false
         contextBarPicks = emptyList()
@@ -1303,11 +1442,17 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
         // 大細／貼邊／關聯字字體全部跟而家見緊嗰組（見 [padGroup]）。要喺
         // setCandidates 之前做 —— 條 bar 幾高、啲 chip 幾大都係跟呢個組行
         bars.padGroup = padGroup
+        // 條 bar 入面啲嘢（工具掣、✖／⇄、關聯字、▼）要企喺鍵盤本體上面，
+        // 唔好鋪滿成行 —— 鍵盤靠邊／置中，上面啲掣一齊跟住郁
+        padInsets().let { (l, r) -> bars.setContentInsets(l, r) }
+        // 條 bar 唔可以粗過下面一行鍵（見 [OptionBarsView.keyRowHeightPx]）——
+        // 一樣要喺 refreshFontScale 之前擺低，條 bar 幾高就係喺嗰度計
+        bars.keyRowHeightPx = keyRowHeightPx()
         bars.refreshFontScale()
         // 設定頁改完「按鍵排位」返嚟：工具列有邊幾粒可能已經唔同咗
         bars.refreshTools()
         bars.setMode(effective)
-        bars.setCandidates(if (effective == BarMode.CANDIDATES) cands else emptyList())
+        bars.setCandidates(if (effective.hasCands) cands else emptyList())
         bars.setCloseVisible(specialPad)
         // 常駐 + 中文九宮格：切換掣已經搬咗去右上角嗰粒鍵，條 bar 唔使再擺多粒。
         // 英文／符號頁冇嗰粒鍵，所以一定要留返，唔係就入唔到工具列
@@ -1320,6 +1465,22 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
         // 條 bar 高度淨係跟關聯字嘅字體行（見 [OptionBarsView.barHeightFor]），
         // 唔會因為有冇關聯字、而家喺邊一段而跳高跳低
         bars.visibility = if (effective == BarMode.OFF) View.GONE else View.VISIBLE
+    }
+
+    /**
+     * 下面鍵盤**一行鍵**幾高（px）。上面條 bar 跟呢個數封頂 ——
+     * 打橫縮到最細嗰陣，一行鍵得三十幾 dp，條 bar 唔跟住縮就會變咗最粗嗰橛。
+     *
+     * 唔量真 view（開鍵盤第一下、轉頁嗰陣佢仲未排好），用返砌鍵盤嗰條式
+     * （[PadMetrics.padHeightPx] ÷ 行數）—— 同鍵盤本身一定夾得返。
+     * 行數要問返而家嗰塊 pad：英文開咗數字行 5 行、中文九宮格 4 行。
+     */
+    private fun keyRowHeightPx(): Int {
+        if (!::padHolder.isInitialized) return 0
+        val w = if (padHolder.width > 0) padHolder.width else resources.displayMetrics.widthPixels
+        if (w <= 0) return 0
+        val rows = (padHolder.getChildAt(0) as? RowsPadView)?.rowCount ?: CJK_ROWS
+        return (PadMetrics.padHeightPx(this, w, padGroup) / max(1, rows)).roundToInt()
     }
 
     /** 記住而家出緊嗰個 list，[onPickCandidate] 就知撳咗邊隻字（未入過選字模式） */
@@ -1429,7 +1590,9 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
     private fun sideGeom(): SideGeom? {
         if (mode != PadMode.CHINESE || !::padHolder.isInitialized) return null
         val align = Prefs.align(this)
-        if (align == PadAlign.STRETCH) return null
+        // 「拉闊」冇位空出嚟；「置中」空出嚟嗰啲位一開二，兩邊都窄過擺得落工具掣，
+        // 所以兩個都照用返上面條 bar
+        if (align == PadAlign.STRETCH || align == PadAlign.CENTER) return null
         val w = padHolder.width.takeIf { it > 0 } ?: resources.displayMetrics.widthPixels
         if (w <= 0) return null
         val m = PadMetrics(this, w)
@@ -1507,6 +1670,11 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
                 // composing 係空、又未 swiped → 呢個係「下一個字」預測嘅提示，唔係補完緊打嘅字
                 val wasNextWordPick = mode == PadMode.LATIN && !latinSwiped && latinComposing.isEmpty()
                 if (wasTypedPrefix) ic.deleteSurroundingText(latinComposing.length, 0)
+                // 「下一個字」係揀嚟接喺前面嗰個字後面嘅，兩個字之間一定要有個空格
+                // （`hello` 揀 `there` 要出 `hello there`，唔係 `hellothere`）。
+                // 前面唔係英文字（空格、標點、換行、中文、乜都冇）就唔使補 ——
+                // 嗰啲位置本來就係一個字嘅開頭。
+                if (wasNextWordPick && needSpaceBeforeWord()) ic.commitText(" ", 1)
                 ic.commitText(w, 1)
                 if (wasNextWordPick) ic.commitText(" ", 1)
                 latinComposing.setLength(0)
@@ -1542,6 +1710,9 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
      * 顯示方式：內容貼右（左邊留白）嗰陣向左拖先係拉闊，貼左就啱啱相反 ——
      * 永遠都係「拖向留白嗰邊 = 拉闊」。[PadAlign.SPLIT] 條罅喺中間，
      * 所以向右（＝向住條罅）拖就係兩橛一齊拉闊。
+     *
+     * [PadAlign.CENTER] 兩邊都有留白，冇「留白嗰邊」可言，所以跟返最順手嗰個：
+     * **向右拖 = 拉闊**（兩邊一齊向外撐）。
      */
     override fun onWidthDrag(dxDp: Int) {
         if (dxDp == 0) return
@@ -1579,7 +1750,11 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
     override fun onSizeDrag(dyDp: Int) {
         if (dyDp == 0) return
         val g = padGroup
-        val cur = Prefs.heightScale(this, g)
+        // 由**而家實際嗰個**倍數開始加減，唔係 pref 嗰個 —— 未校過高度嘅闊 screen
+        // 俾「最多半個螢幕」封咗頂（見 [PadMetrics]），由 pref 嗰個 100% 起計
+        // 就會一拖落去反而彈高咗
+        val w = if (padHolder.width > 0) padHolder.width else resources.displayMetrics.widthPixels
+        val cur = PadMetrics(this, w, group = g).heightScale
         val next = (cur + dyDp / 250f).coerceIn(Prefs.MIN_HEIGHT_SCALE, Prefs.MAX_HEIGHT_SCALE)
         if (next != cur) { Prefs.setHeightScale(this, next, g); relayoutPads(); refreshBars() }
     }
@@ -1596,7 +1771,7 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
             rememberPadHeight()
             (v.parent as? ViewGroup)?.removeView(v)
             val h = if (padHeightPx > 0) padHeightPx else PadMetrics.defaultPadHeightPx(this).roundToInt()
-            padHolder.addView(v, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, h))
+            padHolder.addView(v, panelLayoutParams(h))
         } else {
             (v.parent as? ViewGroup)?.removeView(v)
         }
@@ -1630,13 +1805,32 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
     // ---- AI 改寫 -----------------------------------------------------------
 
     /**
+     * 長撳「AI改」：成個鍵盤位置攤開 prompt 名單（同長撳「貼上」開剪貼簿歷史同一招），
+     * 撳邊個就用邊個 prompt 改寫。短撳就唔經呢度，一律用名單第一個。
+     *
+     * **揀之前唔可以郁個輸入框**：`showOverlay` 淨係喺 `padHolder` 加塊 view，
+     * 冇搶 focus 亦都冇掂過個 selection，所以揀完落到 [runAi] 嗰陣，
+     * user 原本揀住嗰段字仲喺度。
+     */
+    private fun openAiPrompts() {
+        if (Prefs.aiApiKey(this).isBlank()) { toast("請先在設定頁輸入 Gemini API key"); return }
+        if (!Prefs.aiRewriteOn(this)) { toast("AI 改寫已在設定頁關閉"); return }
+        rememberPadHeight()
+        showOverlay(AiPromptListView(this).apply {
+            applyTheme(theme)
+            forcedHeightPx = padHeightPx
+            promptHost = AiPromptListView.PromptHost { p -> hideOverlay(); runAi(p.text) }
+        })
+    }
+
+    /**
      * ✨：**冇揀住字都用得**。揀咗就淨係改揀咗嗰段，冇揀就當「改寫成個輸入框」——
      * 夾硬全選再交出去，返到嚟嗰段字直接取代成個欄嘅內容。
      *
      * 全選要喺出返嚟嗰陣**再做多次**：等緊 Gemini 嗰幾秒 user 隨時撳過個欄，
      * 一撳 caret 就散咗個 selection，`commitText` 就會變成插埋落去而唔係取代。
      */
-    private fun runAi() {
+    private fun runAi(template: String = Prefs.aiPrompt(this)) {
         val ic = currentInputConnection ?: return
         if (Prefs.aiApiKey(this).isBlank()) { toast("請先在設定頁輸入 Gemini API key"); return }
         if (!Prefs.aiRewriteOn(this)) { toast("AI 改寫已在設定頁關閉"); return }
@@ -1661,7 +1855,7 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
         }
         ui.postDelayed(timeout, AI_TIMEOUT_MS)
 
-        AiRewrite.rewrite(this, selected) { r ->
+        AiRewrite.rewrite(this, selected, template) { r ->
             if (myGen != aiGeneration) return@rewrite // 已經逾時處理咗
             ui.removeCallbacks(timeout)
             aiGeneration++
@@ -1851,6 +2045,18 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
     private fun wordCharsAfter(): String {
         val s = currentInputConnection?.getTextAfterCursor(24, 0)?.toString().orEmpty()
         return s.takeWhile { it in 'a'..'z' || it in 'A'..'Z' }
+    }
+
+    /**
+     * 游標前面**貼實**住個英文字（字母／數字／`'`）—— 即係喺呢度直接打落去會黐埋
+     * 上一個字，要自己補返個空格。空格、標點、換行、中文字、或者成個欄都係吉嗰陣
+     * 就 false（嗰啲位置本來就係一個字嘅開頭）。
+     */
+    private fun needSpaceBeforeWord(): Boolean {
+        val c = currentInputConnection?.getTextBeforeCursor(1, 0)?.toString().orEmpty()
+        if (c.isEmpty()) return false
+        val ch = c[0]
+        return ch in 'a'..'z' || ch in 'A'..'Z' || ch in '0'..'9' || ch == '\''
     }
 
     private fun endsWithSpace(): Boolean {
@@ -2385,6 +2591,9 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
         private const val LEGACY_PICK_ID = 1000
         /** 打咗一兩個碼嗰陣，條 bar 出幾多隻「呢個碼最常用」嘅字 */
         private const val BAR_PREVIEW_COUNT = 9
+
+        /** 中文九宮格永遠 4 行（[keyRowHeightPx] 度唔到行數嗰陣嘅預設） */
+        private const val CJK_ROWS = 4
         /** 開完鍵盤幾耐補度一次尺寸（見 [scheduleSizeRecheck]） */
         private const val SIZE_RECHECK_MS = 100L
         /** 補度幾多次 —— 有啲機要等埋 insets 落嚟先報得到啱嘅高度 */

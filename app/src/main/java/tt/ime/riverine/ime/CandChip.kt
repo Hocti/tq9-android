@@ -8,6 +8,7 @@ import android.view.View
 import android.widget.TextView
 import tt.ime.riverine.core.PadGroup
 import kotlin.math.max
+import kotlin.math.min
 import kotlin.math.roundToInt
 
 /**
@@ -112,13 +113,26 @@ class CandChip private constructor(
         }
 
         /**
+         * 條 bar 再粗都唔可以粗過一行鍵，但係都要撳得中，所以封頂之後仲有呢條底線。
+         * 鍵盤縮到每行矮過呢個數，條 bar 就唔再跟落去。
+         */
+        const val MIN_CAPPED_BAR_DP = 28f
+
+        /**
          * 條 bar 幾高：一個 chip 連上下 margin，最矮 [MIN_BAR_DP]。
          * 一定要夠位擺得落成個 chip，唔係就會俾 `AT_MOST` 迫窄（見成個 class 嘅講法）。
+         *
+         * [rowH] = 下面鍵盤**一行鍵**幾高（px，0 = 未知就唔封頂）。條 bar 唔可以粗過
+         * 一行鍵 —— 打橫縮細嗰陣一行鍵得三十幾 dp，[MIN_BAR_DP] 嗰條 42dp 就會變成
+         * 成個鍵盤最粗嗰橛，睇落好突兀（2026-09-11 user 踩到）。封咗頂嗰陣啲關聯字
+         * 要跟住縮細，唔係就會俾迫窄，嗰件事喺 `OptionBarsView.applyBarSize` 度做。
          */
-        fun barHeightPx(ctx: Context, chip: CandChip): Int {
+        fun barHeightPx(ctx: Context, chip: CandChip, rowH: Int = 0): Int {
             val dm = ctx.resources.displayMetrics
             fun dp(v: Float) = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, v, dm)
-            return max(dp(MIN_BAR_DP), chip.chipH + dp(MARGIN_DP * 2)).roundToInt()
+            val natural = max(dp(MIN_BAR_DP), chip.chipH + dp(MARGIN_DP * 2))
+            if (rowH <= 0) return natural.roundToInt()
+            return min(natural, max(rowH.toFloat(), dp(MIN_CAPPED_BAR_DP))).roundToInt()
         }
     }
 }

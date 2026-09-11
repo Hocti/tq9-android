@@ -63,6 +63,9 @@ class SidePanelView(context: Context) : LinearLayout(context) {
     /** 邊粒掣用邊個圖案（＋TalkBack 讀嘅名），轉主題重新畫嗰陣要用 */
     private val icons = LinkedHashMap<TextView, Pair<ToolIcon, String>>()
 
+    /** 長撳「表情」彈嗰行速選（同工具列嗰粒一模一樣，見 [QuickEmoji]） */
+    private var quickEmoji: QuickEmojiPopup? = null
+
     private var candidates: List<String> = emptyList()
     private var aiReady = false
     private var sttActive = false
@@ -117,6 +120,8 @@ class SidePanelView(context: Context) : LinearLayout(context) {
         toolSlots = slots
         for (b in toolBtns) { icons.remove(b.view); toolFlow.removeView(b.view) }
         toolBtns.clear()
+        quickEmoji?.dismiss()
+        quickEmoji = null
 
         for (slot in slots) {
             val f = slot.tap
@@ -136,6 +141,16 @@ class SidePanelView(context: Context) : LinearLayout(context) {
                 v.setOnClickListener { listener?.onTool(f.action()) }
                 v.setOnLongClickListener { listener?.onToolLong(key) == true }
             }
+            // 長撳「表情」= 彈一行最近用過嘅 emoji 速選（同工具列，見 [QuickEmoji]）
+            if (f == PadFunc.EMOJI) {
+                val pick = QuickEmojiPopup(v) { e -> listener?.onQuickEmoji(e) }
+                quickEmoji = pick
+                v.setOnLongClickListener {
+                    pick.open(theme, Prefs.fontScale(context)) ||
+                        listener?.onToolLong(key) == true
+                }
+                v.setOnTouchListener { _, e -> pick.onTouch(e) }
+            }
             if (f == PadFunc.STT) v.setOnTouchListener { _, e ->
                 if (e.actionMasked == MotionEvent.ACTION_UP ||
                     e.actionMasked == MotionEvent.ACTION_CANCEL) listener?.onSttHoldEnd()
@@ -151,6 +166,12 @@ class SidePanelView(context: Context) : LinearLayout(context) {
         refreshAlignLabel()
         refreshAiLook()
         refreshSttLook()
+    }
+
+    /** 鍵盤收起／view 拆走：速選 popup 係 `PopupWindow`，唔收就會漏喺度 */
+    override fun onDetachedFromWindow() {
+        super.onDetachedFromWindow()
+        quickEmoji?.dismiss()
     }
 
     /** 設定頁改咗排位先重砌（見 [OptionBarsView.refreshTools]） */
@@ -262,7 +283,8 @@ class SidePanelView(context: Context) : LinearLayout(context) {
     /**
      * 同工具 bar 嗰粒一樣，圖案係「貼邊」嘅樣（一條牆 + 箭嘴指住埋去）。
      * 側邊欄淨係中文九宮格先出（[PadGroup.CJK]），所以永遠唔會撞到
-     * [PadAlign.SPLIT]（嗰個係英數鍵盤專用），但個 `when` 都要寫齊。
+     * [PadAlign.SPLIT]（嗰個係英數鍵盤專用）同 [PadAlign.CENTER]
+     * （置中冇側邊欄，見 `TTInputMethodService.sideGeom`），但個 `when` 都要寫齊。
      */
     fun refreshAlignLabel() {
         val v = sizeBtn ?: return
@@ -271,6 +293,7 @@ class SidePanelView(context: Context) : LinearLayout(context) {
             PadAlign.LEFT_GAP -> ToolIcon.ALIGN_RIGHT to "靠右"
             PadAlign.RIGHT_GAP -> ToolIcon.ALIGN_LEFT to "靠左"
             PadAlign.SPLIT -> ToolIcon.ALIGN_SPLIT to "左右拆開"
+            PadAlign.CENTER -> ToolIcon.ALIGN_CENTER to "置中"
         }
         styleTool(v, theme.keyFaceAlt)
     }

@@ -39,6 +39,14 @@ class PadMetrics(
     val offsetX: Float
     val contentW: Float
 
+    /**
+     * 真正用咗嘅高度倍數。多數就係 [Prefs.heightScale]，**除非**闊 screen
+     * 未校過高度而撞到「最多半個螢幕」嗰個封頂（見 [AUTO_HEIGHT_RATIO]）——
+     * 嗰陣呢度細過設定嗰個數。工具列粒掣上下拖就係由呢個數開始加減
+     * （見 `TTInputMethodService.onSizeDrag`），唔係一拖就由封頂彈返去 100%。
+     */
+    val heightScale: Float
+
     init {
         val dm = ctx.resources.displayMetrics
         fun dp(v: Float) = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, v, dm)
@@ -55,7 +63,8 @@ class PadMetrics(
         val hRatio = Prefs.keyHeightRatio(ctx)
         // 高度**唔跟**闊度倍數行：左右拉淨係應該改到闊度，唔可以順手拉埋高度
         // （上下拉係另一件事，行 Prefs.heightScale）
-        cellH = unit * hRatio * Prefs.heightScale(ctx, group)
+        heightScale = autoCapped(ctx, unit * hRatio, Prefs.heightScale(ctx, group), group)
+        cellH = unit * hRatio * heightScale
         // 本體再窄都要有 [MIN_CONTENT_DP] 咁闊（螢幕本身窄過呢個數就用盡螢幕）——
         // 拉到得幾格咁窄嘅鍵盤，每粒鍵細過隻手指，根本撳唔中
         val minContent = min(dp(MIN_CONTENT_DP), availW.toFloat())
@@ -87,6 +96,7 @@ class PadMetrics(
             PadAlign.STRETCH -> 0f
             PadAlign.RIGHT_GAP -> 0f                                   // 右邊留白 → 內容貼左
             PadAlign.LEFT_GAP -> slack                                 // 左邊留白 → 內容貼右
+            PadAlign.CENTER -> slack / 2f                              // 兩邊各留一半白
             PadAlign.SPLIT -> 0f                                       // 兩橛各自貼邊，見 RowsPadView
         }
     }
@@ -96,7 +106,33 @@ class PadMetrics(
 
     val totalHeight: Float get() = cellH * rows
 
+    /**
+     * 闊 screen（打橫／摺機內屏／平板）**未校過高度**嗰陣，成塊鍵盤最多佔
+     * 螢幕 [AUTO_HEIGHT_RATIO]（一半）（2026-09-11 user 要求：「首次打橫時
+     * 經常高到遮住整個screen」）。
+     *
+     * 點解唔直接改細個預設倍數：倍數係乘落 `unit` 度，而 `unit` 本身跟
+     * 「最大闊度／最大高度」兩條 slider 行，同螢幕幾高冇關係 —— 打橫嗰陣
+     * 300dp 高嘅 `maxH` 夾 4 行，出嚟就已經超過半個螢幕。所以要喺呢度
+     * **度返真螢幕幾高**先封得到頂。
+     *
+     * 封頂淨係當 user 未郁過高度（[Prefs.heightScaleSet]）先做 —— 撳過設定頁
+     * 條 slider、或者喺工具列粒掣度拖過一下，之後就完全聽返 user 嗰個數。
+     * 再細都唔會細過 [Prefs.MIN_HEIGHT_SCALE]（細過就撳唔中）。
+     */
+    private fun autoCapped(ctx: Context, rowBase: Float, want: Float, group: PadGroup): Float {
+        if (rowBase <= 0f) return want
+        if (Prefs.screenWidthDp(ctx) <= Prefs.SPLIT_MIN_WIDTH_DP) return want
+        if (Prefs.heightScaleSet(ctx, group)) return want
+        val cap = ctx.resources.displayMetrics.heightPixels * AUTO_HEIGHT_RATIO / rows
+        if (cap <= 0f || rowBase * want <= cap) return want
+        return max(cap / rowBase, Prefs.MIN_HEIGHT_SCALE)
+    }
+
     companion object {
+        /** 見 [autoCapped] */
+        const val AUTO_HEIGHT_RATIO = 0.5f
+
         /**
          * 鍵盤本體最少要咁闊。螢幕本身窄過呢個數就用盡螢幕闊度
          * （細機唔會被迫到橫向 scroll），闊過就一定夠 320dp。

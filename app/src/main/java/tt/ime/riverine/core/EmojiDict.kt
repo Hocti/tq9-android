@@ -97,6 +97,43 @@ object EmojiDict {
         Prefs.sp(ctx).getString(Prefs.KEY_EMOJI_RECENT, "")!!
             .split(SEP).filter { it.isNotEmpty() }
 
+    /**
+     * 長撳「表情」彈出嚟嗰行速選（見 `ime/QuickEmoji.kt`）：**最近用過嗰啲排先**，
+     * 唔夠 [limit] 個就由 [COMMON] 補返尾。
+     *
+     * 特登唔查 `emoji.txt`（[require]）—— 長撳要即刻彈得出，唔可以喺嗰一刻先載成個表；
+     * [COMMON] 得十個，逐個問 [Paint.hasGlyph] 都係一眨眼嘅事，而且問完就記住。
+     */
+    fun quick(ctx: Context, limit: Int): List<String> {
+        val out = ArrayList<String>(limit)
+        for (e in recents(ctx)) {
+            if (out.size >= limit) return out
+            out.add(e)
+        }
+        for (e in common()) {
+            if (out.size >= limit) break
+            if (e !in out) out.add(e)
+        }
+        return out
+    }
+
+    /**
+     * 一部新機未用過 emoji 嗰陣，[quick] 攞嚟頂住嘅一批（次序 = 全世界用得最多嗰幾個）。
+     * 用過幾個之後就會俾「最近用過」逐個擠走。
+     */
+    private val COMMON = listOf("\uD83D\uDE02", "\u2764\uFE0F", "\uD83D\uDC4D", "\uD83D\uDE0D",
+        "\uD83D\uDE2D", "\uD83D\uDE4F", "\uD83D\uDE0A", "\uD83D\uDD25", "\uD83C\uDF89", "\uD83D\uDE05")
+
+    @Volatile private var commonOk: List<String>? = null
+
+    /** [COMMON] 篩走部機冇字型嗰啲（同 [load] 一樣唔好出豆腐字），篩完記住 */
+    private fun common(): List<String> = commonOk ?: run {
+        val paint = Paint()
+        val l = COMMON.filter { paint.hasGlyph(it) }
+        commonOk = l
+        l
+    }
+
     fun addRecent(ctx: Context, emoji: String) {
         val list = ArrayList<String>(recents(ctx))
         list.remove(emoji)

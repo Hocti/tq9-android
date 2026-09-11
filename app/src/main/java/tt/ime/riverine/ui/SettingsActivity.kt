@@ -46,6 +46,7 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import com.google.android.material.tabs.TabLayout
 import tt.ime.riverine.BuildConfig
+import tt.ime.riverine.core.AiPrompt
 import tt.ime.riverine.core.AiStt
 import tt.ime.riverine.core.BarMode
 import tt.ime.riverine.core.EngLongPress
@@ -502,6 +503,9 @@ class SettingsActivity : AppCompatActivity() {
         }
         note("選了「靠左」或「靠右」而中文鍵盤只佔螢幕六成或以下時，" +
             "上方工具列會自動收起，功能鍵與關聯字改為顯示在空出來的一側。")
+        note("寬螢幕（打橫、摺機內屏、平板）未自己調整過高度之前，鍵盤最高只佔螢幕一半；" +
+            "打橫時上方那條 bar 亦預設收起。按英文鍵盤底行那顆、或中文鍵盤右上角的 " +
+            "「轉換工具列」，都可以叫它回來。")
         note("英文與符號鍵盤在螢幕寬過 ${Prefs.SPLIT_MIN_WIDTH_DP}dp 時，" +
             "「靠左」「靠右」會換成「左右拆開」：每行鍵分成兩半各貼一邊，中間留空，" +
             "橫向雙手持機時兩隻拇指各顧一邊。")
@@ -732,13 +736,118 @@ class SettingsActivity : AppCompatActivity() {
         if (Prefs.aiApiKey(this).isBlank()) {
             note("⚠️ 尚未設定 API key，「AI 改寫」按鍵不會出現，請先在「AI 設定」貼上。")
         }
-        textField("Prompt（%text% 代表要改寫的文字）", Prefs.KEY_AI_PROMPT, Prefs.DEFAULT_AI_PROMPT,
-            multiline = true)
-        row(button("還原預設 Prompt") {
-            Prefs.sp(this).edit().putString(Prefs.KEY_AI_PROMPT, Prefs.DEFAULT_AI_PROMPT).apply()
-            rebuildAiSection()
-            toast("已還原預設 Prompt")
-        })
+        buildPromptList()
+    }
+
+    /**
+     * Prompt 清單（[Prefs.KEY_AI_PROMPTS]）。**次序有意思**：按一下工具列那顆
+     * 「AI 改寫」用第一個，長按才彈出整張清單讓使用者選，所以最常用那個
+     * 應該排第一（下面「設為預設」就是把它搬到最前）。
+     *
+     * 名稱必須唯一 —— 長按那張清單只靠名字認人，重名會分不出誰是誰
+     * （儲存時擋住，見 [editAiPrompt]）。
+     */
+    private fun buildPromptList() {
+        val prompts = Prefs.aiPrompts(this)
+        note("按一下「AI 改寫」鍵會直接用清單第一個 Prompt；長按則彈出整張清單讓你選。")
+        for ((i, p) in prompts.withIndex()) {
+            content.addView(TextView(this).apply {
+                text = if (i == 0) "${p.name}（預設）" else p.name
+                textSize = 15f
+                setTypeface(typeface, android.graphics.Typeface.BOLD)
+                setPadding(0, dp(10), 0, 0)
+            })
+            content.addView(TextView(this).apply {
+                // 整段 prompt 攤開會佔滿整頁，這裡只印頭一截認得出是哪個就夠
+                text = p.text.replace(Regex("\\s+"), " ").trim().take(90)
+                textSize = 12f
+                alpha = 0.7f
+                maxLines = 2
+                ellipsize = TextUtils.TruncateAt.END
+            })
+            row(
+                button("編輯") { editAiPrompt(i) },
+                button(if (i == 0) "已是預設" else "設為預設") {
+                    if (i == 0) { toast("已經是預設"); return@button }
+                    val list = prompts.toMutableList()
+                    list.add(0, list.removeAt(i))
+                    Prefs.setAiPrompts(this, list)
+                    rebuildAiSection()
+                    toast("「${p.name}」已設為預設")
+                },
+                button("刪除") {
+                    // 至少要剩一個：短按那下沒有清單可以退回去
+                    if (prompts.size <= 1) { toast("至少要保留一個 Prompt"); return@button }
+                    Prefs.setAiPrompts(this, prompts.filterIndexed { j, _ -> j != i })
+                    rebuildAiSection()
+                    toast("已刪除「${p.name}」")
+                }
+            )
+        }
+        row(
+            button("新增 Prompt") { editAiPrompt(-1) },
+            button("還原預設清單") {
+                Prefs.setAiPrompts(this, Prefs.defaultAiPrompts())
+                rebuildAiSection()
+                toast("已還原預設清單（英譯／回答／修飾）")
+            }
+        )
+    }
+
+    /**
+     * 新增（[index] < 0）或編輯一個 Prompt。
+     *
+     * 正面按鍵**不是**用 `setPositiveButton` 那個 listener：那個一按就關窗，
+     * 名稱重覆或空白時使用者剛打好的整段 Prompt 就沒有了。改成 show 之後
+     * 自己接管 click，驗不過就只出提示、不關窗。
+     */
+    private fun editAiPrompt(index: Int) {
+        val prompts = Prefs.aiPrompts(this).toMutableList()
+        val cur = prompts.getOrNull(index)
+        val nameEdit = EditText(this).apply {
+            hint = "名稱（例如：英譯）"
+            setSingleLine()
+            setText(cur?.name.orEmpty())
+        }
+        val textEdit = EditText(this).apply {
+            hint = "Prompt（%text% 代表要改寫的文字）"
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE
+            minLines = 4
+            gravity = Gravity.TOP or Gravity.START
+            setText(cur?.text ?: Prefs.DEFAULT_AI_PROMPT)
+        }
+        val box = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(20), dp(8), dp(20), 0)
+            addView(nameEdit, LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+            addView(textEdit, LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+        }
+        val dialog = AlertDialog.Builder(this)
+            .setTitle(if (cur == null) "新增 Prompt" else "編輯「${cur.name}」")
+            .setView(ScrollView(this).apply { addView(box) })
+            .setPositiveButton("儲存", null)
+            .setNegativeButton("取消", null)
+            .create()
+        dialog.setOnShowListener {
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                val name = nameEdit.text.toString().trim()
+                val text = textEdit.text.toString()
+                if (name.isEmpty()) { toast("請輸入名稱"); return@setOnClickListener }
+                if (text.isBlank()) { toast("Prompt 不可以留空"); return@setOnClickListener }
+                if (prompts.withIndex().any { (j, q) -> j != index && q.name == name }) {
+                    toast("已有名為「$name」的 Prompt"); return@setOnClickListener
+                }
+                if (cur == null) prompts.add(AiPrompt(name, text))
+                else prompts[index] = AiPrompt(name, text)
+                Prefs.setAiPrompts(this, prompts)
+                dialog.dismiss()
+                rebuildAiSection()
+                toast("已儲存「$name」")
+            }
+        }
+        dialog.show()
     }
 
     /**

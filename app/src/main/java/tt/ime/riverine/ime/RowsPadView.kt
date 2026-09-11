@@ -12,6 +12,12 @@ abstract class RowsPadView(context: Context) : KeyboardBaseView(context) {
     protected abstract fun rows(): List<List<Key>>
 
     /**
+     * 而家排緊幾多行（英文開咗數字行就 5 行、符號頁 5 行、純數字 4~5 行）。
+     * 上面條 bar 要知一行鍵幾高先定得到自己幾粗（見 `OptionBarsView.keyRowHeightPx`）。
+     */
+    val rowCount: Int get() = rows().size
+
+    /**
      * 攞邊套大細／字體設定。英文同符號自成一套（[PadGroup.LATIN]），
      * 純數字 keypad 就跟返中文九宮格（見 [NumberPadView]）。
      */
