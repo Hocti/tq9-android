@@ -3,10 +3,10 @@ package tt.ime.riverine.ime
 import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Color
-import android.graphics.Paint
 import android.graphics.Rect
 import android.graphics.drawable.GradientDrawable
 import android.text.TextPaint
+import android.text.TextUtils
 import android.util.TypedValue
 import android.view.Gravity
 import android.view.View
@@ -65,6 +65,21 @@ class CandFlowView(context: Context) : ViewGroup(context) {
 
     private var items: List<String> = emptyList()
 
+    /**
+     * **第一行**右邊要留低幾多 px 唔擺字（其餘行照用盡）。
+     *
+     * 拉大咗嗰版右上角浮住粒 ▲（[OptionBarsView] 個 `collapseBtn`）—— 唔留個位
+     * 俾佢，第一行最尾嗰隻字就會俾佢冚住，撳都撳唔到（2026-09-13 user 要求）。
+     * 側邊欄冇嗰粒掣，所以一路係 0。
+     */
+    var firstRowInsetRight = 0
+        set(v) {
+            if (field == v) return
+            field = v
+            builtForWidth = -1
+            requestLayout()
+        }
+
     // ---- 一粒 chip 個樣（[applyStyle] 設定）--------------------------------
 
     private var textSp = 0f
@@ -72,8 +87,18 @@ class CandFlowView(context: Context) : ViewGroup(context) {
     private var textColor = Color.BLACK
     private var faceColor = Color.WHITE
 
-    /** 淨係攞嚟度字闊 —— 高度一定要問真 `TextView`，點解見 [CandChip] */
-    private val probe = TextPaint(Paint.ANTI_ALIAS_FLAG)
+    /**
+     * 度字闊用嘅 chip **樣本**：永遠唔會擺出嚟，淨係借佢個 [TextPaint]（[probe]）。
+     *
+     * 一定要用**真 chip 嗰個 paint**，唔可以自己 `TextPaint(ANTI_ALIAS_FLAG)` 度
+     * （2026-09-13 user 報「expand 之後兩個字嘅詞少咗一個字」）：自己開嗰個冇咗
+     * `TextView` 嗰套 locale／flag，CJK 度出嚟窄過真正排版嗰陣嘅闊度，
+     * 個 chip 就會度到啱啱唔夠位，`StaticLayout` 喺兩隻字中間斷行 ——
+     * 第二隻字跌咗落第二行，而 chip 得一行咁高，所以睇落似「少咗一個字」。
+     */
+    private val probeChip = TextView(context)
+
+    private val probe: TextPaint get() = probeChip.paint
 
     // ---- 排好嘅版（[buildRows] 計，唔使起 view）-----------------------------
 
@@ -145,8 +170,8 @@ class CandFlowView(context: Context) : ViewGroup(context) {
         this.chip = chip
         this.textColor = textColor
         this.faceColor = faceColor
-        probe.textSize =
-            TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, textSp, resources.displayMetrics)
+        // 樣本同真 chip 一模一樣咁 style，[probe] 度出嚟先同排版嗰陣一致
+        styleChip(probeChip, textSp, chip, textColor, faceColor)
         removeAllViewsInLayout()
         active.clear()
         scrap.clear()
@@ -177,7 +202,10 @@ class CandFlowView(context: Context) : ViewGroup(context) {
         rowCount = 0
         if (n == 0) return
 
-        val avail = (width - paddingLeft - paddingRight).coerceAtLeast(minW)
+        val full = (width - paddingLeft - paddingRight).coerceAtLeast(minW)
+        // 第一行右邊留返個位俾粒 ▲（見 [firstRowInsetRight]）
+        fun availOf(row: Int) =
+            (if (row == 0) full - firstRowInsetRight else full).coerceAtLeast(minW)
         var x = 0
         var row = 0
         var placed = false
@@ -191,11 +219,13 @@ class CandFlowView(context: Context) : ViewGroup(context) {
                 rows[i] = row
                 continue
             }
-            val cw = chipWidth(w).coerceAtMost(avail)
-            if (x > 0 && x + cw > avail) {
+            var cw = chipWidth(w).coerceAtMost(availOf(row))
+            if (x > 0 && x + cw > availOf(row)) {
                 row++
                 rowStart.add(i)
                 x = 0
+                // 摺咗落第二行就冇咗嗰個留位，可以擺返闊啲
+                cw = chipWidth(w).coerceAtMost(availOf(row))
             }
             widths[i] = cw
             xs[i] = paddingLeft + x
@@ -210,11 +240,11 @@ class CandFlowView(context: Context) : ViewGroup(context) {
     }
 
     /**
-     * 闊 1px 位鬆容：`TextView` 自己排版同 [probe] 度出嚟可能爭少少，
-     * 度窄咗就會切爛隻字（尤其係 emoji），度闊少少肉眼睇唔出。
+     * 留 [SLACK_DP] 位鬆容：`TextView` 排版嗰陣仲會有 rounding，度窄咗就會斷行
+     * （見 [probeChip]）。度闊咗兩三 px 肉眼根本睇唔出，度窄咗就會少隻字。
      */
     private fun chipWidth(text: String): Int =
-        max(minW, ceil(probe.measureText(text)).toInt() + padH * 2 + 1)
+        max(minW, ceil(probe.measureText(text)).toInt() + padH * 2 + dp(SLACK_DP).roundToInt())
 
     private fun rowTop(row: Int) = paddingTop + row * (chip.chipH + vGap)
 
@@ -319,6 +349,9 @@ class CandFlowView(context: Context) : ViewGroup(context) {
     }
 
     companion object {
+        /** 度字闊之後再加幾多 dp 鬆容（見 [chipWidth]） */
+        private const val SLACK_DP = 2f
+
         /**
          * 一粒關聯字 chip 個樣。條 bar 收埋嗰行（[OptionBarsView] 個 `strip`）同
          * 呢度攤開嗰版一模一樣，所以擺喺呢度寫一次兩邊共用。
@@ -326,6 +359,10 @@ class CandFlowView(context: Context) : ViewGroup(context) {
         fun styleChip(v: TextView, textSp: Float, chip: CandChip, textColor: Int, faceColor: Int) {
             v.textSize = textSp
             v.gravity = Gravity.CENTER
+            // 一粒 chip 淨係一行咁高（[CandChip.chipH]）—— 唔鎖死一行嘅話，
+            // 度闊度爭少少就會斷行，第二行喺 chip 外面，睇落似個詞少咗隻字
+            v.maxLines = 1
+            v.ellipsize = TextUtils.TruncateAt.END
             // 熄咗 `includeFontPadding`，再用 [CandChip] 計出嚟嗰個**唔對稱** padding
             // —— 兩樣都要，個字先至真係睇落上下置中（點解見 [CandChip]）
             v.includeFontPadding = false

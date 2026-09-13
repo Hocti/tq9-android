@@ -33,8 +33,8 @@ android {
         applicationId = "tt.ime.riverine"
         minSdk = 26
         targetSdk = 36
-        versionCode = 73
-        versionName = "2.2.11"
+        versionCode = 78
+        versionName = "2.2.16"
     }
 
     signingConfigs {
@@ -64,6 +64,13 @@ android {
         release {
             isMinifyEnabled = false
             signingConfig = signingConfigs.getByName(if (useUploadKey) "upload" else "release")
+        }
+        // 加咗 `-Ptt.upload` 嘅話，`installDebug` 都跟住用返上架嗰條 key，
+        // 咁樣先可以喺已經裝咗 upload key 簽嘅版本上面直接 update，唔使 uninstall。
+        if (useUploadKey) {
+            debug {
+                signingConfig = signingConfigs.getByName("upload")
+            }
         }
     }
 

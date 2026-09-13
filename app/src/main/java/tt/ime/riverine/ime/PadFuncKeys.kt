@@ -16,6 +16,7 @@ fun PadFunc.action(): KeyAction = when (this) {
     PadFunc.RELATE -> KeyAction.RELATE
     PadFunc.EMOJI -> KeyAction.TO_EMOJI
     PadFunc.PASTE -> KeyAction.PASTE
+    PadFunc.COPY -> KeyAction.COPY
     PadFunc.STT -> KeyAction.STT
     PadFunc.AI -> KeyAction.AI
     PadFunc.HOMO -> KeyAction.HOMO
@@ -37,6 +38,7 @@ fun PadFunc.action(): KeyAction = when (this) {
     // （見 `OptionBarsView.handleSizeDrag`），所以淨係工具列擺得，
     // 亦都淨係喺嗰度接駁（見 `PadFunc.place`）
     PadFunc.ALIGN -> KeyAction.NOOP
+    PadFunc.TO_CJK -> KeyAction.TO_CHINESE
 }
 
 /**

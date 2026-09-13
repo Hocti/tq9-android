@@ -123,10 +123,30 @@ class SettingsActivity : AppCompatActivity() {
             PadFunc.SHORTCUT, PadFunc.SC_TOGGLE, PadFunc.RELATE, PadFunc.EMOJI,
             PadFunc.PASTE, PadFunc.STT, PadFunc.AI, PadFunc.NONE,
         )
+
+        /**
+         * 連按「一般」分頁三下先至再次顯示嘅「進階隱藏設定」（見
+         * [Prefs.showAdvancedSettings]、[countGeneralTabTap]）。一般人用唔著，
+         * 一次過收埋唔逐項揀，避免第一次打開設定頁就俾一大堆較少用嘅選項嚇親：
+         *
+         *  - 「字碼資料庫」「筆形提示圖」成節
+         *  - 「鍵盤大小」成節（字體大小／邊框粗細——長寬已經改喺鍵盤上直接拖）
+         *  - 滑動輸入嗰兩條「停留時間」「轉角」slider
+         *  - 「其他」節嘅「按鍵按下時的效果」同「長按時間」
+         *  - 「顯示目前已輸入碼」開關
+         *  - debug build 先有嘅「記錄輸入過程 (logcat)」
+         *
+         * 同 [SHOW_HIDDEN_OPTIONS] / [SHOW_LEGACY_KEY_OPTIONS] 唔同：呢個唔係
+         * 編譯時開關，而係存喺 pref、user 自己連按分頁解鎖，解鎖後所有裝置設定頁
+         * 都一齊出返（`Prefs.showAdvancedSettings`）。
+         */
     }
 
     private lateinit var content: LinearLayout
+    private lateinit var generalPane: LinearLayout
     private lateinit var aiContent: LinearLayout
+    /** 連按「一般」分頁幾多下（見 [countGeneralTabTap]），第三下就切換「進階隱藏設定」 */
+    private var generalTabTaps = 0
     private var preview: ChinesePadView? = null
     private var previewHolder: FrameLayout? = null
     private var dbLabelView: TextView? = null
@@ -216,7 +236,7 @@ class SettingsActivity : AppCompatActivity() {
             ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
         setContentView(root)
 
-        val generalPane = LinearLayout(this).apply {
+        generalPane = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(16), dp(16), dp(16), dp(24))
         }
@@ -236,7 +256,33 @@ class SettingsActivity : AppCompatActivity() {
         pages.addView(aiScroll, FrameLayout.LayoutParams(panelLp))
         pages.addView(helpView, FrameLayout.LayoutParams(panelLp))
 
+        rebuildGeneralSection()
+        rebuildAiSection()
+
+        aiScroll.visibility = View.GONE
+        helpView.visibility = View.GONE
+        tabs.addOnTabSelectedListener(object : TabLayout.OnTabSelectedListener {
+            override fun onTabSelected(tab: TabLayout.Tab) {
+                generalScroll.visibility = if (tab.position == 0) View.VISIBLE else View.GONE
+                aiScroll.visibility = if (tab.position == 1) View.VISIBLE else View.GONE
+                helpView.visibility = if (tab.position == 2) View.VISIBLE else View.GONE
+                if (tab.position == 0) countGeneralTabTap() else generalTabTaps = 0
+            }
+            override fun onTabUnselected(tab: TabLayout.Tab) {}
+            override fun onTabReselected(tab: TabLayout.Tab) {
+                if (tab.position == 0) countGeneralTabTap()
+            }
+        })
+    }
+
+    /**
+     * 「一般」頁整個重新畫過 —— 開關「進階隱藏設定」冇得逐項 toggle 個 view，
+     * 索性同 [rebuildAiSection] 一樣成頁重來。
+     */
+    private fun rebuildGeneralSection() {
+        generalPane.removeAllViews()
         content = generalPane
+        funcPickers.clear()
         buildImeSection()
         buildDbSection()
         buildImgSection()
@@ -249,20 +295,20 @@ class SettingsActivity : AppCompatActivity() {
             buildTryBox()
             buildPreview()
         }
+    }
 
-        rebuildAiSection()
-
-        aiScroll.visibility = View.GONE
-        helpView.visibility = View.GONE
-        tabs.addOnTabSelectedListener(object : TabLayout.OnTabSelectedListener {
-            override fun onTabSelected(tab: TabLayout.Tab) {
-                generalScroll.visibility = if (tab.position == 0) View.VISIBLE else View.GONE
-                aiScroll.visibility = if (tab.position == 1) View.VISIBLE else View.GONE
-                helpView.visibility = if (tab.position == 2) View.VISIBLE else View.GONE
-            }
-            override fun onTabUnselected(tab: TabLayout.Tab) {}
-            override fun onTabReselected(tab: TabLayout.Tab) {}
-        })
+    /**
+     * 連按「一般」分頁三下 = 開／關[進階隱藏設定][Prefs.showAdvancedSettings]。
+     * 冇任何畫面提示會教人咁做，純粹俾知道呢招嘅人（自己）隨時解鎖返嚟。
+     */
+    private fun countGeneralTabTap() {
+        generalTabTaps++
+        if (generalTabTaps < 3) return
+        generalTabTaps = 0
+        val next = !Prefs.showAdvancedSettings(this)
+        Prefs.setShowAdvancedSettings(this, next)
+        rebuildGeneralSection()
+        toast(if (next) "已顯示進階設定" else "已隱藏進階設定")
     }
 
     /**
@@ -327,6 +373,7 @@ class SettingsActivity : AppCompatActivity() {
     }
 
     private fun buildDbSection() {
+        if (!Prefs.showAdvancedSettings(this)) return
         header("字碼資料庫")
         dbLabelView = note("目前使用：" + Prefs.dbLabel(this))
         note("選取的 sqlite 會立即覆蓋現有資料庫，須有 mapped_table、" +
@@ -366,6 +413,7 @@ class SettingsActivity : AppCompatActivity() {
      * 「還原」則刪除該檔案（見 [StrokeImages]）。
      */
     private fun buildImgSection() {
+        if (!Prefs.showAdvancedSettings(this)) return
         header("筆形提示圖")
         imgLabelView = note(imgStatusText())
         note("九宮格的 90 格筆形提示由同一幅圖切出：橫切 9 份、直切 10 份，" +
@@ -463,6 +511,7 @@ class SettingsActivity : AppCompatActivity() {
      * `TTInputMethodService.onCycleAlign` 也仍在使用。
      */
     private fun buildSizeSection() {
+        if (!Prefs.showAdvancedSettings(this)) return
         header("鍵盤大小")
         note("高度與寬度請直接在鍵盤上調整：拖動工具列最左的按鍵，上下改高度、左右改寬度，" +
             "長按則可一次拉至最寬。按一下同一個鍵，可切換配置方式（拉寬、靠左、靠右）。")
@@ -554,9 +603,13 @@ class SettingsActivity : AppCompatActivity() {
             "九宮格 1~9、兩格寬的 0 與「取消」是三三的打法本身，不能改動。")
         note("由下面的按鍵池往上拖 = 加一顆（池裡不會減少）；格子與格子互拖 = 兩格對調；" +
             "拖回池裡 = 清走那一格。格子太小拖不準，按一下它也可以直接選。")
-        note("Eng、空格、刪除、換行／送出、轉換工具列這五顆一定要留在左右兩欄，" +
-            "不能放進工具列；空格、刪除、換行只能放短按，放了之後同一格的長按會停用；" +
-            "「改變大小」相反，只能放在工具列（要在那顆按鍵上直接拖才拉得動鍵盤大小）。")
+        note("空格、刪除、換行／送出、轉換工具列這四顆只能放在左右兩欄，不能放進工具列；" +
+            "空格、刪除、換行只能放短按，放了之後同一格的長按會停用；" +
+            "「改變大小」與「中文鍵盤」相反，只能放在工具列" +
+            "（「改變大小」要在那顆按鍵上直接拖才拉得動鍵盤大小）。")
+        note("四顆轉鍵盤的（Eng、?123 符號、123 純數字、中文鍵盤）兩邊都可以放" +
+            "（「中文鍵盤」只能放工具列），但 Eng 一定要有一顆留在左右兩欄 —— " +
+            "工具列收起來時就只剩鍵盤本身那顆切換得回英文。")
         note("左右兩欄之間不可以有重複的按鍵，工具列本身也不可以；" +
             "但同一顆可以同時出現在工具列與左右兩欄。")
 
@@ -570,10 +623,12 @@ class SettingsActivity : AppCompatActivity() {
         note("鍵面左上角的小字（或小圖案）就是長按會做的事。「同音」鍵左下角另有即時提示：" +
             "正在輸入的字碼、正在查詢哪個字的同音，或該字本身的正常打法。")
 
-        switch("顯示目前已輸入碼", Prefs.KEY_SHOW_CURR_CODE, true)
-        note("開啟後，輸入字碼時「同音」鍵左下角會寫出目前已按的碼（1 → 12 → 123），" +
-            "選完字或取消後就會消失。它與上述另外兩種提示共用同一位置，" +
-            "極少同時出現，真的撞在一起時以正在輸入的字碼為準。")
+        if (Prefs.showAdvancedSettings(this)) {
+            switch("顯示目前已輸入碼", Prefs.KEY_SHOW_CURR_CODE, true)
+            note("開啟後，輸入字碼時「同音」鍵左下角會寫出目前已按的碼（1 → 12 → 123），" +
+                "選完字或取消後就會消失。它與上述另外兩種提示共用同一位置，" +
+                "極少同時出現，真的撞在一起時以正在輸入的字碼為準。")
+        }
 
         note("九宮格 1~9 按下即出碼，不必等放開手指，長按等於連按兩下。" +
             "選字狀態、以及關閉滑動輸入後開了「長按 1~9 開速選字表」而未輸入字碼時例外，" +
@@ -602,7 +657,7 @@ class SettingsActivity : AppCompatActivity() {
 
     /**
      * 選字內容達兩頁時，底行佔兩格寬的 `0` 鍵會如何變化（見 [PagerLayout]）。
-     * 四種排法在 `ChinesePadView` 實作，此處只負責選擇。
+     * 五種排法在 `ChinesePadView` 實作，此處只負責選擇。
      *
      * 排在「按鍵排位」下面是有原因的：選了 [PagerLayout.NO_CHANGE]（0 鍵維持原樣）
      * 之後，翻頁就要靠上面那個介面拖一顆「下頁」／「上頁」出來。
@@ -630,6 +685,9 @@ class SettingsActivity : AppCompatActivity() {
             PagerLayout.WIDE_NEXT ->
                 "0 鍵維持兩格寬，整顆是「下頁」（較容易按中），長按為「上頁」。" +
                 "選字期間長按 0 的成對標點會暫停，頁數改在右上角，離開選字即回復。"
+            PagerLayout.WIDE_NEXT_LEFT_PREV ->
+                "0 鍵維持兩格寬且整顆是「下頁」，「上頁」則在選字翻頁期間借用左下角那顆鍵。" +
+                "長按 0 的成對標點與左上角頁數都保持原樣，離開選字左下角即回復原本功能。"
             PagerLayout.NO_CHANGE ->
                 "0 鍵完全不變樣：仍是兩格寬，長按仍是成對標點。選字時按下去照樣翻下一頁，" +
                 "只是不會為了翻頁而改動排位。想要一顆明確的「下頁」／「上頁」，" +
@@ -997,15 +1055,18 @@ class SettingsActivity : AppCompatActivity() {
             "中間經過的格子會依停留時間、轉向角度與字碼表的使用頻率一併判斷。")
         note("開啟滑動輸入時，「長按 1~9 開速選字表」不能同時使用（該選項會收起）。")
         // 「停留」與「轉角」2026-08-29 隱藏過（一般人不需要進行如此細緻的調整），
-        // 2026-08-31 應 使用者要求重新顯示做 debug 測試用
-        slider("停留多久當作按下", 60, 400, Prefs.swipeDwellMs(this).toInt(), "ms") { v ->
-            Prefs.sp(this).edit().putInt(Prefs.KEY_SWIPE_DWELL, v).apply()
+        // 2026-08-31 應 使用者要求重新顯示做 debug 測試用，
+        // 2026-09-13 併入「進階隱藏設定」（連按「一般」分頁三下先顯示）
+        if (Prefs.showAdvancedSettings(this)) {
+            slider("停留多久當作按下", 60, 400, Prefs.swipeDwellMs(this).toInt(), "ms") { v ->
+                Prefs.sp(this).edit().putInt(Prefs.KEY_SWIPE_DWELL, v).apply()
+            }
+            slider("轉多少度當作轉角", 25, 110, Prefs.swipeAngleDeg(this).toInt(), "°") { v ->
+                Prefs.sp(this).edit().putInt(Prefs.KEY_SWIPE_ANGLE, v).apply()
+            }
+            note("這兩項是滑動途中判斷「這格到底有沒有按過」的門檻，" +
+                "調整後可觀察滑動出碼的鬆緊，一般不必改動。")
         }
-        slider("轉多少度當作轉角", 25, 110, Prefs.swipeAngleDeg(this).toInt(), "°") { v ->
-            Prefs.sp(this).edit().putInt(Prefs.KEY_SWIPE_ANGLE, v).apply()
-        }
-        note("這兩項是滑動途中判斷「這格到底有沒有按過」的門檻，" +
-            "調整後可觀察滑動出碼的鬆緊，一般不必改動。")
     }
 
     /**
@@ -1082,11 +1143,14 @@ class SettingsActivity : AppCompatActivity() {
         }
         note("工具列固定顯示。切換「關聯字 ⇄ 工具」靠一顆「轉換工具列」按鍵，" +
             "預設在鍵盤右欄最上，位置可以在「按鍵排位」自行調整。")
-        val pressEffects = KeyPressEffect.entries.toList()
-        enumPicker("按鍵按下時的效果", pressEffects.map { it.label },
-            pressEffects.indexOf(Prefs.keyPressEffect(this))) { i ->
-            Prefs.setKeyPressEffect(this, pressEffects[i])
-            rebuildPreview()
+        // 「按鍵按下時的效果」2026-09-13 併入「進階隱藏設定」（連按「一般」分頁三下先顯示）
+        if (Prefs.showAdvancedSettings(this)) {
+            val pressEffects = KeyPressEffect.entries.toList()
+            enumPicker("按鍵按下時的效果", pressEffects.map { it.label },
+                pressEffects.indexOf(Prefs.keyPressEffect(this))) { i ->
+                Prefs.setKeyPressEffect(this, pressEffects[i])
+                rebuildPreview()
+            }
         }
         slider("按鍵震動", 0, Prefs.MAX_VIBRATE_LEVEL, Prefs.vibrateLevel(this), "",
             format = { Prefs.vibrateLevelLabel(it) }) { v ->
@@ -1102,8 +1166,12 @@ class SettingsActivity : AppCompatActivity() {
             "與按鍵聲是兩件事。拉到「關閉」就完全不出聲。")
         note("0 為關閉，1 最輕，2、3 震幅同時間都加大。放手時會震一下讓你試效果。")
         switch("按鍵聲音", Prefs.KEY_SOUND, false)
-        slider("長按時間", 200, 700, Prefs.longPressMs(this).toInt(), "ms", step = 10) { v ->
-            Prefs.sp(this).edit().putInt(Prefs.KEY_LONG_PRESS_MS, v).apply()
+        // 「長按時間」2026-09-13 併入「進階隱藏設定」（連按「一般」分頁三下先顯示）；
+        // 下面那段說明講嘅係「長按有咩用」，同條 slider 無關，所以照舊常駐顯示。
+        if (Prefs.showAdvancedSettings(this)) {
+            slider("長按時間", 200, 700, Prefs.longPressMs(this).toInt(), "ms", step = 10) { v ->
+                Prefs.sp(this).edit().putInt(Prefs.KEY_LONG_PRESS_MS, v).apply()
+            }
         }
         note("長按 0 = 成對標點（「」之類）；長按「同音」= 關聯字；" +
             "長按工具列的「貼上」= 剪貼簿記錄；長按 1~9 = 連按兩下。純數字鍵盤沒有長按。")
@@ -1120,7 +1188,8 @@ class SettingsActivity : AppCompatActivity() {
         // （2026-09-09 使用者要求）：正式版的人開了它只會白白把自己打的字寫進
         // logcat。pref 與 `InputLog` 一行都沒有刪，release 版仍可以用
         // `adb shell setprop log.tag.TTInput DEBUG` 打開，見 AGENTS.md。
-        if (BuildConfig.DEBUG) {
+        // 2026-09-13 再併入「進階隱藏設定」——debug build 都要先連按「一般」三下。
+        if (BuildConfig.DEBUG && Prefs.showAdvancedSettings(this)) {
             switch("記錄輸入過程 (logcat)", Prefs.KEY_INPUT_LOG, false) {
                 // 設定頁與 IME service 同一個 process，寫一次立即生效 ——
                 // 不用等 `onStartInputView` 重新讀（那句照留，保持開啟鍵盤改設定時先要）
@@ -1280,6 +1349,7 @@ class SettingsActivity : AppCompatActivity() {
                 override val optionOn: Boolean
                     get() = Prefs.barMode(this@SettingsActivity) != BarMode.OFF
                 override val aiReady: Boolean get() = false
+                override val copyReady: Boolean get() = false
             }
             host = object : KeyboardBaseView.Host {
                 override fun onKey(key: Key) {}

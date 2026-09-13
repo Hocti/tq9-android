@@ -7,8 +7,12 @@ package tt.ime.riverine.core
  * 嘅一部分（撳落去即刻打字／換頁），工具列嗰行係鍵盤上面條 bar（撳落去多數
  * 係開第二樣嘢）。有幾個功能兩邊都擺得，但有兩類唔得：
  *
- *  - [SIDE_ONLY]：`Eng`、`␣`、`⌫`、`⏎`、`⇄` —— 打字必用，冇咗就打唔到字。
+ *  - [SIDE_ONLY]：`␣`、`⌫`、`⏎`、`⇄` —— 打字必用，冇咗就打唔到字。
  *    條 bar 收埋咗（窄螢幕變側邊欄）就會搵唔到，所以一定要釘死喺鍵盤本體。
+ *    **四粒轉鍵盤嘅（`Eng`／`?123`／`123`／`中`）全部唔喺呢類**（2026-09-13
+ *    user 要求）：佢哋做嘅嘢都係「轉去另一個鍵盤」，同工具列本來就擺得嘅
+ *    [TO_CJK] 一模一樣，冇理由淨得轉返中文擺得。`Eng` 照樣係 [required]，
+ *    所以擺咗落工具列都一定仲有一個喺左右欄，條 bar 收埋咗都返得返英文。
  *  - [TOOL_ONLY]：「改變大小」—— 佢唔係撳一下就算，要**喺粒掣度直接拖**
  *    （上下拉高低、左右拉闊窄，見 `OptionBarsView.handleSizeDrag`）。
  *    九宮格啲鍵行嘅係 `KeyboardBaseView` 嗰套（撳落即出、滑動輸入…），
@@ -72,9 +76,15 @@ enum class PadFunc(
     // ---- 2.x 開始可以自由擺位嗰批 ----
     /** 短撳開關同音；長撳做乜就睇同一個位嘅長撳格 */
     HOMO("同音", "同音", FuncPlace.SIDE_ONLY),
-    TO_LATIN("英文鍵盤", "Eng", FuncPlace.SIDE_ONLY, required = true),
-    TO_SYMBOL("符號鍵盤", "?123", FuncPlace.SIDE_ONLY),
-    TO_NUMBER("純數字鍵盤", "123", FuncPlace.SIDE_ONLY),
+    /**
+     * 工具列都擺得（見 [FuncPlace]）。[required] 淨係管左右欄 ——
+     * 擺落工具列唔算數，所以一定仲有一粒 `Eng` 喺鍵盤本體度。
+     */
+    TO_LATIN("英文鍵盤", "Eng", required = true),
+    /** 同 [TO_LATIN] 一樣，工具列都擺得 */
+    TO_SYMBOL("符號鍵盤", "?123"),
+    /** 同 [TO_LATIN] 一樣，工具列都擺得 */
+    TO_NUMBER("純數字鍵盤", "123"),
     SPACE("空格", "␣", FuncPlace.SIDE_ONLY, required = true, tapOnly = true),
     BACKSPACE("刪除", "⌫", FuncPlace.SIDE_ONLY, required = true, tapOnly = true),
     ENTER("換行／送出", "⏎", FuncPlace.SIDE_ONLY, required = true, tapOnly = true),
@@ -89,12 +99,27 @@ enum class PadFunc(
     PREV_PAGE("上頁", "上頁"),
 
     // ---- 編輯個欄嗰批：唔關輸入法事，一律叫個欄自己做（見 `PadFuncKeys.action`）----
+    /**
+     * 有揀字就複製揀住嗰段；冇揀就複製成個輸入框。個欄一隻字都冇（冇揀亦都
+     * 冇字可複製）就撳唔到，見 `ChinesePadView.ChineseHost.copyReady`。
+     */
+    COPY("複製", "複製"),
     SELECT_ALL("全選", "全選"),
     UNDO("復原", "復原"),
     REDO("重做", "重做"),
 
     /** 撳一下轉顯示方式、喺粒掣度直接拖就拉大細（所以擺唔入九宮格，見 [FuncPlace]） */
-    ALIGN("改變大小", "", FuncPlace.TOOL_ONLY);
+    ALIGN("改變大小", "", FuncPlace.TOOL_ONLY),
+
+    /**
+     * 轉返中文九宮格。英文／符號／純數字鍵盤本身一律已經有粒寫死嘅「中」
+     * （`KeyAction.TO_CHINESE`，見 `LatinPadView`／`SymbolPadView`／`NumberPadView`），
+     * 呢個係俾條工具列都揀得返呢個功能——工具列喺邊個鍵盤都會出（見
+     * `TTInputMethodService.refreshBars`），所以擺喺度就轉得返中文，
+     * 唔使淨係靠嗰粒寫死嘅鍵。中文九宮格本身已經係中文，擺落去冇意思，
+     * 所以同「改變大小」一樣淨係工具列擺得（見 [FuncPlace]）。
+     */
+    TO_CJK("中文鍵盤", "中", FuncPlace.TOOL_ONLY);
 
     val sideOk: Boolean get() = place != FuncPlace.TOOL_ONLY
     val toolOk: Boolean get() = place != FuncPlace.SIDE_ONLY

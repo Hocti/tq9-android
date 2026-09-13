@@ -346,6 +346,8 @@ class KeyLayoutEditor(
         !f.toolOk -> "「${f.label}」只能放在鍵盤左右兩欄，不能放進工具列。"
         !f.sideOk -> "「${f.label}」只能放在工具列。"
         f.tapOnly -> "「${f.label}」只能放在短按那一行，放了之後同一格不會有長按格。"
+        // `Eng`：兩邊都放得，但左右兩欄一定要留一個（見 `PadFunc.required`）
+        f.required -> "「${f.label}」左右兩欄與工具列都可以放，但左右兩欄一定要留一個。"
         else -> "「${f.label}」左右兩欄與工具列都可以放。"
     }
 

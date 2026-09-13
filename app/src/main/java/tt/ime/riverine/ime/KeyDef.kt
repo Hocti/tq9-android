@@ -7,7 +7,7 @@ enum class KeyAction {
     SC_TOGGLE,    // 簡體輸出開關
     HOMO,         // 同音 toggle（長撳做乜由設定頁話事，預設 [RELATE]）
     RELATE,       // 游標前面嗰隻字嘅關聯字（TTCmd.RELATE）
-    PREV_PAGE,    // 選字上一頁（淨係選字模式、夠兩頁先出現喺 0 隔籬）
+    PREV_PAGE,    // 選字上一頁（淨係選字模式、夠兩頁先出現喺 0 隔籬或者左下角）
     /**
      * 選字下一頁。撳兩格闊嗰粒 `0` 一路都做得到（`TTEngine.press(0)`），
      * 呢粒係俾人擺粒實牙實齒嘅「下頁」落左右欄用 —— 見
@@ -20,6 +20,12 @@ enum class KeyAction {
     TO_NUMBER,
     TO_EMOJI,     // 開 emoji 表
     PASTE,        // 貼上（長撳 = clipboard 歷史）
+    /**
+     * 複製：有揀字就複製揀住嗰段（`android.R.id.copy`），冇揀就複製成個輸入框
+     * （見 `TTInputMethodService.copy`）。個欄一隻字都冇就撳唔到
+     * （`ChinesePadView.ChineseHost.copyReady`，同 [AI] 個 `aiReady` 一樣做法）。
+     */
+    COPY,
     /**
      * 全選：叫個欄自己做（`android.R.id.selectAll`），唔係我哋自己數字數。
      */

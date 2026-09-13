@@ -8,6 +8,7 @@ import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
+import android.widget.FrameLayout
 import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
 import android.widget.ScrollView
@@ -23,8 +24,13 @@ import kotlin.math.max
 import kotlin.math.roundToInt
 
 /**
- * 鍵盤上面嗰條 bar。**兩行**：關聯字（[candLine]）喺上、工具（[toolLine]）喺下，
- * 邊行見得到就睇 [BarMode]（2026-09-11 user 要求兩樣可以一齊出）：
+ * 鍵盤上面嗰條 bar。**兩行**：工具（[toolLine]）喺上、關聯字（[candLine]）喺下，
+ * 邊行見得到就睇 [BarMode]（2026-09-11 user 要求兩樣可以一齊出）。
+ *
+ * 上下次序係 2026-09-13 調轉嘅：本來關聯字喺上，但係窄螢幕嗰個側邊欄
+ * （[SidePanelView]）一路都係**工具喺上、關聯字喺下**，兩個排法唔一樣，
+ * 打橫打直換來換去就要重新搵過粒掣喺邊。而家兩邊一樣 —— 關聯字永遠係最貼近
+ * 鍵盤嗰行（揀字嗰下手指行得最短），工具釘喺最上。
  *
  *  [BarMode.CANDIDATES] 淨係關聯字。選字／關聯字太多揀唔晒就撳右邊嗰粒 ▼ 拉大——
  *                        向下遮住成個鍵盤本身（[expandedView]），唔會加高成個 UI
@@ -34,11 +40,11 @@ import kotlin.math.roundToInt
  *  [BarMode.BOTH]       兩行一齊（條 bar 因此**真係高一倍**）
  *  [BarMode.OFF]        成條 bar 唔見（host 自己 `GONE` 佢），淨係闊 screen 入得到
  *
- * 切換掣（`⇄`，[Listener.onSwitchView]）喺頭三段之間轉。佢**擺喺最底嗰行最左**：
+ * 切換掣（`⇄`，[Listener.onSwitchView]）喺頭三段之間轉。佢**跟住工具嗰行走**：
  * 有工具嗰行就喺工具嗰行，淨係得關聯字嗰陣就搬去關聯字嗰行（[refreshLeftBtn]）——
  * 兩行一齊嗰陣關聯字嗰行就冇咗粒掣，成行讓晒俾啲字。
  *
- * emoji 表／剪貼簿開住嗰陣，工具嗰行最左嗰粒位讓返俾 ✖（[setCloseVisible]），
+ * 剪貼簿／AI prompt 嗰啲 overlay 開住嗰陣，工具嗰行最左嗰粒位讓返俾 ✖（[setCloseVisible]），
  * 唔會同切換掣同時出現。每行都係**得一行**，而且兩行一樣高（見 [applyBarSize]），
  * 所以喺頭兩段之間轉唔會令個鍵盤跳高跳低。
  */
@@ -87,7 +93,7 @@ class OptionBarsView(context: Context) : LinearLayout(context) {
         fun onSttHoldStart(): Boolean
         /** 放開 🎤。冇喺「撳實錄音」狀態就乜都唔做。 */
         fun onSttHoldEnd()
-        /** ✖：由 emoji 表／剪貼簿返去普通鍵盤 */
+        /** ✖：由剪貼簿／AI prompt 嗰啲 overlay 返去普通鍵盤（emoji 表嗰粒喺佢自己個 header） */
         fun onCloseSpecialPad()
         /** 最左嗰粒切換掣：喺關聯字／工具兩個 view 之間切 */
         fun onSwitchView()
@@ -124,6 +130,7 @@ class OptionBarsView(context: Context) : LinearLayout(context) {
     private val sizeBtn: TextView? get() = btnOf(PadFunc.ALIGN)
     private val sttBtn: TextView? get() = btnOf(PadFunc.STT)
     private val aiBtn: TextView? get() = btnOf(PadFunc.AI)
+    private val copyBtn: TextView? get() = btnOf(PadFunc.COPY)
 
     private val closeBtn = TextView(context)
     private val switchBtn = TextView(context)
@@ -133,14 +140,22 @@ class OptionBarsView(context: Context) : LinearLayout(context) {
     private val strip = LinearLayout(context)
     private val scroller = HorizontalScrollView(context)
     private val expandedScroll = ScrollView(context)
+    /**
+     * 拉大咗嗰版嘅外殼：[expandedScroll] 鋪滿，右上角**浮住**粒 ▲（[collapseBtn]）。
+     *
+     * 拉大嗰陣成塊嘢連條 bar 都蓋埋（見 [Listener.onExpandChanged]），
+     * 條 bar 嗰粒 [expandBtn] 已經俾佢遮住撳唔到，所以呢度要自己有粒收返埋嘅掣。
+     */
+    private val expandedBox = FrameLayout(context)
+    private val collapseBtn = TextView(context)
     private val flow = CandFlowView(context)
     private val candRow = LinearLayout(context)
     /** 工具掣嗰行（每粒鎖死闊度，擺唔晒就 [toolScroll] 打橫捲，見 [ToolStrip]） */
     private val toolRow = ToolStrip(context)
     private val toolScroll = HorizontalScrollView(context)
-    /** 關聯字嗰行（連埋最左嗰粒掣）—— 擺喺 [toolLine] **上面** */
+    /** 關聯字嗰行（連埋最左嗰粒掣）—— 擺喺 [toolLine] **下面**，貼實個鍵盤 */
     private val candLine = LinearLayout(context)
-    /** 工具嗰行（連埋最左嗰粒 ✖／⇄） */
+    /** 工具嗰行（連埋最左嗰粒 ✖／⇄）—— 兩行一齊嗰陣喺最上 */
     private val toolLine = LinearLayout(context)
 
     /**
@@ -162,6 +177,7 @@ class OptionBarsView(context: Context) : LinearLayout(context) {
     private var expanded = false
     private var mode = BarMode.CANDIDATES
     private var aiReady = false
+    private var copyReady = false
     private var sttActive = false
     private var closeVisible = false
     /** 見 [setSwitchVisible] */
@@ -218,7 +234,7 @@ class OptionBarsView(context: Context) : LinearLayout(context) {
             setOnClickListener { listener?.onCloseSpecialPad() }
         }
         // 最底嗰行最左永遠有粒切換掣：關聯字 → 工具 → 兩行一齊，一路撳落去。
-        // emoji 表／剪貼簿開住嗰陣冇位俾佢（要留返俾 ✖ 返去普通鍵盤），
+        // overlay 開住嗰陣冇位俾佢（要留返俾 ✖ 返去普通鍵盤），
         // 同 ✖ 共用同一個位，一次淨係得一粒見到（見 [refreshLeftBtn]）
         for (b in listOf(switchBtn, candSwitchBtn)) b.apply {
             text = "⇄"
@@ -232,7 +248,7 @@ class OptionBarsView(context: Context) : LinearLayout(context) {
         scroller.isHorizontalScrollBarEnabled = false
         scroller.addView(strip, LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.MATCH_PARENT))
 
-        flow.setPadding(dp(4f).toInt(), dp(4f).toInt(), dp(4f).toInt(), dp(4f).toInt())
+        dp(FLOW_PAD_DP).roundToInt().let { flow.setPadding(it, it, it, it) }
         // 攤開嗰版揀完一隻就即刻收返埋 —— 出咗字之後成版關聯字已經換晒，
         // 冇理由仲霸住成個鍵盤等 user 自己撳多次 ▲ 先見返啲鍵
         flow.onPick = { i ->
@@ -241,12 +257,27 @@ class OptionBarsView(context: Context) : LinearLayout(context) {
         }
         expandedScroll.addView(flow, ViewGroup.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
-        // 唔加入 `this` —— 拉大嗰陣係 host 攞 expandedView 去蓋喺鍵盤度（向下遮），
-        // 唔係喺呢條 bar 自己度攤開拉高成條 bar（以前會累個鍵盤跟住跳高）
+        collapseBtn.apply {
+            text = "▲"
+            gravity = Gravity.CENTER
+            textSize = 15f
+            contentDescription = "收起關聯字"
+            setOnClickListener { setExpanded(false) }
+        }
+        // 粒 ▲ 擺喺個 scroll **之上**（唔跟住捲）—— 捲到去邊都收得返埋
+        expandedBox.addView(expandedScroll, FrameLayout.LayoutParams(
+            FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT))
+        expandedBox.addView(collapseBtn, FrameLayout.LayoutParams(0, 0).also {
+            it.gravity = Gravity.TOP or Gravity.END
+        })
+        refreshCollapseBtn()
+        // [expandedBox] 唔加入 `this` —— 拉大嗰陣係 host 攞 expandedView 去蓋喺
+        // 成個鍵盤度，唔係喺呢條 bar 自己度攤開拉高成條 bar（以前會累個鍵盤跟住跳高）
 
         candRow.orientation = HORIZONTAL
         candRow.addView(scroller, LayoutParams(0, LayoutParams.MATCH_PARENT, 1f))
-        candRow.addView(expandBtn, LayoutParams(dp(38f).roundToInt(), LayoutParams.MATCH_PARENT))
+        candRow.addView(expandBtn,
+            LayoutParams(dp(EXPAND_BTN_DP).roundToInt(), LayoutParams.MATCH_PARENT))
 
         // 罅全部由粒掣自己嘅 margin 出（同啲鍵一樣），呢度唔再加 padding
         toolRow.setPadding(0, 0, 0, 0)
@@ -260,20 +291,16 @@ class OptionBarsView(context: Context) : LinearLayout(context) {
         toolScroll.addView(toolRow, LayoutParams(
             LayoutParams.WRAP_CONTENT, LayoutParams.MATCH_PARENT))
 
-        // 兩行各自一個 view，**關聯字嗰行喺上**。兩行一樣高、各自 GONE 得，
-        // 所以 [BarMode] 四段全部係呢兩個 visibility 嘅組合（見 [setMode]）
+        // 兩行各自一個 view，**工具嗰行喺上、關聯字嗰行喺下**（同側邊欄一樣，
+        // 見 class doc）。兩行一樣高、各自 GONE 得，所以 [BarMode] 四段全部
+        // 係呢兩個 visibility 嘅組合（見 [setMode]）
         val lineH = CandChip.barHeightPx(context, chip)
         fun btnLp() = LayoutParams(dp(42f).roundToInt(), LayoutParams.MATCH_PARENT).also {
             it.setMargins(gap(), gap(), gap(), gap())
         }
 
-        candLine.orientation = HORIZONTAL
-        candLine.addView(candSwitchBtn, btnLp())
-        candLine.addView(candRow, LayoutParams(0, LayoutParams.MATCH_PARENT, 1f))
-        addView(candLine, LayoutParams(LayoutParams.MATCH_PARENT, lineH))
-
-        // ✖ 擺喺工具嗰行最左（emoji 表／剪貼簿嗰陣一定係 [BarMode.TOOLS]），
-        // emoji 表同剪貼簿一定要有得返去普通鍵盤。同粒 ⇄ 共用個位 —— GONE 嗰粒
+        // ✖ 擺喺工具嗰行最左（overlay 開住嗰陣一定係 [BarMode.TOOLS]），
+        // 剪貼簿嗰類 overlay 一定要有得返去普通鍵盤。同粒 ⇄ 共用個位 —— GONE 嗰粒
         // 唔佔位，所以永遠淨係得一粒喺最左見到
         toolLine.orientation = HORIZONTAL
         toolLine.addView(closeBtn, btnLp())
@@ -281,6 +308,11 @@ class OptionBarsView(context: Context) : LinearLayout(context) {
         toolLine.addView(toolScroll, LayoutParams(0, LayoutParams.MATCH_PARENT, 1f))
         toolLine.visibility = View.GONE
         addView(toolLine, LayoutParams(LayoutParams.MATCH_PARENT, lineH))
+
+        candLine.orientation = HORIZONTAL
+        candLine.addView(candSwitchBtn, btnLp())
+        candLine.addView(candRow, LayoutParams(0, LayoutParams.MATCH_PARENT, 1f))
+        addView(candLine, LayoutParams(LayoutParams.MATCH_PARENT, lineH))
 
         applyTheme(theme)
         refreshAlignLabel()
@@ -379,6 +411,7 @@ class OptionBarsView(context: Context) : LinearLayout(context) {
         for (b in toolBtns) { b.view.setTextColor(theme.text); styleTool(b.view, theme.keyFaceAlt) }
         refreshAlignLabel()
         refreshAiLook()
+        refreshCopyLook()
         refreshSttLook()
     }
 
@@ -433,19 +466,22 @@ class OptionBarsView(context: Context) : LinearLayout(context) {
         theme = t
         setBackgroundColor(t.background)
         expandedScroll.setBackgroundColor(t.background)
-        for (v in listOf(expandBtn, closeBtn, switchBtn, candSwitchBtn) + toolBtns.map { it.view }) {
+        expandedBox.setBackgroundColor(t.background)
+        for (v in listOf(expandBtn, closeBtn, switchBtn, candSwitchBtn, collapseBtn) +
+            toolBtns.map { it.view }) {
             v.setTextColor(t.text)
             // 圖案係畫死咗色嘅 drawable，setTextColor 影響唔到，要成個底重新砌
             styleTool(v, t.keyFaceAlt)
         }
         refreshAlignLabel()
         refreshAiLook()
+        refreshCopyLook()
         refreshSttLook()
         rebuildChips()
     }
 
-    /** 拉大關聯字嗰陣，host 攞呢個 view 去蓋喺鍵盤本身度（見 [Listener.onExpandChanged]） */
-    val expandedView: View get() = expandedScroll
+    /** 拉大關聯字嗰陣，host 攞呢個 view 去蓋住成個鍵盤（見 [Listener.onExpandChanged]） */
+    val expandedView: View get() = expandedBox
 
     /** 轉緊 pad（中／英／符號…）之前一定要叫，唔係 host 個 padHolder 會清埋覆蓋緊嘅 expandedView */
     fun forceCollapse() { if (expanded) setExpanded(false) }
@@ -477,7 +513,11 @@ class OptionBarsView(context: Context) : LinearLayout(context) {
         updateExpandVisibility()
     }
 
-    /** emoji 表／剪貼簿開住嗰陣先出 ✖，冇開就係切換掣（兩粒共用同一個位） */
+    /**
+     * 剪貼簿／AI prompt 嗰啲 overlay 開住嗰陣先出 ✖，冇開就係切換掣（兩粒共用同一個位）。
+     * emoji 表 2026-09-13 起唔行呢條路 —— 粒 ✖ 搬咗入 `EmojiPadView` 個 header
+     * （擺喺搵字掣左邊），呢度收到嘅係 `false`。
+     */
     fun setCloseVisible(v: Boolean) {
         closeVisible = v
         refreshLeftBtn()
@@ -495,12 +535,12 @@ class OptionBarsView(context: Context) : LinearLayout(context) {
     }
 
     /**
-     * 最左嗰粒邊個出。粒 `⇄` 永遠喺**最底嗰行**（有工具嗰行就跟工具嗰行走）——
+     * 最左嗰粒邊個出。粒 `⇄` **跟住工具嗰行走**（冇工具嗰行先搬去關聯字嗰行）——
      * 兩行一齊嗰陣關聯字嗰行就成行讓晒俾啲字，唔會上下兩粒 `⇄` 做同一件事。
      */
     private fun refreshLeftBtn() {
         closeBtn.visibility = if (closeVisible) View.VISIBLE else View.GONE
-        // ✖ 永遠行先（emoji 表／剪貼簿唔可以冇得返去），冇 ✖ 先輪到 ⇄
+        // ✖ 永遠行先（剪貼簿嗰類 overlay 唔可以冇得返去），冇 ✖ 先輪到 ⇄
         val swit = !closeVisible && switchAllowed
         switchBtn.visibility = if (swit && mode.hasTools) View.VISIBLE else View.GONE
         candSwitchBtn.visibility = if (swit && !mode.hasTools) View.VISIBLE else View.GONE
@@ -521,6 +561,19 @@ class OptionBarsView(context: Context) : LinearLayout(context) {
         val want = if (visible) View.VISIBLE else View.GONE
         val v = aiBtn ?: return
         if (v.visibility != want) v.visibility = want
+    }
+
+    /** 複製要個欄有字（揀咗字或者成個欄有嘢）先撳得，同 [setAiReady] 一樣做法 */
+    fun setCopyReady(ready: Boolean) {
+        if (copyReady == ready) return
+        copyReady = ready
+        refreshCopyLook()
+    }
+
+    private fun refreshCopyLook() {
+        val v = copyBtn ?: return
+        v.isEnabled = copyReady
+        v.alpha = if (copyReady) 1f else 0.4f
     }
 
     private fun refreshAiLook() {
@@ -639,7 +692,31 @@ class OptionBarsView(context: Context) : LinearLayout(context) {
         chip = c
         // 兩行一定要一樣高，唔係兩行一齊出嗰陣上下唔對稱
         for (line in lines) line.layoutParams = line.layoutParams.also { it.height = h }
+        // 粒 ▲ 跟一行關聯字咁高，所以啲字一縮細就要度過
+        refreshCollapseBtn()
         return true
+    }
+
+    /**
+     * 拉大咗嗰版右上角粒 ▲ 幾大、擺喺邊，兼同步留返個空位俾佢
+     * （[CandFlowView.firstRowInsetRight]，2026-09-13 user 要求）。
+     *
+     * 粒掣**啱啱好一行咁高**（[CandChip.chipH]），四邊對齊 [flow] 嗰浸 padding ——
+     * 睇落就似第一行最右嗰粒 chip，唔會浮咗喺半空。
+     */
+    private fun refreshCollapseBtn() {
+        val w = dp(EXPAND_BTN_DP).roundToInt()
+        val pad = dp(FLOW_PAD_DP).roundToInt()
+        val lp = collapseBtn.layoutParams as? FrameLayout.LayoutParams ?: return
+        if (lp.width != w || lp.height != chip.chipH ||
+            lp.topMargin != pad || lp.rightMargin != pad) {
+            lp.width = w
+            lp.height = chip.chipH
+            lp.setMargins(0, pad, pad, 0)
+            collapseBtn.layoutParams = lp
+        }
+        // 留位 = 粒掣本身 + 同下一粒 chip 之間嗰浸罅
+        flow.firstRowInsetRight = w + dp(CandChip.MARGIN_DP).roundToInt()
     }
 
     /**
@@ -762,6 +839,12 @@ class OptionBarsView(context: Context) : LinearLayout(context) {
     private var horizontal = false
 
     private companion object {
+        /** 粒 ▼／▲ 幾闊（條 bar 嗰粒同拉大咗嗰版右上角嗰粒一樣，睇落先似同一粒掣） */
+        const val EXPAND_BTN_DP = 38f
+
+        /** [flow] 四邊嗰浸 padding —— 粒 ▲ 四邊都要對返佢（見 [refreshCollapseBtn]） */
+        const val FLOW_PAD_DP = 4f
+
         /**
          * 工具掣個圖案畫幾大。**唔跟字體 slider 行** —— 佢哋係功能掣，
          * 同鍵盤啲功能鍵一樣（見 [Prefs.funcFontScale]）；條 bar 拉高咗就

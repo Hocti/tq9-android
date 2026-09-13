@@ -496,15 +496,26 @@ ui/     SettingsActivity / MicPermissionActivity
 
 ### 上面工具列：每段一行，`BOTH` 就兩行
 
-`OptionBarsView` 是**兩個 view 疊起**：`candLine`（關聯字）在上、`toolLine`（工具）
+`OptionBarsView` 是**兩個 view 疊起**：`toolLine`（工具）在上、`candLine`（關聯字）
 在下，`BarMode` 四段就是這兩個 `visibility` 的組合（`CANDIDATES` / `TOOLS` /
 `BOTH` 兩行一起 / `OFF` 整條 `GONE`，見 `setMode()`）。`BOTH` 是 2026-09-11
 使用者要求加的，那陣條 bar **真的高一倍**，不是把兩樣塞進同一行。
 
-那顆 `⇄`（與 `✖`）**放在最底那行的最左**：有工具那行就跟工具那行走，只得關聯字
+**上下次序是 2026-09-13 調轉的**（本來關聯字在上）：窄螢幕那個側邊欄
+（`SidePanelView`）一直都是工具在上、關聯字在下，兩個排法不一樣，橫直換來換去
+就要重新找過哪顆掣在哪。現在兩邊一致 —— 關聯字永遠是最貼近鍵盤那行
+（選字時手指走得最短），工具釘在最上。改其中一邊就要兩邊一起改。
+
+那顆 `⇄`（與 `✖`）**跟著工具那行走**：有工具那行就在工具那行，只得關聯字
 那段才搬去關聯字那行（`refreshLeftBtn()` 靠 `mode.hasTools` 分）。兩行一起那陣
 關聯字那行就沒有那顆掣，整行讓給那些字。兩行的高度、`setContentInsets()` 的
 padding **一定要一起改**（`lines`），否則兩行一起出的時候上下不對稱。
+
+**符號／純數字頁不出關聯字那行**（2026-09-13 使用者要求）：那兩頁根本沒有字
+可以提示，設定成怎樣都好，出來都是一行空位 —— `refreshBars()` 直接把
+`effective` 定成 `BarMode.TOOLS`，連那顆 `⇄` 都不出（按了也不會見到有東西變，
+`setSwitchVisible(false)`）。條 bar 本身一定要留：那兩頁沒有 `⇄` 那顆鍵，
+整條收起了就沒有入口開回來。
 
 每段本身仍然只有**一行**。以前有條「狀態」小字
 （字碼、`[同音]`、頁數）放在最上面，一出現就整個鍵盤高了一截，已經**移除**——
@@ -580,6 +591,24 @@ pad 的 `rowCount`）放入 `OptionBarsView.keyRowHeightPx`，
 
 判斷要等排完版先做得，所以在 `onLayout()` 中做，而且**改 visibility 要 `post`**
 （佈局期間修改就會立即再 `requestLayout` 多次）。
+
+### 拉大了的關聯字：蓋住**整個鍵盤**，連條 bar 都食埋
+
+2026-09-13 使用者要求。`onExpandChanged(true)` 把 `bars.expandedView` 加入
+**`outer`**（不是 `padHolder`），高度 = `padHeightPx` + `bars.height`
+（`expandedLayoutParams()`），所以由最頂起計，工具那行也讓給那些字。
+仍然**不可以用 `MATCH_PARENT`**：`outer` 是 `wrap_content`，會撐大整個 IME window。
+
+連帶兩件事：
+
+- 條 bar 那顆 `▼` 被自己遮住了，所以收合那顆 `▲`（`OptionBarsView.collapseBtn`）
+  搬進了 `expandedView` 自己裡面 —— 它是 `FrameLayout`（`expandedBox`）：
+  `ScrollView` 鋪滿，`▲` **浮在上面右上角不跟著捲**，捲到哪裡都收得回。
+- 那顆 `▲` 會壓著第一行最右那隻字，所以 `CandFlowView.firstRowInsetRight`
+  讓**第一行**右邊留回 38dp + 3dp（其餘行照用盡）。側邊欄沒有那顆掣，一直是 0。
+
+`relayoutPads()` 尾那句 `refreshExpandedLayout()` 負責改了顯示方式／拉過寬窄
+之後重新擺位（同 `refreshPanelLayout()` 一樣的道理，只是 parent 是 `outer`）。
 
 ### 中文拉窄就不要上面工具列，改用側邊欄
 
@@ -792,10 +821,17 @@ emoji 表／剪貼簿跟 `forcedHeightPx`，不在此處計（`as? KeyboardBaseV
 
 ## 工具列 不可以出不回來
 
-`EmojiPadView` 與 `ClipboardListView` 沒有自己的「關閉」按鍵 —— 顆 `✖` 統一在
+`ClipboardListView` 那類 overlay 沒有自己的「關閉」按鍵 —— 顆 `✖` 在
 `OptionBarsView` 最左。所以 `refreshBars()` 見到 `specialPad`
-（`mode == EMOJI || overlay != null`）就一定要 **force `BarMode.TOOLS` + 出顆 ✖ + 不得 GONE**，
-不是 使用者關閉工具列 之後開 emoji 就無法返回去普通鍵盤。
+（`mode == EMOJI || overlay != null`）就一定要 **force `BarMode.TOOLS` + 不得 GONE**，
+不是 使用者關閉工具列 之後開剪貼簿就無法返回去普通鍵盤。
+
+`EmojiPadView` 是例外（2026-09-13 使用者要求）：它自己個 header 最左有顆 `✖`
+（擺在搵字掣 `⌕` 左邊，`EmojiHost.onEmojiClose()` → `closeEmoji()`），
+所以 `bars.setCloseVisible()` 收到的是 `overlay != null`，**不是** `specialPad`。
+emoji 那陣條 bar 仍然 force `TOOLS` + 不得 GONE，但理由只剩「那行工具掣」，
+不再是「沒有它就返不去」。順帶：emoji 那陣 `⇄` 也不出（`fixedTools` 包了
+`PadMode.EMOJI`）—— 條 bar 夾硬是 `TOOLS`，那顆掣按極都沒有反應。
 
 `showOverlay()` / `hideOverlay()` 兩邊都會叫 `refreshBars()`。
 
@@ -809,8 +845,9 @@ emoji 表／剪貼簿跟 `forcedHeightPx`，不在此處計（`as? KeyboardBaseV
 `PadMetrics.contentW`，`gravity` 跟 `PadAlign`（`RIGHT_GAP` → `START`、
 `LEFT_GAP` → `END`、`CENTER` → `CENTER_HORIZONTAL`）。`STRETCH` 與 `SPLIT`
 本來就用盡成行，回 `MATCH_PARENT`。四個入口：`showOverlay()`（剪貼簿、
-AI prompt 名單）、`switchMode()` 加 view 那句（emoji 表）、`onExpandChanged()`
-（拉大了的候選字），以及 `relayoutPads()` 尾那幾句 `refreshPanelLayout()`。
+AI prompt 名單）、`switchMode()` 加 view 那句（emoji 表）、`expandedLayoutParams()`
+（拉大了的候選字 —— 它加在 `outer`，高度另計，見上面那節），以及
+`relayoutPads()` 尾那幾句 `refreshPanelLayout()`。
 
 兩個陷阱：
 
@@ -819,8 +856,8 @@ AI prompt 名單）、`switchMode()` 加 view 那句（emoji 表）、`onExpandC
   是 `padHolder` 的另一個 child），本體一縮窄側邊欄就沒有位置放。
 - **改了顯示方式／拉過寬窄，要重新 set `layoutParams`**，`requestLayout()` 沒有用 ——
   寬度記在 `LayoutParams` 裡面，不重新 set 就會維持上一次那個寬度。
-  `relayoutPads()` 因此同時 `refreshPanelLayout(overlay)` / `emojiPad` /
-  `bars.expandedView`（只在 `candidatesExpanded` 時）。
+  `relayoutPads()` 因此同時 `refreshPanelLayout(overlay)` / `emojiPad`，
+  拉大了的候選字就行 `refreshExpandedLayout()`（只在 `candidatesExpanded` 時）。
 
 ### 上面那條 bar 裡面的內容也跟著縮進來
 
@@ -904,7 +941,8 @@ banner、按邊都按到嘢；八顆的時候窄機平分下來每顆三十幾 d
 `isFillViewport = true`，否則第二次量度根本不會發生，那行掣永遠是最窄那個樣。
 
 **`setSwitchVisible` 只在中文九宮格中隱藏顆 `⇄`**：英文／符號頁根本沒有右上角
-那按鍵，已隱藏就永遠無法進入工具列。`✖`（emoji 表／剪貼簿）永遠優先，
+那按鍵，已隱藏就永遠無法進入工具列（符號／純數字／emoji 三頁夾硬是 `TOOLS`，
+`⇄` 也不出）。`✖`（剪貼簿那類 overlay）永遠優先，
 兩個共用一個位置（`refreshLeftBtn()`）。
 
 **英文／符號頁也強行重新開啟工具列**：這兩頁靠它出打字提示與滑出來的字，
@@ -1333,9 +1371,14 @@ AI 語音輸入開著時，講一兩句都要等 upload + Gemini 回覆，而系
 0. **工具列沒有長按**（`KeyLayout.TOOLS_HAVE_LONG` = false）—— 那幾顆本來就有
    自己的按住動作（「貼上」開剪貼簿歷史、🎤 一路錄、「改變大小」拉到最闊），
    再讓人配一個上去一定撞。`normalise()` 會強行把 tools 的 `long` 清成 `NONE`
-1. **擺得去哪**：`Eng`／`␣`／`⌫`／`⏎`／`⇄` 只能在左右欄（條工具列會在窄螢幕
-   變側邊欄，那時找不到它們）；「改變大小」相反，只能在工具列（它不是按一下
-   就算，要**在那顆按鍵上直接拖**才拉得動鍵盤大小，九宮格那套沒有這種拖法）
+1. **擺得去哪**：`␣`／`⌫`／`⏎`／`⇄` 只能在左右欄（條工具列會在窄螢幕
+   變側邊欄，那時找不到它們）；「改變大小」與「中文鍵盤」相反，只能在工具列
+   （「改變大小」不是按一下就算，要**在那顆按鍵上直接拖**才拉得動鍵盤大小，
+   九宮格那套沒有這種拖法）。
+   **四顆轉鍵盤的（`Eng`／`?123`／`123`／`中`）兩邊都擺得**（2026-09-13
+   使用者要求）：它們做的都是「轉去另一個鍵盤」，與工具列本來就擺得的
+   「中文鍵盤」同一件事。`Eng` 照舊是必用鍵（規矩 4），所以左右欄一定仍有一顆，
+   條 bar 收起了也切換得回英文
 2. **`␣`／`⌫`／`⏎` 只能放短按**，放了之後同一格的長按強制停用
    （`Slot.effectiveLong`）—— 它們自己的長按早有意思（拖游標、連續刪）
 3. **左右欄八個位置之間不准重複；工具列自己也不准** —— 但**兩邊各自計**，

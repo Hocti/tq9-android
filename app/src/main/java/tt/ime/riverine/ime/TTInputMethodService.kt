@@ -1,6 +1,7 @@
 package tt.ime.riverine.ime
 
 import android.Manifest
+import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
@@ -90,7 +91,7 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
      * 唔夠窄就一路係 null／detach 咗，成套行為同以前一模一樣。
      */
     private var sidePanel: SidePanelView? = null
-    /** 關聯字 bar 拉大咗：`bars.expandedView` 蓋喺 padHolder 度（見 [onExpandChanged]） */
+    /** 關聯字 bar 拉大咗：`bars.expandedView` 蓋住成個鍵盤（見 [onExpandChanged]） */
     private var candidatesExpanded = false
     private var aiOverlay: View? = null
     private var aiGeneration = 0
@@ -117,8 +118,13 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
     private var aiUsable = false
     /** 設定頁有冇入 Gemini API key —— 冇就成粒 ✨ 唔見咗，唔係淨係灰咗 */
     private var aiKeySet = false
+    /** 個欄係咪一隻字都冇（揀咗字或者成個欄有嘢就唔算），複製鍵撳唔撳得靠呢個 */
+    private var fieldHasText = false
     private val latinComposing = StringBuilder()
     private var latinSuggestions: List<String> = emptyList()
+
+    /** 見 [latinDefaultSuggestions]（載好詞庫之前一路係吉） */
+    private var defaultLatinSuggestions: List<String> = emptyList()
 
     /**
      * 啱啱出咗一個完整嘅英文字（滑出嚟嘅，或者喺候選欄揀咗嘅），中間冇再郁過。
@@ -214,6 +220,7 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
         get() = if (Prefs.barPinned(this)) barMode.hasTools && !Prefs.barHidden(this)
                 else barMode != BarMode.OFF
     override val aiReady: Boolean get() = aiUsable
+    override val copyReady: Boolean get() = fieldHasText
 
     // ---- lifecycle --------------------------------------------------------
 
@@ -258,6 +265,7 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
     override fun onCreateInputView(): View {
         theme = Theme.of(this)
         StrokeImages.configure(theme.dark)
+        applyThemeToPads() // 啲 pad cache 住唔會跟住 recreate，要自己補返色
         Thread { StrokeImages.preload(this) }.start()
 
         root = LinearLayout(this).apply {
@@ -269,6 +277,9 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
             applyTheme(theme)
         }
         padHolder = FrameLayout(this)
+        // 條 bar 係新起嘅，一定係收埋咗嗰個樣 —— 唔清返個 flag，撳返粒 ▼ 就會
+        // 以為「已經拉大咗」乜都唔做（見 [onExpandChanged]）
+        candidatesExpanded = false
 
         root.addView(bars, LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT))
@@ -308,8 +319,47 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
     /** 就算插咗實體鍵盤都照出，唔好淨係得 candidate bar */
     override fun onEvaluateInputViewShown(): Boolean = true
 
+    /**
+     * 啲 pad（同側邊欄）而家套緊邊個主題。
+     *
+     * [outer]／[root]／[bars] 每次 [onCreateInputView] 都重新起過，跟得實 [theme]；
+     * 但係啲 pad **cache 住一世**（起一次就一直留喺 [chinesePad] 嗰堆 field 度），
+     * 淨係出世嗰陣 `applyTheme` 過一次。所以要另外記低套咗邊個色落佢哋度。
+     */
+    private var padsDark: Boolean? = null
+
+    private fun applyThemeToPads() {
+        if (padsDark == theme.dark) return
+        padsDark = theme.dark
+        chinesePad?.applyTheme(theme)
+        latinPad?.applyTheme(theme)
+        symbolPad?.applyTheme(theme)
+        numberPad?.applyTheme(theme)
+        emojiPad?.applyTheme(theme)
+        sidePanel?.applyTheme(theme)
+    }
+
+    /**
+     * 系統 dark/light 轉咗就喺度補返色。轉主題通常會連 input view 都重新 create
+     * （[onCreateInputView] 度已經處理），但係唔可以靠得實佢一定會發生 ——
+     * 每次彈鍵盤 check 多次，最多都係白行一句比較。
+     */
+    private fun refreshThemeIfChanged() {
+        if (!::root.isInitialized) return
+        val fresh = Theme.of(this)
+        if (fresh.dark != theme.dark) {
+            theme = fresh
+            StrokeImages.configure(theme.dark)
+            root.setBackgroundColor(theme.background)
+            outer.setBackgroundColor(theme.background)
+            bars.applyTheme(theme)
+        }
+        applyThemeToPads()
+    }
+
     override fun onStartInputView(info: EditorInfo, restarting: Boolean) {
         super.onStartInputView(info, restarting)
+        refreshThemeIfChanged()
         engine.scOutput = Prefs.scOutput(this)
         // 設定頁改完個開關唔會 restart 個 service，所以每次入欄都要重新讀
         engine.usageReorder = Prefs.usageReorder(this)
@@ -539,7 +589,7 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
         // LayoutParams 度，齋 requestLayout 係唔會變嘅）
         refreshPanelLayout(overlay)
         refreshPanelLayout(emojiPad)
-        if (candidatesExpanded) refreshPanelLayout(bars.expandedView)
+        refreshExpandedLayout()
     }
 
     // ---- 開鍵盤嗰下再度多次尺寸 --------------------------------------------
@@ -708,6 +758,7 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
             KeyAction.TO_NUMBER -> switchMode(PadMode.NUMBER)
             KeyAction.TO_EMOJI -> openEmoji()
             KeyAction.PASTE -> paste()
+            KeyAction.COPY -> copy()
             KeyAction.SELECT_ALL -> selectAll()
             KeyAction.UNDO -> undo(redo = false)
             KeyAction.REDO -> undo(redo = true)
@@ -1069,6 +1120,25 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
         else NextWordModel.get()?.predictNext(prev) ?: emptyList()
 
     /**
+     * 冇 context 嗰陣嘅**預設英文提示** —— 即係 `prev` 吉嗰陣
+     * [NextWordModel.predictNext] 跌落去嗰批全域最常用字。
+     *
+     * 幾時用：英文鍵盤，冇字打緊，而上一個字又唔係英文（啱啱打完中文、標點、
+     * 或者成個欄都係空）。2026-09-13 user 報「上一個字係中文嗰陣條 bar 吉咗」。
+     *
+     * 個 list 成世都係同一批字，所以**計一次就 cache 住** ——
+     * [refreshBars] 逐粒鍵行一次，唔想每次都行一轉個 trie。
+     * 詞庫係背景載嘅，未載好嗰陣回吉，所以吉就唔 cache，下次再試過。
+     */
+    private fun latinDefaultSuggestions(): List<String> {
+        if (passwordField) return emptyList()
+        if (defaultLatinSuggestions.isEmpty()) {
+            defaultLatinSuggestions = NextWordModel.get()?.predictNext("").orEmpty()
+        }
+        return defaultLatinSuggestions
+    }
+
+    /**
      * 打緊字嗰陣（[latinComposing] 唔係空）出嘅提示：先用 [lastCommittedWord] 做 context
      * 揾 bigram 夾 prefix 嘅字（AOSP 標準嘅 N-gram 做法），唔夠先用 [EnDict] 補齊。
      */
@@ -1110,6 +1180,26 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
         val text = runCatching { ClipHistory.current(this) }.getOrDefault("")
         if (text.isEmpty()) { toast("剪貼簿是空的"); return }
         commitPlain(text)
+    }
+
+    /**
+     * 複製：有揀字就叫個欄自己複製揀住嗰段（`android.R.id.copy`，同 [selectAll]
+     * 一樣行 `performContextMenuAction`，保住個欄原本嗰種複製方式）；冇揀就攞
+     * 成個輸入框嘅字直接寫落 clipboard —— 唔夾硬全選，唔想搞郁 user 個 caret／
+     * selection 顯示。個欄一隻字都冇（[fieldHasText] 假）粒鍵已經撳唔到，
+     * 呢度嘅 empty 分支純粹保底。
+     */
+    private fun copy() {
+        val ic = currentInputConnection ?: return
+        val selected = ic.getSelectedText(0)?.toString().orEmpty()
+        if (selected.isNotEmpty()) {
+            ic.performContextMenuAction(android.R.id.copy)
+            return
+        }
+        val all = extractedAll()
+        if (all.isEmpty()) { toast("輸入框沒有文字，無法複製"); return }
+        clipboard()?.setPrimaryClip(ClipData.newPlainText(null, all))
+        toast("已複製整個輸入框")
     }
 
     /**
@@ -1283,6 +1373,9 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
 
     override fun onEmojiBackspace() = backspace()
 
+    /** emoji 表自己個 header 有粒 ✖（搵字掣左邊），同條 bar 嗰粒做同一件事 */
+    override fun onEmojiClose() = closeEmoji()
+
     /**
      * 撳 emoji 表嗰粒搵字掣：轉去英文鍵盤打字，但啲字唔會入落個欄，
      * 淨係即時篩 emoji，夾到嗰啲出喺上面條 bar 度撳。
@@ -1380,7 +1473,12 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
         chinesePad?.invalidate() // 常駐模式：右上角嗰粒著燈與否跟住呢個狀態行
     }
 
-    /** emoji 表／剪貼簿開住：一定要有條 bar 出返粒 ✖，唔係就返唔到去普通鍵盤 */
+    /**
+     * emoji 表／剪貼簿開住：條 bar 一定要出返（唔可以俾 [Prefs.barHidden] 收埋），
+     * 唔係剪貼簿就返唔到去普通鍵盤 —— 佢粒 ✖ 就喺條 bar 度。emoji 表自己個
+     * header 已經有粒 ✖（2026-09-13，見 [EmojiPadView]），條 bar 留返係為咗
+     * 嗰行工具掣，唔再係為咗有得返去。
+     */
     private val specialPad: Boolean get() = mode == PadMode.EMOJI || overlay != null
 
     private fun refreshBars() {
@@ -1397,12 +1495,14 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
         val mustShow = emojiSearch || (forceCandidates && latinSuggestions.isNotEmpty())
         // 本來就有關聯字嗰行（[BarMode.BOTH]）就唔使郁，工具嗰行照留返
         var effective = if (mustShow && !barMode.hasCands) BarMode.CANDIDATES else barMode
-        // 英文／符號頁夾硬開返條 bar：呢兩頁靠佢出打字提示同滑動出嚟嘅字，
+        // 英文頁夾硬開返條 bar：佢靠條 bar 出打字提示同滑動出嚟嘅字，
         // 冇咗就等於打盲舖。**唔會改到 [barMode] 本身** —— 返到中文頁
         // 照樣跟返 user 設定嘅開關。
-        if ((mode == PadMode.LATIN || mode == PadMode.SYMBOL) && effective == BarMode.OFF) {
-            effective = BarMode.CANDIDATES
-        }
+        if (mode == PadMode.LATIN && effective == BarMode.OFF) effective = BarMode.CANDIDATES
+        // 符號／純數字頁**一律唔出關聯字嗰行**（2026-09-13 user 要求）：嗰兩頁
+        // 根本冇字可以提示，設定成點都好，出嚟都係一行吉位。條 bar 本身照留做
+        // 工具嗰行 —— 嗰兩頁冇 `⇄` 嗰粒鍵，成條 bar 收埋咗就冇入口開返。
+        if (mode == PadMode.SYMBOL || mode == PadMode.NUMBER) effective = BarMode.TOOLS
         // emoji 表／剪貼簿嗰陣冇關聯字可以出，索性成行出工具，唔好淨係得粒 ✖ 吉住
         if (specialPad) effective = BarMode.TOOLS
         // 闊 keyboard 收起咗成條 bar（英文底行嗰粒，見 [cycleBarWithHide]；
@@ -1430,7 +1530,16 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
                 // 乜都未打：跟游標前面嗰隻字（唔係「啱啱打完嗰隻」）
                 else -> contextBar(contextPicks())
             }
-            mode == PadMode.LATIN || mode == PadMode.SYMBOL -> latinSuggestions
+            // 冇字打緊、又冇提示（上一個字唔係英文、或者成個欄係空）：出返全域
+            // 最常用嗰幾個字（2026-09-13 user 要求，本來係留一行吉位）。**要寫
+            // 返落 [latinSuggestions]** —— 撳落去揀邊個字係查返佢嘅（見
+            // [onPickCandidate]），淨係畫出嚟就會變咗撳極都冇反應
+            mode == PadMode.LATIN -> {
+                if (latinSuggestions.isEmpty() && latinComposing.isEmpty()) {
+                    latinSuggestions = latinDefaultSuggestions()
+                }
+                latinSuggestions
+            }
             else -> emptyList()
         }
 
@@ -1453,12 +1562,21 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
         bars.refreshTools()
         bars.setMode(effective)
         bars.setCandidates(if (effective.hasCands) cands else emptyList())
-        bars.setCloseVisible(specialPad)
+        // ✖ 淨係俾剪貼簿／AI prompt 嗰啲 overlay 用 —— emoji 表 2026-09-13 改咗
+        // 自己個 header 出粒 ✖（見 [EmojiPadView]），條 bar 唔使再出多粒
+        bars.setCloseVisible(overlay != null)
         // 常駐 + 中文九宮格：切換掣已經搬咗去右上角嗰粒鍵，條 bar 唔使再擺多粒。
-        // 英文／符號頁冇嗰粒鍵，所以一定要留返，唔係就入唔到工具列
-        bars.setSwitchVisible(!(pinned && mode == PadMode.CHINESE))
+        // 英文頁冇嗰粒鍵，所以一定要留返，唔係就入唔到工具列。
+        // 符號／純數字頁就連粒 `⇄` 都唔出 —— 嗰兩頁夾硬淨係得工具嗰行（見上面），
+        // 撳極都唔會見到有嘢變，出粒似壞咗嘅掣不如唔出
+        // emoji 表冇關聯字可以切換過去（條 bar 夾硬係 TOOLS），出粒撳極都冇反應嘅 ⇄
+        // 不如唔出 —— 以前呢個位係俾 ✖ 霸住嘅，而家 ✖ 搬咗入 emoji 表個 header
+        val fixedTools = mode == PadMode.SYMBOL || mode == PadMode.NUMBER ||
+            mode == PadMode.EMOJI
+        bars.setSwitchVisible(!(pinned && mode == PadMode.CHINESE) && !fixedTools)
         bars.setAiReady(aiUsable)
         bars.setAiVisible(aiKeySet)
+        bars.setCopyReady(fieldHasText)
         // 大細／貼邊分咗兩組存，粒「靠左／靠右」掣要拉、要著返邊個樣，
         // 都係跟而家見緊嗰組（見 [padGroup]）
         bars.refreshAlignLabel()
@@ -1578,6 +1696,7 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
         panel.setCandidates(cands)
         panel.setAiReady(aiUsable)
         panel.setAiVisible(aiKeySet)
+        panel.setCopyReady(fieldHasText)
         panel.setCloseVisible(false)
         panel.refreshAlignLabel()
         return true
@@ -1629,11 +1748,17 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
         // 設定頁熄咗「AI 改寫」就當冇入過 key 咁處理 —— 成粒 ✨ 唔出
         val keySet = Prefs.aiApiKey(this).isNotBlank() && Prefs.aiRewriteOn(this)
         val usable = keySet && hasText
-        if (keySet == aiKeySet && usable == aiUsable) return
+        val textChanged = hasText != fieldHasText
+        if (keySet == aiKeySet && usable == aiUsable && !textChanged) return
         aiKeySet = keySet
         aiUsable = usable
+        fieldHasText = hasText
         if (::bars.isInitialized) { bars.setAiVisible(keySet); bars.setAiReady(usable) }
         sidePanel?.let { it.setAiVisible(keySet); it.setAiReady(usable) }
+        if (textChanged) {
+            if (::bars.isInitialized) bars.setCopyReady(hasText)
+            sidePanel?.setCopyReady(hasText)
+        }
         chinesePad?.invalidate()
     }
 
@@ -1767,14 +1892,36 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
         if (!::padHolder.isInitialized || candidatesExpanded == expanded) return
         candidatesExpanded = expanded
         val v = bars.expandedView
-        if (expanded) {
-            rememberPadHeight()
-            (v.parent as? ViewGroup)?.removeView(v)
-            val h = if (padHeightPx > 0) padHeightPx else PadMetrics.defaultPadHeightPx(this).roundToInt()
-            padHolder.addView(v, panelLayoutParams(h))
-        } else {
-            (v.parent as? ViewGroup)?.removeView(v)
-        }
+        (v.parent as? ViewGroup)?.removeView(v)
+        // 蓋喺 [outer]（唔係 padHolder）—— 連上面條 bar 都要遮埋，見 [expandedLayoutParams]
+        if (expanded) outer.addView(v, expandedLayoutParams())
+    }
+
+    /**
+     * 拉大咗嘅關聯字幾大、擺喺邊：**成個鍵盤咁高**（連上面條 bar 嗰一兩行都食埋，
+     * 2026-09-13 user 要求）。
+     *
+     * 以前淨係蓋住 `padHolder`，條 bar 照留喺上面 —— 拉大嗰下工具嗰行仲霸住成行，
+     * 得返下面嗰橛出字，字一多就要捲好耐。而家由最頂起計，所以粒 ▲ 亦都要搬入
+     * 塊嘢自己度（見 [OptionBarsView.expandedView]），唔係就連佢都俾自己遮住。
+     *
+     * 打橫嘅擺位照跟鍵盤本體（[panelLayoutParams]）。高度寫死做「條 bar ＋ 鍵盤」，
+     * 唔用 MATCH_PARENT —— `outer` 係 wrap_content，MATCH_PARENT 會撐大個 IME window。
+     */
+    private fun expandedLayoutParams(): FrameLayout.LayoutParams {
+        rememberPadHeight()
+        val padH =
+            if (padHeightPx > 0) padHeightPx else PadMetrics.defaultPadHeightPx(this).roundToInt()
+        val barsH = if (bars.visibility == View.VISIBLE) bars.height else 0
+        return panelLayoutParams(padH + barsH).also { it.gravity = it.gravity or Gravity.TOP }
+    }
+
+    /** 攤開住嘅關聯字：改咗顯示方式／拉過闊窄就要重新擺位 */
+    private fun refreshExpandedLayout() {
+        if (!candidatesExpanded || !::outer.isInitialized) return
+        val v = bars.expandedView
+        if (v.parent !== outer) return
+        v.layoutParams = expandedLayoutParams()
     }
 
     override fun onTool(action: KeyAction) = onKey(Key(action))

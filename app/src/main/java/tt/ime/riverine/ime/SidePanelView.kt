@@ -53,6 +53,7 @@ class SidePanelView(context: Context) : LinearLayout(context) {
     private val sizeBtn: TextView? get() = btnOf(PadFunc.ALIGN)
     private val sttBtn: TextView? get() = btnOf(PadFunc.STT)
     private val aiBtn: TextView? get() = btnOf(PadFunc.AI)
+    private val copyBtn: TextView? get() = btnOf(PadFunc.COPY)
 
     private val closeBtn = TextView(context)
 
@@ -68,6 +69,7 @@ class SidePanelView(context: Context) : LinearLayout(context) {
 
     private var candidates: List<String> = emptyList()
     private var aiReady = false
+    private var copyReady = false
     private var sttActive = false
 
     /** 關聯字而家幾大（sp），見 [Prefs.candTextSp]。側邊欄淨係中文，所以永遠 CJK 嗰組 */
@@ -165,6 +167,7 @@ class SidePanelView(context: Context) : LinearLayout(context) {
         for (b in toolBtns) { b.view.setTextColor(theme.text); styleTool(b.view, theme.keyFaceAlt) }
         refreshAlignLabel()
         refreshAiLook()
+        refreshCopyLook()
         refreshSttLook()
     }
 
@@ -200,6 +203,7 @@ class SidePanelView(context: Context) : LinearLayout(context) {
         }
         refreshAlignLabel()
         refreshAiLook()
+        refreshCopyLook()
         refreshSttLook()
         rebuildChips()
     }
@@ -236,6 +240,19 @@ class SidePanelView(context: Context) : LinearLayout(context) {
         val v = aiBtn ?: return
         v.isEnabled = aiReady
         v.alpha = if (aiReady) 1f else 0.4f
+    }
+
+    /** 複製要個欄有字（揀咗字或者成個欄有嘢）先撳得，同 [setAiReady] 一樣做法 */
+    fun setCopyReady(ready: Boolean) {
+        if (copyReady == ready) return
+        copyReady = ready
+        refreshCopyLook()
+    }
+
+    private fun refreshCopyLook() {
+        val v = copyBtn ?: return
+        v.isEnabled = copyReady
+        v.alpha = if (copyReady) 1f else 0.4f
     }
 
     fun setSttActive(on: Boolean) {

@@ -18,9 +18,13 @@ import tt.ime.riverine.core.EmojiDict
 import kotlin.math.roundToInt
 
 /**
- * Emoji 表：上面一行係分類同搵字，下面攤開成個 grid。
+ * Emoji 表：上面一行係「返去（✖）＋搵字（⌕）＋分類」，下面攤開成個 grid。
  *
- * 搵字唔係喺呢度打，撳左上角粒搵字掣（[SEARCH_GLYPH]）會轉去英文鍵盤，打嘅字淨係用嚟篩，
+ * 粒 ✖ 2026-09-13 由條工具 bar 搬咗入嚟呢度（擺喺搵字掣左邊，見 [EmojiHost.onEmojiClose]）——
+ * 以前要落去條 bar 最左先撳得返去普通鍵盤，離開 emoji 表嘅掣同 emoji 表本身隔咗一行。
+ * 剪貼簿／AI prompt 嗰啲 overlay 就冇搬，仍然用返條 bar 嗰粒 ✖。
+ *
+ * 搵字唔係喺呢度打，撳粒搵字掣（[SEARCH_GLYPH]）會轉去英文鍵盤，打嘅字淨係用嚟篩，
  * 夾到嘅 emoji 出喺上面條 bar（睇 `TTInputMethodService.emojiQuery`）。
  * 咁樣就唔使喺鍵盤入面再塞多個輸入框，個鍵盤高度都唔會變。
  */
@@ -31,6 +35,8 @@ class EmojiPadView(context: Context) : LinearLayout(context) {
         fun onEmojiPicked(emoji: String)
         fun onEmojiSearch()
         fun onEmojiBackspace()
+        /** 撳左上角粒 ✖：收返 emoji 表，返去開之前嗰個鍵盤 */
+        fun onEmojiClose()
     }
 
     var emojiHost: EmojiHost? = null
@@ -41,6 +47,7 @@ class EmojiPadView(context: Context) : LinearLayout(context) {
     private val grid = FlowLayout(context)
     private val gridScroll = ScrollView(context)
     private val header = LinearLayout(context)
+    private val closeBtn = TextView(context)
     private val searchBtn = TextView(context)
     private val backspaceBtn = TextView(context)
 
@@ -55,6 +62,7 @@ class EmojiPadView(context: Context) : LinearLayout(context) {
     init {
         orientation = VERTICAL
 
+        chip(closeBtn, "✖") { emojiHost?.onEmojiClose() }
         // 單色 `⌕`，唔用彩色 emoji 🔍（見 [SEARCH_GLYPH]）
         chip(searchBtn, SEARCH_GLYPH) { emojiHost?.onEmojiSearch() }
         chip(backspaceBtn, "⌫") { emojiHost?.onEmojiBackspace() }
@@ -67,6 +75,7 @@ class EmojiPadView(context: Context) : LinearLayout(context) {
 
         header.orientation = HORIZONTAL
         header.setPadding(dp(3f).toInt(), dp(3f).toInt(), dp(3f).toInt(), dp(3f).toInt())
+        header.addView(closeBtn, chipLp(dp(42f).roundToInt()))
         header.addView(searchBtn, chipLp(dp(42f).roundToInt()))
         header.addView(tabScroll, LayoutParams(0, LayoutParams.MATCH_PARENT, 1f))
         header.addView(backspaceBtn, chipLp(dp(42f).roundToInt()))
@@ -100,7 +109,7 @@ class EmojiPadView(context: Context) : LinearLayout(context) {
     fun applyTheme(t: Theme) {
         theme = t
         setBackgroundColor(t.background)
-        for (v in listOf(searchBtn, backspaceBtn)) {
+        for (v in listOf(closeBtn, searchBtn, backspaceBtn)) {
             v.setTextColor(t.text)
             v.background = bgOf(t.keyFaceAlt)
         }

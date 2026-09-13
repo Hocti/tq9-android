@@ -34,7 +34,9 @@ import kotlin.math.roundToInt
  *
  * 選字夠兩頁嗰陣底行兩格闊嗰粒 `0` 點變，由設定頁嗰個 [PagerLayout] 話事
  * （以前係撳住「下頁」向左掃先返到上一頁，太難撳，收咗）：拆做「下頁」＋「上頁」
- * 兩粒正常闊（左右次序兩個選擇），或者唔拆、成兩格闊嗰粒做「下頁」＋長撳做「上頁」。
+ * 兩粒正常闊（左右次序兩個選擇），或者唔拆、成兩格闊嗰粒做「下頁」，
+ * 「上頁」就擺喺長撳（[PagerLayout.WIDE_NEXT]）或者左下角
+ * （[PagerLayout.WIDE_NEXT_LEFT_PREV]，嗰陣左欄最底嗰粒暫時讓位）。
  *
  * 「左上角細字 = 長撳做乜」呢條規矩喺八個位全部照用。長撳嗰個功能冇字好寫
  * （轉輸入法嗰兩粒）就改為喺左上角畫個圖案，見 [drawFunction]。
@@ -47,6 +49,8 @@ class ChinesePadView(context: Context, private val engine: TTEngine) : KeyboardB
         val optionOn: Boolean
         /** AI 鍵要而家真係揀咗一段字先撳得 */
         val aiReady: Boolean
+        /** 複製鍵要個欄有字（揀咗字或者成個欄有嘢）先撳得，同 [aiReady] 一樣做法 */
+        val copyReady: Boolean
     }
 
     var chineseHost: ChineseHost? = null
@@ -63,7 +67,13 @@ class ChinesePadView(context: Context, private val engine: TTEngine) : KeyboardB
      */
     private var splitPager = false
 
-    /** 而家係咪「選字、夠兩頁」——三個 [PagerLayout] 都係喺呢個狀態先變樣 */
+    /**
+     * 左下角而家係咪暫時借咗俾「上頁」（[PagerLayout.WIDE_NEXT_LEFT_PREV]）。
+     * 同 [splitPager] 一樣，記住實際排咗邊個樣，好等 [onEngineState] 知使唔使重排。
+     */
+    private var leftPrevPager = false
+
+    /** 而家係咪「選字、夠兩頁」——變樣嗰幾個 [PagerLayout] 都係喺呢個狀態先郁 */
     private fun paging() = engine.selectMode && engine.totalPage > 1
 
     /**
@@ -80,6 +90,14 @@ class ChinesePadView(context: Context, private val engine: TTEngine) : KeyboardB
      * 右上角寫頁數（見 [drawDigit]、`TTInputMethodService.onLongPress`）。
      */
     fun wideNextPage() = paging() && Prefs.pagerLayout(context) == PagerLayout.WIDE_NEXT
+
+    /**
+     * 左下角「上頁」模式：兩格闊嗰粒 `0` 一樣係「下頁」，但「上頁」有返粒自己嘅鍵——
+     * 揭緊頁嗰陣借咗左欄最底嗰個位（見 [PagerLayout.WIDE_NEXT_LEFT_PREV]）。
+     * 粒 `0` 本身冇變樣：長撳照舊係成對標點，頁數照舊喺左上角。
+     */
+    private fun wantLeftPrevPager() =
+        paging() && Prefs.pagerLayout(context) == PagerLayout.WIDE_NEXT_LEFT_PREV
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         val w = MeasureSpec.getSize(widthMeasureSpec)
@@ -108,7 +126,14 @@ class ChinesePadView(context: Context, private val engine: TTEngine) : KeyboardB
         // 左欄：由設定頁嗰個排位砌（見 [KeyLayout]）。以前八個位寫死喺呢度，
         // 而家淨係 [KeyLayout.DEFAULT] 仲留住嗰個排法
         val layout = KeyLayout.load(context)
-        for ((row, slot) in layout.left.withIndex()) add(slotKey(slot), 0f, row)
+        // 左欄最底（左下角）揭緊頁嗰陣可以暫時讓咗俾「上頁」（見 [leftPrevPager]）
+        leftPrevPager = wantLeftPrevPager()
+        val lastLeftRow = layout.left.size - 1
+        for ((row, slot) in layout.left.withIndex()) {
+            val key = if (leftPrevPager && row == lastLeftRow)
+                Key(KeyAction.PREV_PAGE, label = "上頁") else slotKey(slot)
+            add(key, 0f, row)
+        }
 
         // 九宮格 1~9：跟足 numpad 排法，7 8 9 喺最上面
         for (i in 1..9) {
@@ -147,14 +172,17 @@ class ChinesePadView(context: Context, private val engine: TTEngine) : KeyboardB
     private fun slotKey(slot: KeyLayout.Slot): Key = slot.tap.toKey(slot.effectiveLong)
 
     override fun keyEnabled(k: Key): Boolean =
-        k.enabled && (k.action != KeyAction.AI || chineseHost?.aiReady == true)
+        k.enabled &&
+            (k.action != KeyAction.AI || chineseHost?.aiReady == true) &&
+            (k.action != KeyAction.COPY || chineseHost?.copyReady == true)
 
     /**
      * engine 狀態變咗要重畫。入／出「夠兩頁嘅選字模式」嗰陣底行會由
      * 兩格闊嘅 `0` 變成「下頁」＋「上頁」兩粒，所以仲要重排一次。
      */
     fun onEngineState() {
-        if (splitPager != wantSplitPager()) relayout() else invalidate()
+        if (splitPager != wantSplitPager() || leftPrevPager != wantLeftPrevPager())
+            relayout() else invalidate()
     }
 
     fun onSettingsChanged() {
@@ -170,7 +198,7 @@ class ChinesePadView(context: Context, private val engine: TTEngine) : KeyboardB
     /**
      * **淨係打碼階段先至滑得**。入咗選字模式啲數字鍵已經唔再係碼，
      * 而係「揀第幾個字」同埋 `0` = 揭下一頁，滑過去等於亂咁揀字揭頁
-     * （三個 [PagerLayout] 都一樣，大格「下頁」嗰個一樣係選字模式）。
+     * （每個 [PagerLayout] 都一樣，大格「下頁」嗰啲一樣係選字模式）。
      */
     override fun canSwipe(key: Key) =
         key.action == KeyAction.DIGIT && Prefs.swipeEnabled(context) && !engine.selectMode

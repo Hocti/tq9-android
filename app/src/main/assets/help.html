@@ -42,11 +42,12 @@
   <p><strong>選字翻頁</strong></p>
   <p>候選字多於一頁時，底行的 <span class="key">0</span> 會變成翻頁鍵。可在「一般 → 選字翻頁」選擇排法：</p>
   <ul>
-    <li><strong>大格「下頁」</strong>（預設）：按下前往下一頁，長按返回上一頁。</li>
+    <li><strong>大格「下頁」＋左下角「上頁」</strong>（預設）：整顆 <span class="key">0</span> 是「下頁」，「上頁」暫時借用左下角那顆鍵，離開選字即回復原本功能；長按 <span class="key">0</span> 的成對標點與頁碼位置都保持原樣。</li>
+    <li><strong>大格「下頁」</strong>：按下前往下一頁，長按返回上一頁；此時長按 <span class="key">0</span> 的成對標點會暫停，頁碼改到右上角。</li>
     <li><strong>雙鍵</strong>：將「上頁」和「下頁」分開顯示，並可選擇左右次序。</li>
     <li><strong>無效果</strong>：<span class="key">0</span> 完全不變樣，長按仍是成對標點。按下去照樣翻下一頁，只是不會為了翻頁而改動排位；想要一顆明確的「下頁」／「上頁」，在「按鍵排位」把它拖到左右兩欄。</li>
   </ul>
-  <p class="note">頁碼以 <span class="key">1/10</span> 形式顯示。使用大格「下頁」時，長按 <span class="key">0</span> 的成對標點功能會在選字期間暫停。</p>
+  <p class="note">頁碼以 <span class="key">1/10</span> 形式顯示。</p>
 </div>
 
 <h2>按鍵與長按</h2>
@@ -54,7 +55,8 @@
   <li>中文鍵盤左欄四顆、右欄四顆，以及整條工具列，每一顆的短按與長按都可以自己編排：「一般 → 按鍵排位」。九宮格 <span class="key">1</span>～<span class="key">9</span>、兩格寬的 <span class="key">0</span> 與「取消」是三三的打法本身，不能改動。</li>
   <li>從按鍵池往上拖 = 加一顆（池裡不會減少）；格子與格子互拖 = 兩格對調；拖回池裡 = 清走那一格。按一下格子也可以直接選，不一定要拖。</li>
   <li><strong>工具列只有短按</strong>（那幾顆本來就有自己的按住動作），最多八顆。它沒有 <span class="key">＋</span> 掣 —— 加一顆就是把按鍵池那顆拖到工具列任何空位。</li>
-  <li><span class="key">Eng</span>、<span class="key">␣</span>、<span class="key">⌫</span>、<span class="key">⏎</span>、「轉換工具列」一定要留在左右兩欄，不能放進工具列；<span class="key">␣</span>、<span class="key">⌫</span>、<span class="key">⏎</span> 只能放短按，放了之後同一格不會有長按格。「改變大小」相反，只能放在工具列。</li>
+  <li><span class="key">␣</span>、<span class="key">⌫</span>、<span class="key">⏎</span>、「轉換工具列」只能放在左右兩欄，不能放進工具列；<span class="key">␣</span>、<span class="key">⌫</span>、<span class="key">⏎</span> 只能放短按，放了之後同一格不會有長按格。「改變大小」與「中文鍵盤」相反，只能放在工具列。</li>
+  <li>四顆轉鍵盤的 —— <span class="key">Eng</span>（英文）、<span class="key">?123</span>（符號）、<span class="key">123</span>（純數字）、<span class="key">中</span>（中文，只能放工具列）—— 左右兩欄與工具列都可以放；但 <span class="key">Eng</span> 一定要有一顆留在左右兩欄，否則工具列收起時就切換不回英文。</li>
   <li>鍵面左上角的小字（或小圖案）就是長按會做的事。</li>
   <li>長按「同音」鍵可顯示關聯字；長按 <span class="key">📋</span> 可開啟剪貼簿記錄。</li>
   <li>九宮格 <span class="key">1</span>～<span class="key">9</span> 長按等於連按兩下。純數字鍵盤只有 <span class="key">Eng</span> 有長按（＝切換輸入法，跟九宮格那顆一樣），其餘按鍵一律沒有。</li>
@@ -70,6 +72,7 @@
 
 <h2>英文、符號與數字</h2>
 <ul>
+  <li>英文鍵盤未打字時也會顯示一列常用字 —— 上一個字是英文就按它預測下一個字，上一個字不是英文（例如中文、標點，或輸入欄是空的）就顯示通用的常用字。按一下即可輸入，並自動補上前後空格。</li>
   <li>英文鍵盤固定顯示數字行。長按數字鍵可輸入對應符號；長按 <span class="key">4</span> 還可選擇貨幣符號。</li>
   <li>長按字母鍵可選擇大小寫及重音字母。</li>
   <li>長按 <span class="key">,</span>、<span class="key">.</span> 或 <span class="key">/</span> 可選擇其他標點。</li>
@@ -79,6 +82,9 @@
 
 <h2>工具列與鍵盤大小</h2>
 <p>工具列固定顯示，預設提供大小位置、剪貼簿、語音輸入、表情符號及 AI 功能 —— 有哪幾顆、甚麼次序，都可以在「按鍵排位」自己排。切換「關聯字 ⇄ 工具」靠「轉換工具列」那顆按鍵，預設在九宮格右上角，顯示為 <span class="key">⇄</span>。</p>
+<p>符號鍵盤與純數字鍵盤<strong>不會顯示關聯字那行</strong>（那兩頁沒有字可以提示），無論切到哪一段都只出工具那行。</p>
+<p>按 <span class="key">⇄</span> 切到「關聯字＋工具」時，<strong>工具列在上、關聯字在下</strong>（關聯字貼近鍵盤，選字時手指走得最短）；鍵盤縮窄後自動彈出的側邊欄也是同一個次序。</p>
+<p>關聯字太多時，按右邊的 <span class="key">▼</span> 可以展開 —— 展開後會用盡整個鍵盤的高度（連工具列那一行都蓋住），右上角的 <span class="key">▲</span> 收回。</p>
 <ul>
   <li>按一下大小位置鍵，可切換拉寬、靠左或靠右。</li>
   <li>上下拖動調整鍵盤高度；左右拖動調整鍵盤寬度。</li>
@@ -129,10 +135,12 @@
 <ul>
   <li><strong>輸出簡體字</strong>：將輸入結果轉為簡體字。</li>
   <li><strong>按鍵震動</strong>：共 0～3 級，0 為關閉。</li>
-  <li><strong>長按時間</strong>：調整長按的觸發時間。</li>
-  <li><strong>字體大小</strong>：中文與英文鍵盤分別調整。</li>
+  <li><strong>長按時間</strong>：調整長按的觸發時間（進階設定）。</li>
+  <li><strong>按鍵按下時的效果</strong>：按下時的變色方式（進階設定）。</li>
+  <li><strong>字體大小</strong>：中文與英文鍵盤分別調整（進階設定）。</li>
   <li><strong>版本資訊</strong>：顯示在「一般」分頁底部，方便回報問題。</li>
 </ul>
+<p>標示「進階設定」的項目平時收起。在設定頁連按「一般」分頁三下即可顯示或再次隱藏。</p>
 
 </body>
 </html>

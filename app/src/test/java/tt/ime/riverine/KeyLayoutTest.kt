@@ -56,11 +56,30 @@ class KeyLayoutTest {
 
     // ---- 擺得邊 -----------------------------------------------------------
 
+    /** `␣`／`⌫`／`⏎`／`⇄` 呢類：必用而且淨係鍵盤本體擺得 */
     @Test fun `必用鍵擺唔入工具列`() {
-        for (f in PadFunc.entries.filter { it.required }) {
+        for (f in PadFunc.entries.filter { it.required && !it.toolOk }) {
             assertNotNull("$f 唔應該入得工具列",
                 KeyLayout.checkDrop(def, Cell(Area.TOOLS, 0, false), f))
         }
+    }
+
+    /**
+     * `Eng`／`123` 工具列都擺得（2026-09-13 user 要求）。由 pool 拖落去係
+     * **加多一粒**，左右欄嗰粒照留 —— 所以 `Eng` 雖然係必用鍵都照准。
+     */
+    @Test fun `英文同數字鍵盤擺得入工具列`() {
+        for (f in listOf(PadFunc.TO_LATIN, PadFunc.TO_NUMBER)) {
+            assertNull("$f 應該入得工具列",
+                KeyLayout.checkDrop(def, Cell(Area.TOOLS, 0, false), f))
+        }
+    }
+
+    /** 但係**搬**（唔係加）就唔得：左右欄冇咗 `Eng` 就返唔到英文 */
+    @Test fun `Eng 由左右欄搬去工具列唔得`() {
+        val eng = Cell(Area.LEFT, 3, false)
+        assertEquals(PadFunc.TO_LATIN, KeyLayout.at(def, eng))
+        assertNotNull(KeyLayout.checkDrop(def, Cell(Area.TOOLS, 0, false), PadFunc.TO_LATIN, eng))
     }
 
     @Test fun `改變大小擺唔入左右欄`() {

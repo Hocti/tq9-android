@@ -98,6 +98,17 @@ enum class PagerLayout(val label: String) {
     WIDE_NEXT("大格「下頁」（長按 = 上頁）"),
 
     /**
+     * **大格「下頁」＋左下角「上頁」**：兩格闊嗰粒 `0` 照 [WIDE_NEXT] 咁做「下頁」，
+     * 但「上頁」唔再收埋喺長撳度，而係揭緊頁嗰陣暫時借用**左欄最底嗰個位**
+     * （左下角，即係 `KeyLayout` 左欄第 4 格）。
+     *
+     * 同 [WIDE_NEXT] 比：長撳 `0` 嘅成對標點（`「」`）保得住，頁數亦都照舊喺
+     * 粒 `0` 左上角；代價係左下角原本嗰粒（預設 `Eng`）選字揭頁期間撳唔到，
+     * 離開選字即刻返返嚟。
+     */
+    WIDE_NEXT_LEFT_PREV("大格「下頁」＋左下角「上頁」"),
+
+    /**
      * **粒 `0` 由頭到尾唔變樣**：兩格闊照舊，長撳照舊係成對標點（`「」`）。
      *
      * 選字模式撳落去一樣係揭下一頁（`TTEngine.press` 收到 `0` 就 `TTCmd.NEXT`，
@@ -343,6 +354,19 @@ object Prefs {
     // 內部 state（唔喺設定頁出現）
     const val KEY_CLIP_HISTORY = "clip_history"
     const val KEY_EMOJI_RECENT = "emoji_recent"
+
+    /**
+     * 「進階隱藏設定」開唔開（見 `SettingsActivity` 連按「一般」分頁三下）。
+     *
+     * 呢啲設定（swipe 停留時間／轉角、logcat、鍵盤大小、顯示目前輸入碼、
+     * 字碼資料庫、筆形提示圖）一般人唔會用到，預設收埋；連按分頁三下就會
+     * 切換返出嚟，一次過切換晒，唔逐項揀。
+     */
+    const val KEY_SHOW_ADVANCED = "show_advanced_settings"
+
+    fun showAdvancedSettings(ctx: Context) = sp(ctx).getBoolean(KEY_SHOW_ADVANCED, false)
+    fun setShowAdvancedSettings(ctx: Context, v: Boolean) =
+        sp(ctx).edit().putBoolean(KEY_SHOW_ADVANCED, v).apply()
 
     fun sp(ctx: Context): SharedPreferences =
         ctx.applicationContext.getSharedPreferences(FILE, Context.MODE_PRIVATE)
@@ -656,12 +680,15 @@ object Prefs {
 
     fun sound(ctx: Context) = sp(ctx).getBoolean(KEY_SOUND, false)
 
-    /** 舊版本一律使用 [KeyPressEffect.LIGHTEN]，新選項的預設值保持相同。 */
+    /**
+     * 舊版本一律使用 [KeyPressEffect.LIGHTEN]；2026-09-13 起新裝置預設改為
+     * [KeyPressEffect.ENLARGE]（略為放大），已經揀過其他效果的舊 user 不受影響。
+     */
     fun keyPressEffect(ctx: Context): KeyPressEffect = runCatching {
         KeyPressEffect.valueOf(
-            sp(ctx).getString(KEY_PRESS_EFFECT, KeyPressEffect.LIGHTEN.name)!!
+            sp(ctx).getString(KEY_PRESS_EFFECT, KeyPressEffect.ENLARGE.name)!!
         )
-    }.getOrDefault(KeyPressEffect.LIGHTEN)
+    }.getOrDefault(KeyPressEffect.ENLARGE)
 
     fun setKeyPressEffect(ctx: Context, effect: KeyPressEffect) =
         sp(ctx).edit().putString(KEY_PRESS_EFFECT, effect.name).apply()
@@ -699,10 +726,17 @@ object Prefs {
      */
     fun inputLog(ctx: Context) = sp(ctx).getBoolean(KEY_INPUT_LOG, false)
 
-    /** 選字揭頁嗰兩粒點排（見 [PagerLayout]） */
+    /**
+     * 選字揭頁嗰兩粒點排（見 [PagerLayout]）。2026-09-13 起新裝置預設改為
+     * [PagerLayout.WIDE_NEXT_LEFT_PREV]（左下角變上頁），已經揀過其他排法的
+     * 舊 user 不受影響。
+     */
     fun pagerLayout(ctx: Context): PagerLayout =
-        runCatching { PagerLayout.valueOf(sp(ctx).getString(KEY_PAGER_LAYOUT, PagerLayout.WIDE_NEXT.name)!!) }
-            .getOrDefault(PagerLayout.WIDE_NEXT)
+        runCatching {
+            PagerLayout.valueOf(
+                sp(ctx).getString(KEY_PAGER_LAYOUT, PagerLayout.WIDE_NEXT_LEFT_PREV.name)!!
+            )
+        }.getOrDefault(PagerLayout.WIDE_NEXT_LEFT_PREV)
 
     fun setPagerLayout(ctx: Context, p: PagerLayout) =
         sp(ctx).edit().putString(KEY_PAGER_LAYOUT, p.name).apply()
