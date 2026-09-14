@@ -1064,14 +1064,23 @@ app 內所有 使用者見到的字（設定頁、toast、鍵面、空狀態提�
 講個專利就只寫「使用已過期專利 HK1035043」，不要帶埋邊間公司。
 （2.0.0 商標避嫌改的，見 CHANGELOG。）
 
-## AI 設定頁分三大類
+## AI 設定頁分兩大類
 
-「AI」分頁分為 **語音輸入 (STT)** / **AI 改寫** / **AI 設定** 三段，每段均可收合
-（`SettingsActivity.collapsible()`）。頭兩段各自有個總開關，第三段是
-**兩邊共用的 provider 設定**（API key、模型名稱、自訂 API、profile）——
-不要分開兩份 key 或者兩個 model 出來。
+「AI」分頁分為 **語音輸入 (STT)** / **AI 改寫** 兩段，每段均可收合
+（`SettingsActivity.collapsible()`），各自有個總開關，**也各自有一組 provider 設定**
+（2026-09-14 改）：`buildAiProviderBlock(slot)` 是可重用的一整組
+「profile＋API key＋模型＋自訂 API」，`AiSlot.REWRITE` / `AiSlot.STT` 各放一個。
 
-已隱藏未是 activity 的 instance state（`aiOpenStt` / `aiOpenRewrite` / `aiOpenSetup`），
+- `AiSlot.REWRITE` 沿用舊 key（`ai_api_key`…），`AiSlot.STT` 用 `slot.key()` 加 `stt_` 前綴。
+  讀一律用 `Prefs.aiProvider(ctx, slot)`（已填好預設值的 `AiProvider`）。
+- 語音輸入有個 **「和 AI 改寫共用 Profile」**（`KEY_AI_STT_SHARE`，預設開）：
+  開著就用 REWRITE 那組、設定頁不顯示 STT 那組。**永遠經 `Prefs.aiSttSlot()` 決定用哪組**，
+  不要直接寫死 `AiSlot.STT`。
+- **Profile 只存 provider 那幾欄**（key／model／useCustom／url／headers／body／
+  multipart／responsePath），名單兩組共用，載入時只寫入按鍵所在那組。舊版 profile
+  存有 prompt／STT 開關，現在載入時不理。
+
+已隱藏未是 activity 的 instance state（`aiOpenStt` / `aiOpenRewrite`），
 不入 pref：重新開應用程式就當三段都展開。改任何一個開關都是整個
 `rebuildAiSection()` 重畫，所以 `collapsible()` 收合時不建立任何 view。
 
@@ -1115,10 +1124,18 @@ app 內所有 使用者見到的字（設定頁、toast、鍵面、空狀態提�
 那套內容一個都不會 set。（`Prefs.aiSttSysSec` 開著時 AI 那條路仍然會自己另外開
 一個 `SpeechRecognizer`，但用的是 `sysStt` 那組獨立欄位，見下面一節。）
 
-- **只 Gemini 做得**：段錄音要用 `inline_data` 這個 Gemini 專用格式送上去，
-  設定頁那套自訂 API 範本（URL／headers／body）無法表達。所以
-  `Prefs.aiSttOn()` 見到 `aiUseCustom` 就**一律回 false**（不理個 pref 之前開過），
-  設定頁那個開關也會鎖住。加新 provider 之前請先諗清楚點送段錄音。
+- **Gemini 或自訂 API 都得**：Gemini 用 `inline_data` 送 ADTS AAC；自訂 API 靠範本中的
+  **`%audio%`** 放錄音 —— multipart 模式（`AiProvider.multipart`）值剛好是 `%audio%`
+  那行變成檔案 `audio.m4a`，JSON 模式 `%audio%` = base64、`%audio_mime%` = MIME。
+  STT 那組的預設範本是 OpenAI Whisper（`Prefs.DEFAULT_AI_STT_BODY`）。
+  用緊的那組是自訂 API 但 body 沒有 `%audio%`（例如共用了改寫那組 chat 範本），
+  `Prefs.aiSttOn()` 就**一律回 false**，跌回系統 STT（`Prefs.aiAudioCapable`）。
+- 自訂 API 範本的 placeholder 用 `AiTemplate.fill()` **一次過掃一轉**，換入去的
+  prompt 內容不會再被換第二次；multipart body 要**先拆行再換**（prompt 本身可以有換行）。
+  兩個都有 `AiTemplateTest`。
+- **`%lang%`**：STT prompt 中換成目標語言。中文九宮格（`PadMode.CHINESE`）按語音用
+  `Prefs.aiSttLang(chinese = true)`（預設「廣東話(有機會中英夾雜)」），其他鍵盤一律
+  預設 `English`，兩個字串都可以在設定頁改。
 - **錄音**用 `VoiceRecorder`（`core/AiStt.kt`）：`AudioRecord` 收 16kHz mono PCM。
   特意**不用 `MediaRecorder`** —— 它一定要寫落檔案，而且各家機出來的容器
   不一定正確 Gemini 收。段 PCM 點包由 `SttAudio` 決定（見下面）。
@@ -1171,6 +1188,10 @@ app 內所有 使用者見到的字（設定頁、toast、鍵面、空狀態提�
   ADTS header 本身已包含同樣的資料。裝置沒有 AAC encoder、或者中途 fail
   （包括 `ENCODE_DEADLINE_MS` 逾時）就回退至 WAV —— **不可以**因為 encode 失敗
   就當今次語音輸入失敗。
+  自訂 API 則用 `SttAudio.encodeM4a()`：同一批 AAC frame（`aacFrames()`）經
+  `MediaMuxer` 包成 m4a（Whisper 不收裸 ADTS）。`MediaMuxer` 只寫得落檔案，所以借
+  `cacheDir` 寫臨時檔再讀回；m4a 需要的 csd-0 來自 `INFO_OUTPUT_FORMAT_CHANGED` 那個
+  `outputFormat`，同樣不可以把 `CODEC_CONFIG` 那段當 frame 寫。
 - prompt（`Prefs.DEFAULT_AI_STT_PROMPT`）逐條明確列出禁止模型進行的操作 —— Gemini 很容易
   加句「以下是錄音的轉錄內容：」，也容易擅自潤飾句子。改 prompt 時
   不要已刪除「只輸出結果」與「逐字轉錄不要潤飾」這兩條。

@@ -144,6 +144,36 @@ enum class KeyPressEffect(val label: String) {
  */
 data class AiPrompt(val name: String, val text: String)
 
+/**
+ * 邊個功能嘅 AI provider 設定（profile／API key／模型／自訂 API）。
+ *
+ * 兩個功能**各有一套**（2026-09-14 user 要求），可以一個用 Gemini、一個用 Whisper。
+ * [REWRITE] 沿用舊版嗰批 key（升級上嚟唔使搬），[STT] 就喺前面加 `stt_`（見 [key]）。
+ * 語音輸入預設**共用** [REWRITE] 嗰套，見 [Prefs.aiSttSlot]。
+ */
+enum class AiSlot {
+    REWRITE, STT;
+
+    /** 呢套設定真正存落 SharedPreferences 嗰個 key */
+    fun key(base: String): String = if (this == REWRITE) base else "stt_$base"
+}
+
+/**
+ * 一套已經填好預設值嘅 provider 設定（[Prefs.aiProvider] 讀出嚟）。
+ * [multipart] = 自訂 API 用 `multipart/form-data` 送（Whisper 嗰類要上傳檔案嘅 API），
+ * 否則用 JSON，見 `AiRewrite.callCustom`。
+ */
+data class AiProvider(
+    val useCustom: Boolean,
+    val key: String,
+    val model: String,
+    val url: String,
+    val headers: String,
+    val body: String,
+    val multipart: Boolean,
+    val responsePath: String,
+)
+
 object Prefs {
 
     /**
@@ -284,6 +314,34 @@ object Prefs {
         "{\"model\":\"%model%\",\"messages\":[{\"role\":\"user\",\"content\":\"%prompt%\"}]}"
     const val DEFAULT_AI_RESPONSE_PATH = "choices.0.message.content"
 
+    /** 自訂 API 用 `multipart/form-data` 送（而唔係 JSON），見 [AiProvider.multipart] */
+    const val KEY_AI_MULTIPART = "ai_custom_multipart"
+
+    /**
+     * 語音輸入嗰套（[AiSlot.STT]）自訂 API 嘅預設範本 = OpenAI Whisper。
+     * multipart body 每行一個 `名稱=值`，值係 `%audio%` 嗰行就係段錄音個檔案；
+     * `prompt` 喺 Whisper 度係「前文」提示（唔係指令），所以填 `%text%` 而唔係 `%prompt%`。
+     */
+    const val DEFAULT_AI_STT_URL = "https://api.openai.com/v1/audio/transcriptions"
+    const val DEFAULT_AI_STT_BODY =
+        "file=%audio%\nmodel=%model%\nprompt=%text%\nresponse_format=json"
+    const val DEFAULT_AI_STT_RESPONSE_PATH = "text"
+
+    /**
+     * 語音輸入同 AI 改寫共用同一套 provider 設定（預設開）。
+     * 熄咗就用語音輸入自己嗰套（[AiSlot.STT]），見 [aiSttSlot]。
+     */
+    const val KEY_AI_STT_SHARE = "ai_stt_share_provider"
+
+    /**
+     * STT prompt 入面 `%lang%` 換成乜：中文九宮格撳語音用 [KEY_AI_STT_LANG_ZH]，
+     * 其他鍵盤（英文／符號／數字／emoji）一律用 [KEY_AI_STT_LANG_OTHER]。
+     */
+    const val KEY_AI_STT_LANG_ZH = "ai_stt_lang_zh"
+    const val KEY_AI_STT_LANG_OTHER = "ai_stt_lang_other"
+    const val DEFAULT_AI_STT_LANG_ZH = "廣東話(有機會中英夾雜)"
+    const val DEFAULT_AI_STT_LANG_OTHER = "English"
+
     /**
      * AI 改寫（✨）成個功能嘅總開關。熄咗就算入咗 API key，工具列都唔會出粒 ✨
      * （見 `TTInputMethodService.applyAiState`）。
@@ -292,8 +350,8 @@ object Prefs {
 
     /**
      * 用 AI 做語音輸入（取代系統嗰個 `SpeechRecognizer`）。
-     * **淨係 Gemini 做得**（要送成段錄音上去），所以 [KEY_AI_USE_CUSTOM] 開咗就唔准開。
-     * 見 `AiStt` 同 `TTInputMethodService.startAiStt`。
+     * 用緊自訂 API 嘅話，body 範本一定要有 `%audio%`（段錄音放喺邊），
+     * 冇就當閂咗（見 [aiSttOn]）。見 `AiStt` 同 `TTInputMethodService.startAiStt`。
      */
     const val KEY_AI_STT_ON = "ai_stt_on"
     const val KEY_AI_STT_PROMPT = "ai_stt_prompt"
@@ -323,11 +381,12 @@ object Prefs {
     /**
      * STT 個 prompt 寫到咁死板係有原因嘅：Gemini 好鍾意喺結果前面加句
      * 「以下是錄音的轉錄內容：」，又鍾意自動幫你執順啲句子。呢兩樣落到輸入框
-     * 都係垃圾，所以逐條寫死唔准做乜。`%text%` 會換成輸入框而家嘅內容（上下文）。
+     * 都係垃圾，所以逐條寫死唔准做乜。`%text%` 會換成輸入框而家嘅內容（上下文），
+     * `%lang%` 換成目標語言（見 [KEY_AI_STT_LANG_ZH]）。
      */
     const val DEFAULT_AI_STT_PROMPT =
         "You are a speech-to-text transcription engine. Transcribe the attached audio " +
-        "recording into Traditional Chinese (Hong Kong usage).\n" +
+        "recording. The expected spoken language is: %lang%\n" +
         "\n" +
         "Rules, all mandatory:\n" +
         "1. Output ONLY the transcription itself. No preamble, no closing remark, " +
@@ -339,8 +398,8 @@ object Prefs {
         "false starts, and filler sounds.\n" +
         "4. Keep the speaker's own words, including English words, numbers, slang and " +
         "proper nouns, exactly as spoken.\n" +
-        "5. Use Traditional Chinese characters only, never Simplified. Add natural " +
-        "punctuation.\n" +
+        "5. Write any Chinese in Traditional Chinese characters (Hong Kong usage) only, " +
+        "never Simplified. Add natural punctuation.\n" +
         "6. If the audio contains no intelligible speech, output nothing at all.\n" +
         "\n" +
         "The text below is what is already typed in the input field. It is context " +
@@ -348,7 +407,11 @@ object Prefs {
         "output:\n" +
         "%text%"
 
-    /** 成套 AI 設定（provider／key／model／prompt／自訂範本）打包做一個 profile，存喺呢個 key 底下嘅一個 JSON object */
+    /**
+     * 一套 provider 設定（[AiProvider]：key／model／自訂範本）打包做一個 profile，
+     * 存喺呢個 key 底下嘅一個 JSON object。AI 改寫同語音輸入**共用同一個名單**，
+     * 邊邊都載入得。舊版 profile 仲有 prompt／STT 開關嗰啲欄，而家載入嗰陣唔理。
+     */
     const val KEY_AI_PROFILES = "ai_profiles"
 
     // 內部 state（唔喺設定頁出現）
@@ -805,9 +868,8 @@ object Prefs {
 
     fun sttLocale(ctx: Context): String = sp(ctx).getString(KEY_STT_LOCALE, "yue-Hant-HK")!!
 
-    fun aiApiKey(ctx: Context): String = sp(ctx).getString(KEY_AI_KEY, "")!!
-    fun aiModel(ctx: Context): String =
-        sp(ctx).getString(KEY_AI_MODEL, DEFAULT_AI_MODEL)!!.ifBlank { DEFAULT_AI_MODEL }
+    fun aiApiKey(ctx: Context, slot: AiSlot = AiSlot.REWRITE): String =
+        sp(ctx).getString(slot.key(KEY_AI_KEY), "")!!
     /** 短撳「AI改」用嘅 prompt ＝ 名單第一個（見 [KEY_AI_PROMPTS]） */
     fun aiPrompt(ctx: Context): String = aiPrompts(ctx).first().text
 
@@ -851,21 +913,38 @@ object Prefs {
         return out.ifEmpty { null }
     }
 
-    fun aiUseCustom(ctx: Context) = sp(ctx).getBoolean(KEY_AI_USE_CUSTOM, false)
-
     /** ✨ 改寫功能開唔開（熄咗連粒掣都唔出） */
     fun aiRewriteOn(ctx: Context) = sp(ctx).getBoolean(KEY_AI_REWRITE_ON, true)
 
+    /** 見 [KEY_AI_STT_SHARE] */
+    fun aiSttShare(ctx: Context) = sp(ctx).getBoolean(KEY_AI_STT_SHARE, true)
+
+    /** 語音輸入真正用緊邊套 provider 設定 */
+    fun aiSttSlot(ctx: Context): AiSlot = if (aiSttShare(ctx)) AiSlot.REWRITE else AiSlot.STT
+
     /**
-     * AI 語音輸入開唔開。**自訂 API 一律當閂咗**——送錄音上去嗰段係
-     * Gemini 專用格式（`inline_data`），自訂範本冇得表達，所以就算個 pref
-     * 之前開過，切咗去自訂 API 都要跌返落系統內置嗰個 STT。
+     * 呢套設定送唔送得段錄音上去：Gemini 一定得（`inline_data`）；
+     * 自訂 API 就要 body 範本有 `%audio%`，唔係根本冇位放段錄音
+     * （例如共用咗 AI 改寫嗰套 chat completions 範本）。
+     */
+    fun aiAudioCapable(p: AiProvider) = !p.useCustom || p.body.contains("%audio%")
+
+    /**
+     * AI 語音輸入開唔開。用緊嗰套設定送唔到錄音（[aiAudioCapable]）就一律當閂咗，
+     * 跌返落系統內置嗰個 STT —— 就算個 pref 之前開過都係。
      */
     fun aiSttOn(ctx: Context) =
-        sp(ctx).getBoolean(KEY_AI_STT_ON, false) && !aiUseCustom(ctx)
+        sp(ctx).getBoolean(KEY_AI_STT_ON, false) && aiAudioCapable(aiProvider(ctx, aiSttSlot(ctx)))
 
     fun aiSttPrompt(ctx: Context): String =
         sp(ctx).getString(KEY_AI_STT_PROMPT, DEFAULT_AI_STT_PROMPT)!!.ifBlank { DEFAULT_AI_STT_PROMPT }
+
+    /** `%lang%` 換成乜：[chinese] = 喺中文九宮格度撳語音（見 [KEY_AI_STT_LANG_ZH]） */
+    fun aiSttLang(ctx: Context, chinese: Boolean): String =
+        if (chinese) sp(ctx).getString(KEY_AI_STT_LANG_ZH, DEFAULT_AI_STT_LANG_ZH)!!
+            .ifBlank { DEFAULT_AI_STT_LANG_ZH }
+        else sp(ctx).getString(KEY_AI_STT_LANG_OTHER, DEFAULT_AI_STT_LANG_OTHER)!!
+            .ifBlank { DEFAULT_AI_STT_LANG_OTHER }
 
     /** 見 [KEY_STT_MUTE_EARCON] */
     fun sttMuteEarcon(ctx: Context) = sp(ctx).getBoolean(KEY_STT_MUTE_EARCON, true)
@@ -873,14 +952,29 @@ object Prefs {
     /** 見 [KEY_AI_STT_SYS_SEC]。0 = 一律用 AI */
     fun aiSttSysSec(ctx: Context): Int =
         sp(ctx).getInt(KEY_AI_STT_SYS_SEC, 8).coerceIn(0, MAX_AI_STT_SYS_SEC)
-    fun aiCustomUrl(ctx: Context): String =
-        sp(ctx).getString(KEY_AI_URL, DEFAULT_AI_URL)!!.ifBlank { DEFAULT_AI_URL }
-    fun aiCustomHeaders(ctx: Context): String =
-        sp(ctx).getString(KEY_AI_HEADERS, DEFAULT_AI_HEADERS)!!
-    fun aiCustomBody(ctx: Context): String =
-        sp(ctx).getString(KEY_AI_BODY, DEFAULT_AI_BODY)!!.ifBlank { DEFAULT_AI_BODY }
-    fun aiCustomResponsePath(ctx: Context): String =
-        sp(ctx).getString(KEY_AI_RESPONSE_PATH, DEFAULT_AI_RESPONSE_PATH)!!.ifBlank { DEFAULT_AI_RESPONSE_PATH }
+
+    /** 自訂 API 範本嘅預設值：語音輸入嗰套預設係 Whisper（multipart），改寫嗰套係 chat completions */
+    fun defaultAiUrl(slot: AiSlot) = if (slot == AiSlot.STT) DEFAULT_AI_STT_URL else DEFAULT_AI_URL
+    fun defaultAiBody(slot: AiSlot) = if (slot == AiSlot.STT) DEFAULT_AI_STT_BODY else DEFAULT_AI_BODY
+    fun defaultAiMultipart(slot: AiSlot) = slot == AiSlot.STT
+    fun defaultAiResponsePath(slot: AiSlot) =
+        if (slot == AiSlot.STT) DEFAULT_AI_STT_RESPONSE_PATH else DEFAULT_AI_RESPONSE_PATH
+
+    /** 讀一套 provider 設定，空白嘅欄跌返落預設（headers 除外 —— 留空係合理設定） */
+    fun aiProvider(ctx: Context, slot: AiSlot): AiProvider {
+        val sp = sp(ctx)
+        fun str(base: String, def: String) = sp.getString(slot.key(base), def)!!.ifBlank { def }
+        return AiProvider(
+            useCustom = sp.getBoolean(slot.key(KEY_AI_USE_CUSTOM), false),
+            key = aiApiKey(ctx, slot),
+            model = str(KEY_AI_MODEL, DEFAULT_AI_MODEL),
+            url = str(KEY_AI_URL, defaultAiUrl(slot)),
+            headers = sp.getString(slot.key(KEY_AI_HEADERS), DEFAULT_AI_HEADERS)!!,
+            body = str(KEY_AI_BODY, defaultAiBody(slot)),
+            multipart = sp.getBoolean(slot.key(KEY_AI_MULTIPART), defaultAiMultipart(slot)),
+            responsePath = str(KEY_AI_RESPONSE_PATH, defaultAiResponsePath(slot)),
+        )
+    }
 
     /** 冇自己換過字碼表嗰陣個 label（`TTDb` 靠佢認返「而家用緊內置嗰份」） */
     const val BUILTIN_DB_LABEL = "內置 dataset.db"
@@ -930,52 +1024,41 @@ object Prefs {
     fun aiProfileNames(ctx: Context): List<String> =
         aiProfilesJson(ctx).keys().asSequence().toList().sorted()
 
-    /** 將而家用緊嗰套 AI 設定存做一個叫 [name] 嘅 profile（同名就覆蓋） */
-    fun saveAiProfile(ctx: Context, name: String) {
+    /** 將 [slot] 而家嗰套 provider 設定存做一個叫 [name] 嘅 profile（同名就覆蓋） */
+    fun saveAiProfile(ctx: Context, name: String, slot: AiSlot) {
         val profiles = aiProfilesJson(ctx)
+        val a = aiProvider(ctx, slot)
         val p = JSONObject().apply {
-            put("useCustom", aiUseCustom(ctx))
-            put("key", aiApiKey(ctx))
-            put("model", aiModel(ctx))
-            // "prompt" 留返俾舊版讀（降級返去都仲有返個 prompt 用）；
-            // 新版讀 "prompts" 嗰個名單，見 [loadAiProfile]
-            put("prompt", aiPrompt(ctx))
-            put("prompts", aiPromptsJson(aiPrompts(ctx)))
-            put("url", aiCustomUrl(ctx))
-            put("headers", aiCustomHeaders(ctx))
-            put("body", aiCustomBody(ctx))
-            put("responsePath", aiCustomResponsePath(ctx))
-            put("rewriteOn", aiRewriteOn(ctx))
-            // 唔用 aiSttOn()：嗰個會俾「自訂 API」壓成 false，存 profile 要存返個原本設定
-            put("sttOn", sp(ctx).getBoolean(KEY_AI_STT_ON, false))
-            put("sttPrompt", aiSttPrompt(ctx))
-            put("sttSysSec", aiSttSysSec(ctx))
+            put("useCustom", a.useCustom)
+            put("key", a.key)
+            put("model", a.model)
+            put("url", a.url)
+            put("headers", a.headers)
+            put("body", a.body)
+            put("multipart", a.multipart)
+            put("responsePath", a.responsePath)
         }
         profiles.put(name, p)
         sp(ctx).edit().putString(KEY_AI_PROFILES, profiles.toString()).apply()
     }
 
-    /** 將叫 [name] 嘅 profile 讀返做而家用緊嗰套 AI 設定；搵唔到就乜都唔做，返 false */
-    fun loadAiProfile(ctx: Context, name: String): Boolean {
+    /**
+     * 將叫 [name] 嘅 profile 讀入 [slot]；搵唔到就乜都唔做，返 false。
+     * 淨係郁 provider 嗰幾欄 —— prompt、功能開關唔屬於 profile（舊版 profile 有都唔理）。
+     */
+    fun loadAiProfile(ctx: Context, name: String, slot: AiSlot): Boolean {
         val p = aiProfilesJson(ctx).optJSONObject(name) ?: return false
         sp(ctx).edit()
-            .putBoolean(KEY_AI_USE_CUSTOM, p.optBoolean("useCustom", false))
-            .putString(KEY_AI_KEY, p.optString("key", ""))
-            .putString(KEY_AI_MODEL, p.optString("model", DEFAULT_AI_MODEL))
-            .putString(KEY_AI_PROMPT, p.optString("prompt", DEFAULT_AI_PROMPT))
-            // 舊 profile 冇 "prompts"：攞佢嗰個單一 prompt 砌返成個名單
-            .putString(KEY_AI_PROMPTS, aiPromptsJson(
-                parseAiPrompts(p.optJSONArray("prompts")?.toString())
-                    ?: defaultAiPrompts(p.optString("prompt", DEFAULT_AI_PROMPT))
-            ).toString())
-            .putString(KEY_AI_URL, p.optString("url", DEFAULT_AI_URL))
-            .putString(KEY_AI_HEADERS, p.optString("headers", DEFAULT_AI_HEADERS))
-            .putString(KEY_AI_BODY, p.optString("body", DEFAULT_AI_BODY))
-            .putString(KEY_AI_RESPONSE_PATH, p.optString("responsePath", DEFAULT_AI_RESPONSE_PATH))
-            .putBoolean(KEY_AI_REWRITE_ON, p.optBoolean("rewriteOn", true))
-            .putBoolean(KEY_AI_STT_ON, p.optBoolean("sttOn", false))
-            .putString(KEY_AI_STT_PROMPT, p.optString("sttPrompt", DEFAULT_AI_STT_PROMPT))
-            .putInt(KEY_AI_STT_SYS_SEC, p.optInt("sttSysSec", 8).coerceIn(0, MAX_AI_STT_SYS_SEC))
+            .putBoolean(slot.key(KEY_AI_USE_CUSTOM), p.optBoolean("useCustom", false))
+            .putString(slot.key(KEY_AI_KEY), p.optString("key", ""))
+            .putString(slot.key(KEY_AI_MODEL), p.optString("model", DEFAULT_AI_MODEL))
+            .putString(slot.key(KEY_AI_URL), p.optString("url", defaultAiUrl(slot)))
+            .putString(slot.key(KEY_AI_HEADERS), p.optString("headers", DEFAULT_AI_HEADERS))
+            .putString(slot.key(KEY_AI_BODY), p.optString("body", defaultAiBody(slot)))
+            // 舊 profile 冇呢欄：嗰陣淨係得 JSON
+            .putBoolean(slot.key(KEY_AI_MULTIPART), p.optBoolean("multipart", false))
+            .putString(slot.key(KEY_AI_RESPONSE_PATH),
+                p.optString("responsePath", defaultAiResponsePath(slot)))
             .apply()
         return true
     }

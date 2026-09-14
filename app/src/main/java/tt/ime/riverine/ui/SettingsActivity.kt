@@ -47,6 +47,7 @@ import androidx.core.view.WindowInsetsCompat
 import com.google.android.material.tabs.TabLayout
 import tt.ime.riverine.BuildConfig
 import tt.ime.riverine.core.AiPrompt
+import tt.ime.riverine.core.AiSlot
 import tt.ime.riverine.core.AiStt
 import tt.ime.riverine.core.BarMode
 import tt.ime.riverine.core.EngLongPress
@@ -154,18 +155,17 @@ class SettingsActivity : AppCompatActivity() {
     private var imeStatus: TextView? = null
     /** 四個可選功能的位（[Prefs.FUNC_SLOTS]）各一個 spinner，一起 sync */
     private val funcPickers = ArrayList<FuncPicker>()
-    private var aiKeyLabel: TextView? = null
-    private var aiKeyShown = false
+    /** 邊幾套 provider 設定而家攤開咗完整 API key（按「顯示」） */
+    private val aiKeyShown = HashSet<AiSlot>()
     private var usageLabel: TextView? = null
     private var pagerNote: TextView? = null
     /** 「長按 1~9 開速選字表」那個掣連它的說明 —— 開了滑動輸入就整組收起，
         見 [refreshLongPressShortcut] */
     private var longPressShortcutViews: List<View> = emptyList()
 
-    /** AI 頁三大類別的展開狀態（不寫入 pref，重開應用程式後全部展開） */
+    /** AI 頁兩大類別的展開狀態（不寫入 pref，重開應用程式後全部展開） */
     private var aiOpenStt = true
     private var aiOpenRewrite = true
-    private var aiOpenSetup = true
 
     private val pickDb = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) replaceDb(uri)
@@ -705,14 +705,14 @@ class SettingsActivity : AppCompatActivity() {
     }
 
     /**
-     * AI 頁分為三大類，每類均可收合（[collapsible]）：
+     * AI 頁分為兩大類，每類均可收合（[collapsible]）：
      *
      *  1. **語音輸入**（[buildSttCategory]）—— 用 AI 取代系統那個語音輸入
      *  2. **AI 改寫**（[buildRewriteCategory]）—— 工具列顆 ✨
-     *  3. **AI 設定**（[buildSetupCategory]）—— API key、模型、自訂 API、profile
      *
-     * 頭兩類各自有個總開關，第三類是兩邊共用的 provider 設定：
-     * 一個 API key、一個模型，不會分開兩份。
+     * 兩類各自有個總開關，也各自有一組 provider 設定（[buildAiProviderBlock]：
+     * profile／API key／模型／自訂 API）。語音輸入預設「和 AI 改寫共用」，
+     * 關了共用才顯示它自己那組。
      */
     private fun buildAiSection() {
         collapsible("語音輸入 (STT)", aiOpenStt, { aiOpenStt = !aiOpenStt; rebuildAiSection() }) {
@@ -721,41 +721,46 @@ class SettingsActivity : AppCompatActivity() {
         collapsible("AI 改寫", aiOpenRewrite, { aiOpenRewrite = !aiOpenRewrite; rebuildAiSection() }) {
             buildRewriteCategory()
         }
-        collapsible("AI 設定", aiOpenSetup, { aiOpenSetup = !aiOpenSetup; rebuildAiSection() }) {
-            buildSetupCategory()
-        }
     }
 
     /**
-     * 用 AI 做語音輸入。**只限 Gemini** —— 要把整段錄音送上去，
-     * 自訂 API 那組範本表達不了（見 [Prefs.aiSttOn]），所以開了「自訂 API」
-     * 這個開關就會被鎖住而且強制關閉。
+     * 用 AI 做語音輸入。用的是 [Prefs.aiSttSlot] 那組 provider 設定；
+     * 那組是自訂 API 但 Body 範本沒有 `%audio%`（放不進錄音）時，
+     * [Prefs.aiSttOn] 一律當關閉，這裡只出警告。
      */
     private fun buildSttCategory() {
-        val custom = Prefs.aiUseCustom(this)
-        val hasKey = Prefs.aiApiKey(this).isNotBlank()
         note("開啟後，工具列的「語音輸入」改由 AI 辨識：按一下開始錄音，再按一次停止；" +
             "按住不放則放手即停。太短或聽不到說話的錄音不會上傳。")
         note("錄音同等待期間鍵盤會變灰，並以提示音告知開始、結束、成功與失敗。" +
             "提示音的音量在「其他 → 提示音音量」調整，拉到「關閉」就完全不出聲。")
-        if (custom) {
-            note("⚠️ 目前使用「自訂 API」，AI 語音輸入只能用 Gemini，" +
-                "請先在「AI 設定」關閉自訂 API。")
-        } else if (!hasKey) {
-            note("⚠️ 尚未設定 API key，請先在「AI 設定」貼上 Gemini API key。")
-        }
-        switch("使用 AI 語音輸入", Prefs.KEY_AI_STT_ON, false, enabled = !custom) { rebuildAiSection() }
+        switch("使用 AI 語音輸入", Prefs.KEY_AI_STT_ON, false) { rebuildAiSection() }
 
-        if (Prefs.aiSttOn(this)) {
-            textField("Prompt（%text% 代表輸入框現有內容，只作上下文）",
+        // 不用 aiSttOn()：範本放不進錄音時它回 false，但設定仍要攤開讓使用者改
+        if (Prefs.sp(this).getBoolean(Prefs.KEY_AI_STT_ON, false)) {
+            val share = Prefs.aiSttShare(this)
+            val provider = Prefs.aiProvider(this, Prefs.aiSttSlot(this))
+            if (!Prefs.aiAudioCapable(provider)) {
+                note("⚠️ " + (if (share) "「AI 改寫」" else "語音輸入") + "的 AI 設定使用自訂 API，" +
+                    "但 Body 範本中沒有 %audio%，無法送出錄音，暫時改用系統語音辨識。" +
+                    (if (share) "請關閉下面「和 AI 改寫共用 Profile」，另外設定語音用的 API。" else ""))
+            } else if (provider.key.isBlank()) {
+                note("⚠️ 尚未設定 API key，請在下面的「AI 設定」" +
+                    (if (share) "（與「AI 改寫」共用）" else "") + "貼上。")
+            }
+
+            textField("Prompt（%text% = 輸入框現有內容，只作上下文；%lang% = 目標語言）",
                 Prefs.KEY_AI_STT_PROMPT, Prefs.DEFAULT_AI_STT_PROMPT, multiline = true)
-            note("預設 prompt 已要求只輸出辨識結果、逐字轉錄、只用繁體字，" +
+            note("預設 prompt 已要求只輸出辨識結果、逐字轉錄、中文只用繁體字，" +
                 "並把輸入框現有內容當成上下文。改動時請保留這些要求，否則 AI 容易自行加話或改寫。")
             row(button("還原預設 Prompt") {
                 Prefs.sp(this).edit().putString(Prefs.KEY_AI_STT_PROMPT, Prefs.DEFAULT_AI_STT_PROMPT).apply()
                 rebuildAiSection()
                 toast("已還原預設 Prompt")
             })
+            textField("中文鍵盤按語音時的 %lang%",
+                Prefs.KEY_AI_STT_LANG_ZH, Prefs.DEFAULT_AI_STT_LANG_ZH)
+            textField("其他鍵盤（英文／符號／數字等）按語音時的 %lang%",
+                Prefs.KEY_AI_STT_LANG_OTHER, Prefs.DEFAULT_AI_STT_LANG_OTHER)
             note("錄音最長 " + (AiStt.MAX_RECORD_MS / 1000) + " 秒，屆時自動停止送出。" +
                 "首次使用需授權錄音權限。")
 
@@ -776,7 +781,26 @@ class SettingsActivity : AppCompatActivity() {
                     "開啟這項就在錄音期間暫時靜音（媒體與系統音，不包括我們自己的提示音），" +
                     "錄完立即還原。代價是錄音那幾秒聽不到正在播放的音樂。")
             }
+
+            subHeader("AI 設定")
+            switch("和 AI 改寫共用 Profile", Prefs.KEY_AI_STT_SHARE, true) { rebuildAiSection() }
+            if (share) {
+                note("使用「AI 改寫」那組 Profile／API key／模型／自訂 API 設定。" +
+                    "想語音用另一個服務（例如 Whisper），就關閉這項。")
+            } else {
+                buildAiProviderBlock(AiSlot.STT)
+            }
         }
+    }
+
+    /** AI 頁類別內的小標題（例如每類底下那個「AI 設定」） */
+    private fun subHeader(text: String) {
+        content.addView(TextView(this).apply {
+            this.text = text
+            textSize = 15f
+            setTypeface(typeface, android.graphics.Typeface.BOLD)
+            setPadding(0, dp(16), 0, dp(2))
+        })
     }
 
     /**
@@ -792,9 +816,11 @@ class SettingsActivity : AppCompatActivity() {
             return
         }
         if (Prefs.aiApiKey(this).isBlank()) {
-            note("⚠️ 尚未設定 API key，「AI 改寫」按鍵不會出現，請先在「AI 設定」貼上。")
+            note("⚠️ 尚未設定 API key，「AI 改寫」按鍵不會出現，請在下面的「AI 設定」貼上。")
         }
         buildPromptList()
+        subHeader("AI 設定")
+        buildAiProviderBlock(AiSlot.REWRITE)
     }
 
     /**
@@ -909,27 +935,26 @@ class SettingsActivity : AppCompatActivity() {
     }
 
     /**
-     * 兩邊共用的 provider 設定。
+     * 一組 provider 設定（可重用：「AI 改寫」和「語音輸入」各放一個，[slot] 分開存）。
      *
      * API key 不使用普通輸入框，因為使用者通常只會從其他位置複製後貼上，或直接刪除。
      * 因此介面只提供「貼上／刪除／顯示」三個按鍵和一行狀態文字。
      *
-     * 預設用 Gemini；[Prefs.KEY_AI_USE_CUSTOM] 開啟後就改用下面那組範本打任何
-     * 接受 JSON 的 HTTP POST API（見 `AiRewrite.callCustom`）。成套設定
-     * （provider／key／model／prompt／範本）可以用下面的 profile 按鍵 save/load/delete。
+     * 預設用 Gemini；「使用自訂 API」開啟後就改用下面那組範本打任何
+     * HTTP POST API（見 `AiRewrite.callCustom`）。整組設定可以用最上面的
+     * profile 按鍵 save/load/delete，profile 名單兩邊共用。
      */
-    private fun buildSetupCategory() {
-        note("API key 與模型名稱由「AI 改寫」和「語音輸入」共用。")
-
-        buildAiProfileRow()
+    private fun buildAiProviderBlock(slot: AiSlot) {
+        buildAiProfileRow(slot)
 
         content.addView(TextView(this).apply {
             text = "API key"
             textSize = 14f
             setPadding(0, dp(10), 0, 0)
         })
-        aiKeyLabel = note("")
-        refreshAiKeyLabel()
+        val keyLabel = note("")
+        refreshAiKeyLabel(keyLabel, slot)
+        val keyPref = slot.key(Prefs.KEY_AI_KEY)
         row(
             button("貼上") {
                 val clip = (getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager)
@@ -937,43 +962,69 @@ class SettingsActivity : AppCompatActivity() {
                 val text = clip?.takeIf { it.itemCount > 0 }
                     ?.getItemAt(0)?.coerceToText(this)?.toString()?.trim().orEmpty()
                 if (text.isEmpty()) { toast("剪貼簿是空的"); return@button }
-                Prefs.sp(this).edit().putString(Prefs.KEY_AI_KEY, text).apply()
-                refreshAiKeyLabel()
+                Prefs.sp(this).edit().putString(keyPref, text).apply()
+                // 語音輸入的警告字眼跟 key 有沒有設定走，整頁重畫
+                rebuildAiSection()
                 toast("已貼上 API key")
             },
             button("刪除") {
-                Prefs.sp(this).edit().remove(Prefs.KEY_AI_KEY).apply()
-                aiKeyShown = false
-                refreshAiKeyLabel()
+                Prefs.sp(this).edit().remove(keyPref).apply()
+                aiKeyShown.remove(slot)
+                rebuildAiSection()
                 toast("已刪除 API key")
             },
             button("顯示") {
-                aiKeyShown = !aiKeyShown
-                refreshAiKeyLabel()
+                if (!aiKeyShown.add(slot)) aiKeyShown.remove(slot)
+                refreshAiKeyLabel(keyLabel, slot)
             }
         )
 
-        textField("模型名稱", Prefs.KEY_AI_MODEL, Prefs.DEFAULT_AI_MODEL)
+        textField("模型名稱", slot.key(Prefs.KEY_AI_MODEL), Prefs.DEFAULT_AI_MODEL)
 
-        switch("使用自訂 API（而非 Gemini）", Prefs.KEY_AI_USE_CUSTOM, false) { rebuildAiSection() }
-
-        if (Prefs.aiUseCustom(this)) {
-            note("自訂 API 只適用於「AI 改寫」，語音輸入必須用 Gemini。")
-            note("須為接受 JSON 的 HTTP POST 端點，下面範本預設是 OpenAI 相容格式" +
-                "（OpenAI、Groq、DeepSeek、OpenRouter、Ollama 等大多適用）。" +
-                "範本中 %key% = API key、%model% = 模型名稱、%prompt% = 套用範本後的內容。")
-            textField("Request URL", Prefs.KEY_AI_URL, Prefs.DEFAULT_AI_URL)
-            textField("Request Headers（每行一個，例如 Authorization: Bearer %key%）",
-                Prefs.KEY_AI_HEADERS, Prefs.DEFAULT_AI_HEADERS, multiline = true)
-            textField("Request Body 範本（JSON）", Prefs.KEY_AI_BODY, Prefs.DEFAULT_AI_BODY,
-                multiline = true)
-            textField("回應內容路徑（例如 choices.0.message.content）",
-                Prefs.KEY_AI_RESPONSE_PATH, Prefs.DEFAULT_AI_RESPONSE_PATH)
+        switch("使用自訂 API（而非 Gemini）", slot.key(Prefs.KEY_AI_USE_CUSTOM), false) {
+            rebuildAiSection()
         }
+        val p = Prefs.aiProvider(this, slot)
+        if (!p.useCustom) return
+
+        if (slot == AiSlot.STT) {
+            note("錄音會壓縮成 m4a（AAC）送出。Body 範本中寫 %audio% 的位置就是音訊檔：")
+            note("• multipart/form-data：每行一個「名稱=值」，值只寫 %audio% 的那行" +
+                "會以檔案 audio.m4a 上傳。\n" +
+                "• JSON：%audio% 換成 base64 音訊（自己加頭尾引號），%audio_mime% 換成 MIME type。")
+            note("預設範本是 OpenAI Whisper：模型名稱填 whisper-1，Body 如下，回應內容路徑填 text。\n" +
+                "file=%audio%\nmodel=%model%\nprompt=%text%\nresponse_format=json")
+            note("其他代號：%key% = API key、%model% = 模型名稱、%prompt% = 套用後的 STT Prompt、" +
+                "%text% = 輸入框現有內容、%lang% = 目標語言。Whisper 的 prompt 欄只是前文提示、" +
+                "不是指令，所以範例放 %text% 而不是 %prompt%。")
+        } else {
+            note("下面範本預設是 OpenAI 相容的 chat completions（JSON）" +
+                "（OpenAI、Groq、DeepSeek、OpenRouter、Ollama 等大多適用）。" +
+                "範本中 %key% = API key、%model% = 模型名稱、%prompt% = 套用範本後的內容、" +
+                "%text% = 待改寫的文字。")
+        }
+        textField("Request URL", slot.key(Prefs.KEY_AI_URL), Prefs.defaultAiUrl(slot))
+        textField("Request Headers（每行一個，例如 Authorization: Bearer %key%）",
+            slot.key(Prefs.KEY_AI_HEADERS), Prefs.DEFAULT_AI_HEADERS, multiline = true)
+        switch("以 multipart/form-data 送出（而非 JSON）", slot.key(Prefs.KEY_AI_MULTIPART),
+            Prefs.defaultAiMultipart(slot)) { rebuildAiSection() }
+        textField(
+            if (p.multipart) "Request Body（multipart，每行一個 名稱=值）" else "Request Body 範本（JSON）",
+            slot.key(Prefs.KEY_AI_BODY), Prefs.defaultAiBody(slot), multiline = true)
+        textField("回應內容路徑（例如 " + Prefs.defaultAiResponsePath(slot) + "）",
+            slot.key(Prefs.KEY_AI_RESPONSE_PATH), Prefs.defaultAiResponsePath(slot))
+        row(button("還原預設範本") {
+            val e = Prefs.sp(this).edit()
+            for (k in listOf(Prefs.KEY_AI_URL, Prefs.KEY_AI_HEADERS, Prefs.KEY_AI_BODY,
+                    Prefs.KEY_AI_MULTIPART, Prefs.KEY_AI_RESPONSE_PATH)) e.remove(slot.key(k))
+            e.apply()
+            rebuildAiSection()
+            toast("已還原預設範本")
+        })
     }
 
-    /** 已存 profile 的下拉選單 + 載入／另存新檔／刪除三個按鍵 */
-    private fun buildAiProfileRow() {
+    /** 已存 profile 的下拉選單 + 載入／另存新檔／刪除三個按鍵（名單兩組共用，載入只寫 [slot]） */
+    private fun buildAiProfileRow(slot: AiSlot) {
         content.addView(TextView(this).apply {
             text = "已儲存的 Profile"
             textSize = 14f
@@ -992,12 +1043,12 @@ class SettingsActivity : AppCompatActivity() {
             button("載入") {
                 val name = names.getOrNull(spinner.selectedItemPosition)
                 if (name == null) { toast("未有已存 Profile"); return@button }
-                Prefs.loadAiProfile(this, name)
-                aiKeyShown = false
+                Prefs.loadAiProfile(this, name, slot)
+                aiKeyShown.remove(slot)
                 rebuildAiSection()
                 toast("已載入「$name」")
             },
-            button("另存新檔") { promptSaveAiProfile() },
+            button("另存新檔") { promptSaveAiProfile(slot) },
             button("刪除") {
                 val name = names.getOrNull(spinner.selectedItemPosition)
                 if (name == null) { toast("未有已存 Profile"); return@button }
@@ -1009,7 +1060,7 @@ class SettingsActivity : AppCompatActivity() {
     }
 
     /** 顯示對話框詢問 profile 名稱，按「儲存」後才寫入 */
-    private fun promptSaveAiProfile() {
+    private fun promptSaveAiProfile(slot: AiSlot) {
         val input = EditText(this).apply { hint = "Profile 名稱" }
         val pad = dp(20)
         val wrap = FrameLayout(this).apply {
@@ -1022,7 +1073,7 @@ class SettingsActivity : AppCompatActivity() {
             .setPositiveButton("儲存") { _, _ ->
                 val name = input.text.toString().trim()
                 if (name.isEmpty()) { toast("請輸入名稱"); return@setPositiveButton }
-                Prefs.saveAiProfile(this, name)
+                Prefs.saveAiProfile(this, name, slot)
                 rebuildAiSection()
                 toast("已儲存「$name」")
             }
@@ -1036,11 +1087,12 @@ class SettingsActivity : AppCompatActivity() {
     }
 
     /** 沒有 key 就明確說明沒有，有 key 就預設遮住中間（按「顯示」先查看完整內容） */
-    private fun refreshAiKeyLabel() {
-        val key = Prefs.aiApiKey(this)
-        aiKeyLabel?.text = when {
-            key.isEmpty() -> "尚未設定（「AI 改寫」按鍵不會出現）"
-            aiKeyShown -> key
+    private fun refreshAiKeyLabel(label: TextView, slot: AiSlot) {
+        val key = Prefs.aiApiKey(this, slot)
+        label.text = when {
+            key.isEmpty() && slot == AiSlot.REWRITE -> "尚未設定（「AI 改寫」按鍵不會出現）"
+            key.isEmpty() -> "尚未設定"
+            slot in aiKeyShown -> key
             key.length <= 8 -> "已設定（" + "•".repeat(key.length) + "）"
             else -> "已設定（" + key.take(4) + "…" + key.takeLast(4) + "）"
         }
@@ -1643,7 +1695,7 @@ class SettingsActivity : AppCompatActivity() {
     }
 
     /**
-     * [enabled] = false：按保持不變（目前不允許開啟的項目，例如自訂 API 之下的 AI 語音輸入）
+     * [enabled] = false：按保持不變（目前不允許開啟的項目）
      *
      * 回傳那個 `Switch`，需要事後收起／改動它的（見 [refreshLongPressShortcut]）才用得著。
      */

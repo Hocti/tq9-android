@@ -33,8 +33,8 @@ android {
         applicationId = "tt.ime.riverine"
         minSdk = 26
         targetSdk = 36
-        versionCode = 78
-        versionName = "2.2.16"
+        versionCode = 79
+        versionName = "2.2.17"
     }
 
     signingConfigs {

@@ -7,25 +7,28 @@ import android.media.AudioRecord
 import android.media.MediaCodec
 import android.media.MediaCodecInfo
 import android.media.MediaFormat
+import android.media.MediaMuxer
 import android.media.MediaRecorder
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
 import java.io.ByteArrayOutputStream
+import java.io.File
+import java.nio.ByteBuffer
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.sqrt
 
 /**
- * 用 Gemini 做語音輸入（[Prefs.KEY_AI_STT_ON] 開咗就取代系統嗰個 `SpeechRecognizer`）。
+ * 用 AI 做語音輸入（[Prefs.KEY_AI_STT_ON] 開咗就取代系統嗰個 `SpeechRecognizer`）。
  *
  * 分三件事：[VoiceRecorder] 喺部機度錄一段 PCM、[VoiceActivity] 判斷段嘢究竟有冇人
- * 講過嘢、[transcribe] 壓縮完連 [Prefs.aiSttPrompt] 一齊掟上 Gemini，
+ * 講過嘢、[transcribe] 壓縮完連 [Prefs.aiSttPrompt] 一齊掟上 AI，
  * 回返一段**淨係得結果**嘅字。
  *
- * **淨係 Gemini 做得**：段錄音要用 `inline_data` 呢個 Gemini 專用格式送上去，
- * 設定頁嗰套自訂 API 範本表達唔到，所以 [Prefs.aiSttOn] 見到「自訂 API」開咗
- * 就一律當閂咗，跌返落系統內置嗰個 STT。
+ * 用 [Prefs.aiSttSlot] 嗰套 provider 設定：Gemini 用 `inline_data` 送 ADTS AAC；
+ * 自訂 API 送 m4a，範本入面 `%audio%` 話事段錄音放喺邊（見 `AiRewrite.callCustom`）。
+ * 範本冇 `%audio%` 嘅話 [Prefs.aiSttOn] 一律當閂咗，跌返落系統內置嗰個 STT。
  */
 object AiStt {
 
@@ -36,28 +39,37 @@ object AiStt {
 
     /**
      * [done] 一定喺 main thread 叫。[contextText] 會填入 prompt 嘅 `%text%`
-     * （＝輸入框而家嘅內容，純粹畀個上下文 AI 知，唔會出現喺結果度）。
+     * （＝輸入框而家嘅內容，純粹畀個上下文 AI 知，唔會出現喺結果度），
+     * [lang] 填入 `%lang%`（見 [Prefs.aiSttLang]）。
      *
      * **壓縮喺呢度做，唔喺 [VoiceRecorder.stop] 做** —— 一分鐘錄音 encode 落 AAC
      * 要成幾百毫秒，擺喺 `stop()` 就係擺咗喺 main thread 度，放手嗰下會窒。
      */
-    fun transcribe(ctx: Context, clip: VoiceClip.Ready, contextText: String,
+    fun transcribe(ctx: Context, clip: VoiceClip.Ready, contextText: String, lang: String,
                    done: (Result<String>) -> Unit) {
-        val key = Prefs.aiApiKey(ctx)
-        if (key.isBlank()) {
+        val p = Prefs.aiProvider(ctx, Prefs.aiSttSlot(ctx))
+        if (p.key.isBlank()) {
             done(Result.failure(IllegalStateException("尚未設定 API key")))
             return
         }
-        val model = Prefs.aiModel(ctx)
-        val template = Prefs.aiSttPrompt(ctx)
         // 冇 %text% 就當 user 特登唔要上下文，唔好好似改寫嗰邊咁貼落尾 ——
         // 貼落尾 AI 好易當咗嗰段字都係要轉錄嘅嘢，一併照抄出嚟
-        val prompt = template.replace("%text%", contextText.ifBlank { "（空白）" })
+        val vars = mapOf("text" to contextText.ifBlank { "（空白）" }, "lang" to lang)
+        val prompt = AiTemplate.fill(Prefs.aiSttPrompt(ctx), vars)
+        val cacheDir = ctx.cacheDir
 
         Thread {
             val r = runCatching {
-                val (bytes, mime) = SttAudio.encode(clip.pcm, clip.sampleRate)
-                AiRewrite.callGemini(key, model, prompt, bytes, mime)
+                if (p.useCustom) {
+                    // Whisper 嗰類 API 唔收裸 ADTS（.aac），要 m4a
+                    val (bytes, mime) = SttAudio.encodeM4a(clip.pcm, clip.sampleRate, cacheDir)
+                    val audio = AiRewrite.Audio(bytes, mime, SttAudio.fileName(mime))
+                    // multipart 嗰邊 %text% 係直接送出去嘅值，空白就留空，唔好送「（空白）」
+                    AiRewrite.callCustom(p, prompt, vars + ("text" to contextText), audio)
+                } else {
+                    val (bytes, mime) = SttAudio.encode(clip.pcm, clip.sampleRate)
+                    AiRewrite.callGemini(p.key, p.model, prompt, bytes, mime)
+                }
             }
             ui.post { done(r) }
         }.start()
@@ -271,16 +283,74 @@ object SttAudio {
         24000, 22050, 16000, 12000, 11025, 8000, 7350
     )
 
-    /** 回（要送嘅 bytes、佢個 MIME type） */
+    /** Gemini 用：回（ADTS AAC bytes、MIME type），encode 唔到就 WAV */
     fun encode(pcm: ByteArray, sampleRate: Int): Pair<ByteArray, String> {
         val aac = runCatching { encodeAac(pcm, sampleRate) }.getOrNull()
         return if (aac != null) aac to "audio/aac" else wav(pcm, sampleRate) to "audio/wav"
     }
 
+    /**
+     * 自訂 API（Whisper 嗰類）用：同一批 AAC frame 用 `MediaMuxer` 包做 **m4a**。
+     * Whisper 收 m4a 但唔收裸 ADTS。`MediaMuxer` 淨係寫得落檔案，所以借 [tmpDir]
+     * 寫個臨時檔再讀返出嚟。做唔到一樣跌返落 WAV。
+     */
+    fun encodeM4a(pcm: ByteArray, sampleRate: Int, tmpDir: File): Pair<ByteArray, String> {
+        val m4a = runCatching {
+            aacFrames(pcm, sampleRate)?.let { muxM4a(it, tmpDir) }
+        }.getOrNull()
+        return if (m4a != null) m4a to "audio/mp4" else wav(pcm, sampleRate) to "audio/wav"
+    }
+
+    /** multipart 上傳個檔名 —— Whisper 靠副檔名認格式 */
+    fun fileName(mime: String) = when (mime) {
+        "audio/mp4" -> "audio.m4a"
+        "audio/aac" -> "audio.aac"
+        else -> "audio.wav"
+    }
+
+    private class AacFrame(val bytes: ByteArray, val ptsUs: Long)
+
+    /** encoder 出嚟嘅 frame（唔包 header）連埋個 output format（入面有 muxer 要嘅 csd-0） */
+    private class AacStream(val format: MediaFormat, val frames: List<AacFrame>)
+
     /** 回 null = 呢部機做唔到，由 [encode] 跌返落 WAV */
     private fun encodeAac(pcm: ByteArray, sampleRate: Int): ByteArray? {
         val freqIdx = freqIndex(sampleRate)
-        if (freqIdx < 0 || pcm.isEmpty()) return null
+        if (freqIdx < 0) return null
+        val stream = aacFrames(pcm, sampleRate) ?: return null
+        val out = ByteArrayOutputStream(stream.frames.sumOf { it.bytes.size + 7 })
+        for (f in stream.frames) {
+            out.write(adtsHeader(f.bytes.size, freqIdx))
+            out.write(f.bytes)
+        }
+        return out.toByteArray()
+    }
+
+    private fun muxM4a(stream: AacStream, tmpDir: File): ByteArray? {
+        val file = File.createTempFile("stt", ".m4a", tmpDir)
+        try {
+            val muxer = MediaMuxer(file.path, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
+            try {
+                val track = muxer.addTrack(stream.format)
+                muxer.start()
+                val info = MediaCodec.BufferInfo()
+                for (f in stream.frames) {
+                    info.set(0, f.bytes.size, f.ptsUs, MediaCodec.BUFFER_FLAG_KEY_FRAME)
+                    muxer.writeSampleData(track, ByteBuffer.wrap(f.bytes), info)
+                }
+                muxer.stop()
+            } finally {
+                runCatching { muxer.release() }
+            }
+            return file.readBytes().takeIf { it.isNotEmpty() }
+        } finally {
+            file.delete()
+        }
+    }
+
+    /** 回 null = 呢部機做唔到 */
+    private fun aacFrames(pcm: ByteArray, sampleRate: Int): AacStream? {
+        if (pcm.isEmpty()) return null
         val codec = runCatching {
             MediaCodec.createEncoderByType(MediaFormat.MIMETYPE_AUDIO_AAC)
         }.getOrNull() ?: return null
@@ -295,7 +365,8 @@ object SttAudio {
             codec.configure(fmt, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
             codec.start()
 
-            val out = ByteArrayOutputStream(pcm.size / 8)
+            val frames = ArrayList<AacFrame>()
+            var outFormat: MediaFormat? = null
             val info = MediaCodec.BufferInfo()
             val deadline = SystemClock.elapsedRealtime() + ENCODE_DEADLINE_MS
             var offset = 0
@@ -321,24 +392,26 @@ object SttAudio {
                     }
                 }
                 val outIdx = codec.dequeueOutputBuffer(info, TIMEOUT_US)
-                if (outIdx >= 0) {
-                    // CODEC_CONFIG 嗰嚿係 AudioSpecificConfig，ADTS header 已經
-                    // 包含晒同樣嘅資料，再寫多次落個 stream 度反而會播唔到
+                if (outIdx == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED) {
+                    outFormat = codec.outputFormat
+                } else if (outIdx >= 0) {
+                    // CODEC_CONFIG 嗰嚿係 AudioSpecificConfig：ADTS header 已經包含晒
+                    // 同樣嘅資料，m4a 就由 outputFormat 個 csd-0 帶，兩邊都唔好當 frame 寫
                     val isConfig = (info.flags and MediaCodec.BUFFER_FLAG_CODEC_CONFIG) != 0
                     if (info.size > 0 && !isConfig) {
                         val buf = codec.getOutputBuffer(outIdx) ?: return null
                         buf.position(info.offset)
                         buf.limit(info.offset + info.size)
-                        out.write(adtsHeader(info.size, freqIdx))
                         val chunk = ByteArray(info.size)
                         buf.get(chunk)
-                        out.write(chunk)
+                        frames.add(AacFrame(chunk, info.presentationTimeUs))
                     }
                     codec.releaseOutputBuffer(outIdx, false)
                     if ((info.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) eosSeen = true
                 }
             }
-            out.toByteArray().takeIf { it.isNotEmpty() }
+            val muxFormat = outFormat ?: return null
+            if (frames.isEmpty()) null else AacStream(muxFormat, frames)
         } catch (_: Exception) {
             null
         } catch (_: OutOfMemoryError) {

@@ -99,22 +99,24 @@
   <p>選取文字後按 <span class="accent">✨</span>，可改寫選取的部分；如未選取文字，則改寫整個輸入欄。未設定 API key 或未啟用「AI 改寫」時，按鍵不會顯示。</p>
   <ul>
     <li><strong>Prompt</strong> 中的 <code>%text%</code> 會替換為待改寫文字。</li>
-    <li>預設使用 <strong>Gemini</strong>。如啟用自訂 API，須設定 URL、headers、JSON body 範本及回應內容路徑。</li>
-    <li><code>%key%</code>、<code>%model%</code> 和 <code>%prompt%</code> 會在送出前自動替換。</li>
-    <li>可將整套 AI 設定儲存為 Profile，方便切換不同服務。</li>
+    <li>預設使用 <strong>Gemini</strong>。如啟用自訂 API，須設定 URL、headers、body 範本（JSON 或 multipart/form-data）及回應內容路徑。</li>
+    <li><code>%key%</code>、<code>%model%</code>、<code>%prompt%</code> 和 <code>%text%</code> 會在送出前自動替換。</li>
+    <li>可將 API key、模型及自訂 API 設定儲存為 Profile，方便切換不同服務；Profile 清單與語音輸入共用。</li>
   </ul>
 </div>
 
 <h2>語音輸入</h2>
 <p>按 🎤 可使用系統語音輸入。首次使用時，系統會要求麥克風權限。</p>
 <div class="card">
-  <p><strong>AI 語音輸入</strong>啟用後，🎤 會改用 Gemini 辨識錄音。</p>
+  <p><strong>AI 語音輸入</strong>啟用後，🎤 會改用 AI 辨識錄音。</p>
   <ul>
     <li>按一下開始錄音，再按一下或輕觸畫面停止。按住 🎤 時，放手即停止。</li>
     <li>錄音及等待結果期間，鍵盤會變灰並暫停操作。</li>
     <li>太短或沒有人聲的錄音不會上傳；最長錄音時間為 90 秒。</li>
     <li>輸入欄的現有內容會作為辨識上下文，不會重複輸出。</li>
-    <li>這項功能只支援 Gemini；啟用自訂 API 時無法使用。</li>
+    <li>Prompt 中的 <code>%lang%</code> 會換成目標語言：在中文鍵盤按語音預設為「廣東話(有機會中英夾雜)」，其他鍵盤預設為「English」。</li>
+    <li>預設與「AI 改寫」共用同一組 AI 設定；關閉「和 AI 改寫共用 Profile」後，可另設一組（例如 OpenAI Whisper）。</li>
+    <li>使用自訂 API 時，body 範本中 <code>%audio%</code> 的位置就是錄音（m4a）；沒有 <code>%audio%</code> 則無法送出錄音，會改用系統語音輸入。</li>
   </ul>
 </div>
 

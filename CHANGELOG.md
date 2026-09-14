@@ -5,6 +5,32 @@
 
 ---
 
+## [2.2.17] — 2026-09-14
+
+### AI 語音輸入同 AI 改寫可以用兩套唔同嘅 AI 設定
+
+「AI 設定」（Profile＋API key＋模型＋自訂 API）而家係一組重用嘅設定，
+「AI 改寫」同「語音輸入 (STT)」各有一組，唔再係第三段共用。語音輸入多咗個
+**「和 AI 改寫共用 Profile」**（預設開，即係同以前一樣）；熄咗先會出返語音自己嗰組。
+Profile 名單兩邊共用，但而家淨係存 provider 嗰幾欄 —— 舊 profile 入面嘅 prompt、
+STT 開關載入嗰陣唔再理。
+
+### 語音輸入支援自訂 API（例：OpenAI Whisper）
+
+以前語音輸入淨係 Gemini 做得。而家自訂 API 範本入面 **`%audio%`** 就係段錄音：
+multipart/form-data 模式下 `file=%audio%` 嗰行會以 `audio.m4a` 上傳，JSON 模式就換成
+base64（`%audio_mime%` = MIME type）。語音嗰組嘅預設範本就係 Whisper
+（`/v1/audio/transcriptions`，回應路徑 `text`）。範本冇 `%audio%` 就當送唔到錄音，
+跌返落系統語音輸入。自訂 API 送嘅錄音係 **m4a（AAC）**，Gemini 照舊用 ADTS AAC。
+
+### STT prompt 加 `%lang%`
+
+`%lang%` 換成目標語言：喺中文鍵盤撳語音預設「廣東話(有機會中英夾雜)」，其他鍵盤
+一律「English」，兩句都可以喺設定頁改。預設 prompt 已經用咗 `%lang%`；
+自己改過 prompt 嘅要自己加返（或者撳「還原預設 Prompt」）。
+
+---
+
 ## [2.2.16] — 2026-09-13
 
 ### emoji 表粒 ✖ 搬咗入 emoji 表度

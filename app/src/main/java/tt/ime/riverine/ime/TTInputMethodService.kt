@@ -1960,7 +1960,7 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
      * user 原本揀住嗰段字仲喺度。
      */
     private fun openAiPrompts() {
-        if (Prefs.aiApiKey(this).isBlank()) { toast("請先在設定頁輸入 Gemini API key"); return }
+        if (Prefs.aiApiKey(this).isBlank()) { toast("請先在設定頁輸入 AI 改寫的 API key"); return }
         if (!Prefs.aiRewriteOn(this)) { toast("AI 改寫已在設定頁關閉"); return }
         rememberPadHeight()
         showOverlay(AiPromptListView(this).apply {
@@ -1979,7 +1979,7 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
      */
     private fun runAi(template: String = Prefs.aiPrompt(this)) {
         val ic = currentInputConnection ?: return
-        if (Prefs.aiApiKey(this).isBlank()) { toast("請先在設定頁輸入 Gemini API key"); return }
+        if (Prefs.aiApiKey(this).isBlank()) { toast("請先在設定頁輸入 AI 改寫的 API key"); return }
         if (!Prefs.aiRewriteOn(this)) { toast("AI 改寫已在設定頁關閉"); return }
         var selected = ic.getSelectedText(0)?.toString().orEmpty()
         val wholeField = selected.isBlank()
@@ -2305,10 +2305,11 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
 
     /**
      * 用 AI 做語音輸入（`AiStt`）而唔係系統嗰個 `SpeechRecognizer`。
-     * 要設定頁開咗、有 API key、而且**用緊 Gemini**（自訂 API 送唔到錄音上去，
-     * 見 [Prefs.aiSttOn]）。差一樣就照跌返落 [toggleStt] 原本嗰條路。
+     * 要設定頁開咗、語音輸入嗰套設定（[Prefs.aiSttSlot]）有 API key、而且送得到錄音
+     * （自訂 API 範本要有 `%audio%`，見 [Prefs.aiSttOn]）。差一樣就照跌返落 [toggleStt] 原本嗰條路。
      */
-    private fun aiSttOn() = Prefs.aiSttOn(this) && Prefs.aiApiKey(this).isNotBlank()
+    private fun aiSttOn() =
+        Prefs.aiSttOn(this) && Prefs.aiApiKey(this, Prefs.aiSttSlot(this)).isNotBlank()
 
     /**
      * 開始錄音。[hold] = 撳實錄嗰種（放手就收工），false = 撳一下開始、再撳一下停。
@@ -2380,7 +2381,7 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
         if (useSys) waitSysStt(ready) else if (ready != null) startAiTranscribe(ready)
     }
 
-    /** 段錄音送上 Gemini。呢步之前一定已經出咗 [showSttWaiting] */
+    /** 段錄音送上 AI。呢步之前一定已經出咗 [showSttWaiting] */
     private fun startAiTranscribe(clip: VoiceClip.Ready) {
         val myGen = ++sttGeneration
         val timeout = Runnable {
@@ -2393,7 +2394,9 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
         }
         ui.postDelayed(timeout, STT_TIMEOUT_MS)
 
-        AiStt.transcribe(this, clip, sttContext()) { r ->
+        // 中文九宮格撳就當講廣東話，其他鍵盤（英文／符號／數字／emoji）一律當英文
+        val lang = Prefs.aiSttLang(this, chinese = mode == PadMode.CHINESE)
+        AiStt.transcribe(this, clip, sttContext(), lang) { r ->
             if (myGen != sttGeneration) return@transcribe // 已經逾時處理咗
             ui.removeCallbacks(timeout)
             sttGeneration++
