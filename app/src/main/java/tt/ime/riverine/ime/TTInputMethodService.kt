@@ -759,6 +759,7 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
             KeyAction.TO_EMOJI -> openEmoji()
             KeyAction.PASTE -> paste()
             KeyAction.COPY -> copy()
+            KeyAction.CUT -> cut()
             KeyAction.SELECT_ALL -> selectAll()
             KeyAction.UNDO -> undo(redo = false)
             KeyAction.REDO -> undo(redo = true)
@@ -1200,6 +1201,27 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
         if (all.isEmpty()) { toast("輸入框沒有文字，無法複製"); return }
         clipboard()?.setPrimaryClip(ClipData.newPlainText(null, all))
         toast("已複製整個輸入框")
+    }
+
+    /**
+     * 剪下：有揀字就叫個欄自己剪（`android.R.id.cut`，同 [copy] 一樣行
+     * `performContextMenuAction`）；冇揀就唔似 [copy] 咁淨係讀出嚟算 ——
+     * 剪一定要真係郁到個欄，所以要先幫佢全選成個輸入框先剪得到。
+     */
+    private fun cut() {
+        val ic = currentInputConnection ?: return
+        val selected = ic.getSelectedText(0)?.toString().orEmpty()
+        if (selected.isNotEmpty()) {
+            ic.performContextMenuAction(android.R.id.cut)
+            onStateChanged()
+            return
+        }
+        if (extractedAll().isEmpty()) { toast("輸入框沒有文字，無法剪下"); return }
+        finishLatinComposing()
+        if (mode == PadMode.CHINESE) engine.cancel()
+        ic.performContextMenuAction(android.R.id.selectAll)
+        ic.performContextMenuAction(android.R.id.cut)
+        onStateChanged()
     }
 
     /**

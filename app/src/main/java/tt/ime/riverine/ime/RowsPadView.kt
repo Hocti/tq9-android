@@ -120,12 +120,11 @@ abstract class RowsPadView(context: Context) : KeyboardBaseView(context) {
             },
             scale = scale
         )
-        // 左上角一律寫「長撳做乜」。長撳嗰樣嘢冇字（轉輸入法）就畫個圖案代替 ——
+        // 左上角一律寫「長撳做乜」。長撳嗰個動作有專屬圖案就畫圖案代替 ——
         // 純數字鍵盤粒 `Eng` 就係咁（見 [longIconOf] 同 `NumberPadView.toLatin`）
-        if (k.hint.isNotEmpty()) drawCornerHint(canvas, box, k.hint, scale = scale)
-        else longIconOf(k.longAction)?.let {
-            drawCornerIcon(canvas, box, it, scale = scale)
-        }
+        val hintIcon = longIconOf(k.longAction)
+        if (hintIcon != null) drawCornerIcon(canvas, box, hintIcon, scale = scale)
+        else if (k.hint.isNotEmpty()) drawCornerHint(canvas, box, k.hint, scale = scale)
         if (k.hintRight.isNotEmpty()) drawCornerHintRight(canvas, box, k.hintRight, scale = scale)
     }
 

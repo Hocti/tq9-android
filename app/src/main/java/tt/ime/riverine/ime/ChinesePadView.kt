@@ -331,28 +331,30 @@ class ChinesePadView(context: Context, private val engine: TTEngine) : KeyboardB
             else -> theme.keyFaceAlt
         }
         drawFace(canvas, box, pressedFaceColor(color, isDown && usable))
-        // 功能鍵成粒都行 [funcFontScale]：設定頁條字體 slider 係為咗睇清楚啲**字**
-        // （下面啲關聯字）而拉，「同音」「取消」「Eng」呢啲跟住一齊大就逼爆粒鍵
-        drawLabel(
-            canvas, box, labelOf(k),
-            sizeRatio = if (k.action == KeyAction.CANCEL) 0.36f else 0.40f,
-            color = if (usable) theme.text else theme.textDim,
-            scale = funcFontScale
-        )
         // `on` 淨係同音／簡體／工具 bar 三粒先會 true，嗰陣粒鍵係 accent 色底
         val hintColor = if (on) theme.onAccentText else theme.textDim
-        // 粒鍵冇字好寫（轉輸入法嗰兩粒）就改為喺正中畫個單色圖案 ——
-        // 唔用彩色 emoji，理由同 [ToolIcons] 嗰段一樣
-        if (k.label.isEmpty()) longIconOf(k.action)?.let {
-            drawCenterIcon(canvas, box, it,
+        // 有專屬圖案（複製／剪下／全選／復原／重做／表情／錄音／轉輸入法嗰兩粒）
+        // 就一律畫圖案代替文字，唔畫圖案先寫返 face 嗰幾隻字 —— 同工具列
+        // （`PadFuncKeys.toolIcon`）睇齊，唔好一個功能兩個地方兩個樣
+        val centerIcon = longIconOf(k.action)
+        if (centerIcon != null) {
+            drawCenterIcon(canvas, box, centerIcon,
                 if (usable) theme.text else theme.textDim, scale = funcFontScale)
+        } else {
+            // 功能鍵成粒都行 [funcFontScale]：設定頁條字體 slider 係為咗睇清楚啲**字**
+            // （下面啲關聯字）而拉，「同音」「取消」「Eng」呢啲跟住一齊大就逼爆粒鍵
+            drawLabel(
+                canvas, box, labelOf(k),
+                sizeRatio = if (k.action == KeyAction.CANCEL) 0.36f else 0.40f,
+                color = if (usable) theme.text else theme.textDim,
+                scale = funcFontScale
+            )
         }
-        // 左上角跟返成個 app 嘅規矩：**一律寫「長撳做乜」**。長撳嗰樣嘢冇字
-        // （轉輸入法）就畫個角落圖案代替，否則粒鍵就會完全睇唔出長撳得
-        if (k.hint.isNotEmpty()) drawCornerHint(canvas, box, k.hint, hintColor, funcFontScale)
-        else longIconOf(k.longAction)?.let {
-            drawCornerIcon(canvas, box, it, hintColor, funcFontScale)
-        }
+        // 左上角跟返成個 app 嘅規矩：**一律寫「長撳做乜」**。長撳嗰個動作有專屬
+        // 圖案就畫圖案，冇就照舊寫返長撳個 face（一個字都冇就乜都唔畫）
+        val hintIcon = longIconOf(k.longAction)
+        if (hintIcon != null) drawCornerIcon(canvas, box, hintIcon, hintColor, funcFontScale)
+        else if (k.hint.isNotEmpty()) drawCornerHint(canvas, box, k.hint, hintColor, funcFontScale)
         if (k.action == KeyAction.HOMO) {
             // 同音鍵嘅即時提示喺**左下角**（左上角個位讓咗俾長撳）。三樣嘢輪住用
             // 呢個位，排住嘅次序就係優先次序：

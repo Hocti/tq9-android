@@ -104,6 +104,7 @@ enum class PadFunc(
      * 冇字可複製）就撳唔到，見 `ChinesePadView.ChineseHost.copyReady`。
      */
     COPY("複製", "複製"),
+    CUT("剪下", "剪下"),
     SELECT_ALL("全選", "全選"),
     UNDO("復原", "復原"),
     REDO("重做", "重做"),

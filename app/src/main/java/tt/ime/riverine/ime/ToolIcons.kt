@@ -66,6 +66,21 @@ enum class ToolIcon {
      * 邊粒係邊粒，所以呢個特登係「地球細咗、隔籬有張表」。
      */
     GLOBE_LIST,
+
+    /** 複製：兩張疊埋嘅紙 */
+    COPY,
+
+    /** 剪下：一把較剪 */
+    CUT,
+
+    /** 全選：四隻角括住成個框 */
+    SELECT_ALL,
+
+    /** 復原：向左彎轉頭嘅箭嘴 */
+    UNDO,
+
+    /** 重做：向右彎轉頭嘅箭嘴（同 [UNDO] 照鏡） */
+    REDO,
 }
 
 /**
@@ -109,6 +124,11 @@ class ToolIconDrawable(private val icon: ToolIcon, color: Int) : Drawable() {
             ToolIcon.ALIGN_CENTER -> drawCenter(canvas)
             ToolIcon.GLOBE -> drawGlobe(canvas)
             ToolIcon.GLOBE_LIST -> drawGlobeList(canvas)
+            ToolIcon.COPY -> drawCopy(canvas)
+            ToolIcon.CUT -> drawCut(canvas)
+            ToolIcon.SELECT_ALL -> drawSelectAll(canvas)
+            ToolIcon.UNDO -> drawUndo(canvas)
+            ToolIcon.REDO -> drawRedo(canvas)
         }
         canvas.restoreToCount(save)
     }
@@ -261,6 +281,72 @@ class ToolIconDrawable(private val icon: ToolIcon, color: Int) : Drawable() {
                           half: Float = 4.1f) {
         val bx = tipX - dir * back
         p.moveTo(bx, 12f - half); p.lineTo(tipX, 12f); p.lineTo(bx, 12f + half)
+    }
+
+    /** 兩張疊埋嘅紙（幼框），右上一張、左下一張蓋住少少 —— 複製 */
+    private fun drawCopy(canvas: Canvas) {
+        rect.set(7.5f, 2.2f, 20f, 14.8f)
+        canvas.drawRoundRect(rect, 2.2f, 2.2f, stroke)
+        rect.set(4f, 9.2f, 16.5f, 21.8f)
+        canvas.drawRoundRect(rect, 2.2f, 2.2f, stroke)
+    }
+
+    /** 較剪：兩個手指環（圓圈）+ 兩片交叉嘅較剪刃（斜線）—— 剪下 */
+    private fun drawCut(canvas: Canvas) {
+        canvas.drawCircle(7f, 18f, 3f, stroke)
+        canvas.drawCircle(17f, 18f, 3f, stroke)
+        canvas.drawLine(9.3f, 16f, 20.5f, 3.5f, stroke)
+        canvas.drawLine(14.7f, 16f, 3.5f, 3.5f, stroke)
+    }
+
+    /** 四隻角括住成個框（唔畫足成個框，咁先似「揀住成個範圍」）—— 全選 */
+    private fun drawSelectAll(canvas: Canvas) {
+        val len = 5.2f
+        path.reset()
+        path.moveTo(3f, 3f + len); path.lineTo(3f, 3f); path.lineTo(3f + len, 3f)
+        path.moveTo(21f - len, 3f); path.lineTo(21f, 3f); path.lineTo(21f, 3f + len)
+        path.moveTo(21f, 21f - len); path.lineTo(21f, 21f); path.lineTo(21f - len, 21f)
+        path.moveTo(3f + len, 21f); path.lineTo(3f, 21f); path.lineTo(3f, 21f - len)
+        canvas.drawPath(path, stroke)
+    }
+
+    /** 一條彎返轉頭、尖指住左邊嘅箭嘴 —— 復原 */
+    private fun drawUndo(canvas: Canvas) {
+        path.reset()
+        path.moveTo(17.5f, 6.5f)
+        path.quadTo(22f, 18f, 8f, 18f)
+        canvas.drawPath(path, stroke)
+        path.reset()
+        arrowHeadAt(path, 8f, 18f, -1f, 0f)
+        canvas.drawPath(path, stroke)
+    }
+
+    /** [drawUndo] 照鏡，尖指住右邊 —— 重做 */
+    private fun drawRedo(canvas: Canvas) {
+        path.reset()
+        path.moveTo(6.5f, 6.5f)
+        path.quadTo(2f, 18f, 16f, 18f)
+        canvas.drawPath(path, stroke)
+        path.reset()
+        arrowHeadAt(path, 16f, 18f, 1f, 0f)
+        canvas.drawPath(path, stroke)
+    }
+
+    /**
+     * 箭嘴頭：尖喺 ([tipX], [tipY])，指嘅方向由 ([dirX], [dirY]) 話事
+     * （唔似 [arrowHead] 淨係識指正左／正右，呢個乜方向都得，畀 [drawUndo]／
+     * [drawRedo] 嗰條彎路用）。
+     */
+    private fun arrowHeadAt(p: Path, tipX: Float, tipY: Float, dirX: Float, dirY: Float,
+                             size: Float = 4.4f) {
+        val len = kotlin.math.hypot(dirX, dirY)
+        val ux = dirX / len; val uy = dirY / len
+        val px = -uy; val py = ux
+        val backX = tipX - ux * size; val backY = tipY - uy * size
+        val spread = size * 0.62f
+        p.moveTo(backX + px * spread, backY + py * spread)
+        p.lineTo(tipX, tipY)
+        p.lineTo(backX - px * spread, backY - py * spread)
     }
 
     override fun setAlpha(alpha: Int) { fill.alpha = alpha; stroke.alpha = alpha }

@@ -787,8 +787,9 @@ abstract class KeyboardBaseView(context: Context) : View(context) {
     }
 
     /**
-     * 粒鍵正中一個圖案，當 [drawLabel] 用（換輸入法嗰兩粒 —— 佢哋冇字好寫，
-     * 見 `PadFunc.faceIcon`）。
+     * 粒鍵正中一個圖案，當 [drawLabel] 用 —— 見 `longIconOf`：冇字好寫嗰啲
+     * （換輸入法嗰兩粒）、或者有專屬圖案嘅（複製／剪下／全選／復原／重做／
+     * 表情／錄音）都係揀呢個代替文字。
      *
      * 大細跟 [drawLabel] 嗰個 `sizeRatio` 嘅講法：短嗰邊乘個比例，
      * 所以拉高拉窄粒鍵佢都一直塞得落。

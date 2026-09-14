@@ -27,6 +27,11 @@ enum class KeyAction {
      */
     COPY,
     /**
+     * 剪下：有揀字就叫個欄自己剪（`android.R.id.cut`）；冇揀就先全選成個輸入框
+     * 先剪（見 `TTInputMethodService.cut`）。
+     */
+    CUT,
+    /**
      * 全選：叫個欄自己做（`android.R.id.selectAll`），唔係我哋自己數字數。
      */
     SELECT_ALL,

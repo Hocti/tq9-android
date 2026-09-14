@@ -17,6 +17,7 @@ fun PadFunc.action(): KeyAction = when (this) {
     PadFunc.EMOJI -> KeyAction.TO_EMOJI
     PadFunc.PASTE -> KeyAction.PASTE
     PadFunc.COPY -> KeyAction.COPY
+    PadFunc.CUT -> KeyAction.CUT
     PadFunc.STT -> KeyAction.STT
     PadFunc.AI -> KeyAction.AI
     PadFunc.HOMO -> KeyAction.HOMO
@@ -54,17 +55,13 @@ fun PadFunc.toolIcon(): ToolIcon? = when (this) {
     PadFunc.AI -> ToolIcon.AI
     PadFunc.IME_NEXT -> ToolIcon.GLOBE
     PadFunc.IME_PICKER -> ToolIcon.GLOBE_LIST
+    PadFunc.COPY -> ToolIcon.COPY
+    PadFunc.CUT -> ToolIcon.CUT
+    PadFunc.SELECT_ALL -> ToolIcon.SELECT_ALL
+    PadFunc.UNDO -> ToolIcon.UNDO
+    PadFunc.REDO -> ToolIcon.REDO
     else -> null
 }
-
-/**
- * 鍵面圖案（中文九宮格左右欄嗰八個位）。
- *
- * **淨係 [PadFunc.face] 吉嗰啲先有**：「貼上」「錄音」呢啲喺鍵盤度一路都係
- * 寫中文（鍵面全部單色兼且全部係字，夾一兩個圖案入去反而唔一致），
- * 圖案留返俾工具列用。得換輸入法嗰兩粒冇字好寫，先至畫圖案。
- */
-fun PadFunc.faceIcon(): ToolIcon? = if (face.isEmpty()) toolIcon() else null
 
 /**
  * 砌返粒 [Key] 出嚟。[long] 係同一個位嘅長撳做乜（[PadFunc.NONE] = 冇長撳）。
@@ -83,18 +80,27 @@ fun PadFunc.toKey(long: PadFunc = PadFunc.NONE): Key = Key(
 )
 
 /**
- * 粒鍵**左上角**應唔應該畫個圖案代替文字（＝嗰個長撳動作對應嘅 [PadFunc]
- * 冇 `face` 可寫）。
+ * 呢個動作應唔應該畫個圖案代替文字 —— 唔止畀左上角長撳提示用，
+ * 中文九宮格左右欄嗰八個位（`ChinesePadView.drawFunction`）正中個 label
+ * 都係揀呢個：有圖案就一律用圖案，冇就照舊寫字。
  *
- * 而家淨係轉輸入法嗰兩粒：直接跳去下一個係一個地球，彈選擇表就係地球加張表
- * （[ToolIcon.GLOBE_LIST]）—— 兩粒可以同時擺喺鍵盤度，淨用個地球就分唔出
- * 邊粒係邊粒。
+ * 轉輸入法嗰兩粒（直接跳去下一個係一個地球，彈選擇表就係地球加張表
+ * [ToolIcon.GLOBE_LIST]）係因為 `face` 本身就係空㗎（冇字好寫，唔畫圖案就乜都冇）；
+ * 複製／剪下／全選／復原／重做／表情／錄音就算有字都照樣揀圖案 —— 同工具列
+ * （[toolIcon]）睇齊，一個功能唔可以工具列度係圖案、擺落九宮格就變返做字。
  *
- * 中文九宮格（`ChinesePadView.drawFunction`）同純數字鍵盤
- * （`RowsPadView.drawKey`）兩邊都用佢，所以擺喺呢度唔擺喺其中一邊。
+ * 中文九宮格同純數字鍵盤（`RowsPadView.drawKey`）兩邊都用佢，所以擺喺呢度
+ * 唔擺喺其中一邊。
  */
 fun longIconOf(a: KeyAction): ToolIcon? = when (a) {
     KeyAction.IME_SWITCH -> ToolIcon.GLOBE
     KeyAction.IME_PICKER -> ToolIcon.GLOBE_LIST
+    KeyAction.COPY -> ToolIcon.COPY
+    KeyAction.CUT -> ToolIcon.CUT
+    KeyAction.SELECT_ALL -> ToolIcon.SELECT_ALL
+    KeyAction.UNDO -> ToolIcon.UNDO
+    KeyAction.REDO -> ToolIcon.REDO
+    KeyAction.TO_EMOJI -> ToolIcon.EMOJI
+    KeyAction.STT -> ToolIcon.MIC
     else -> null
 }
