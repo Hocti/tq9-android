@@ -70,6 +70,22 @@ class TTEngine(val db: TTDb) {
     /** 送去 option bar 顯示嘅關聯字（未入選字模式嗰陣） */
     var relateHints: List<String> = emptyList(); private set
 
+    /**
+     * 首頁 1～9 預覽「撳關聯字會坐嗰格嘅字」（第一頁，格號 = 字碼表次序）。
+     * index 0 唔用。`*` 佔位同吉位都係空字串。
+     */
+    private val relatePad = Array(10) { "" }
+
+    /**
+     * 閒置時撳過一次「取消」就收起九宮格上嘅關聯字預覽。
+     * 打完下一個字（[fillRelatePad]）會重新打開。
+     */
+    var relatePreviewDismissed: Boolean = false; private set
+
+    /** 閒置、未收起、而且關聯字表真係有字 → 九宮格應該畫預覽 */
+    val relatePadPreviewing: Boolean
+        get() = !busy && !relatePreviewDismissed && hasRelatePad()
+
     var statusPrefix: String = ""; private set
     var statusText: String = ""; private set
 
@@ -122,6 +138,8 @@ class TTEngine(val db: TTDb) {
         homoCodeHint = ""
         homoWord = ""
         bigramPrev = ""
+        relatePreviewDismissed = false
+        clearRelatePad()
         setPadImages(0)
     }
 
@@ -488,7 +506,10 @@ class TTEngine(val db: TTDb) {
         if (relates.isNotEmpty()) {
             cancel(clearPad = false)
             setRelateHints(relates)
+            fillRelatePad(relates)
         } else {
+            clearRelatePad()
+            relatePreviewDismissed = false
             cancel()
         }
 
@@ -549,6 +570,34 @@ class TTEngine(val db: TTDb) {
     private fun setRelateHints(words: List<String>) {
         setPadImages(0)
         relateHints = words.filter { it.isNotEmpty() && it != PLACEHOLDER }
+    }
+
+    /** 九宮格 [digit]（1～9）預覽嗰隻關聯字；冇／佔位就空 */
+    fun relatePadAt(digit: Int): String = if (digit in 1..9) relatePad[digit] else ""
+
+    /**
+     * 閒置時撳「取消」：收起九宮格上嘅關聯字預覽，**唔清** [lastWord]。
+     * 之後撳「關聯字」仍然開得嗰個表；打完下一個字 [fillRelatePad] 會重新打開。
+     */
+    fun dismissRelatePreview() {
+        if (relatePreviewDismissed || !hasRelatePad()) return
+        relatePreviewDismissed = true
+        changed()
+    }
+
+    private fun hasRelatePad(): Boolean {
+        for (i in 1..9) if (relatePad[i].isNotEmpty()) return true
+        return false
+    }
+
+    private fun fillRelatePad(words: List<String>) {
+        relatePreviewDismissed = false
+        val slots = relatePadSlots(words)
+        for (i in 1..9) relatePad[i] = slots[i]
+    }
+
+    private fun clearRelatePad() {
+        for (i in 1..9) relatePad[i] = ""
     }
 
     private fun changed() { host?.onStateChanged() }
@@ -623,5 +672,22 @@ class TTEngine(val db: TTDb) {
          */
         fun slotOrder(page: Int): List<Int> =
             if (page == 0) FIRST_PAGE_ORDER else SLOT_ORDER
+
+        /**
+         * 撳「關聯字」之後第一頁 1～9 格會坐邊隻字。
+         *
+         * 第一頁永遠 `1`～`9`（見 [slotOrder]），`*` 佔位同吉位唔出字。
+         * 回傳 size 10，index 0 唔用，1～9 對應九宮格。
+         */
+        fun relatePadSlots(words: List<String>): List<String> {
+            val out = MutableList(10) { "" }
+            val order = slotOrder(0)
+            for (rank in 0..8) {
+                val w = words.getOrNull(rank) ?: break
+                if (w.isEmpty() || w == PLACEHOLDER) continue
+                out[order[rank]] = w
+            }
+            return out
+        }
     }
 }

@@ -294,9 +294,12 @@ URL／email／密碼／篩選欄（`textFilter`）不會自動大階（`autoCaps
 | `actionPrevious` | `⇤` | 上一 |
 | `actionUnspecified` / `actionNone` | `⏎` | — |
 
-`IME_FLAG_NO_ENTER_ACTION`（多行欄位框架自己會加）一律出 `⏎` —— 那些欄位按下去
-是真的換行，不要扮成「按了就走」。**這裏的條件要與 `enter()` 那邊一模一樣**，
-不然會出現「鍵面寫住 ✓、按下去卻只是換行」。
+`IME_FLAG_NO_ENTER_ACTION` 一律出 `⏎`。**`TYPE_TEXT_FLAG_MULTI_LINE` 也一律換行**
+（2026-09-15）：聊天欄經常是多行 + `actionSend`，而且會攔截 `KEYCODE_ENTER` 當送出
+—— 以前跟 `performEditorAction` 或 `sendKeyEvent(ENTER)` 就變成送出，其他鍵盤則
+`commitText("\n")` 隔行。單行的搜尋／完成／傳送仍然走 editor action。`TYPE_NULL`
+才送原生 Enter。條件全部在 `EnterKey.behavior()`（有 `EnterKeyTest`），
+**`enterLabelFor()` 與 `enter()` 都要問它**，不然會出現「鍵面寫住 ➤、按下去卻換行」。
 
 ### 純數字頁：成頁不得長按
 
@@ -442,6 +445,7 @@ Kotlin 那邊任何 subtype API 都無效（`grep -ri subtype app/src --include=
 ```
 core/   TTDb       sqlite 存取、assets 安裝、換 db、weight prefix 統計
         TTEngine   輸入狀態機（Windows 版移植），不接觸 Android UI
+        EnterKey   `⏎` 換行 vs 執行欄位動作 vs 原生 Enter（有 `EnterKeyTest`）
         EnDict     5 萬字英文詞庫（blob + starts + weight，慳記憶體），只
                    `fromPrefix` 打字提示 + `word`/`charAt`/`weightAt` 這些
                    public accessor 讓 `GestureDecoder`／`EnTrie` 用
@@ -1270,6 +1274,20 @@ AI 語音輸入開著時，講一兩句都要等 upload + Gemini 回覆，而系
   都找得回「為」，而 `70` **不可以**能正確匹配 `,970`。同一個字有多個打法（幾行記錄），
   要 `GROUP BY char ORDER BY MAX(freq)`。同一個碼查一次就 cache 住（`codePreviewFor`），
   不是每按一下鍵都查次 sqlite。
+
+## 九宮格預覽關聯字（`Prefs.KEY_RELATE_PREVIEW`，預設開）
+
+打完一個字、還沒輸入下一個字碼，而且該字在 `related_candidates_table` 有關聯字時，
+九宮格 **1～9 左上角**預覽「此時按『關聯字』會坐那格的字」（第一頁，格號 = 次序，
+與 `TTEngine.slotOrder(0)`／`relatePadSlots` 相同；`*` 佔位不畫）。
+筆形圖縮至原本的 **55%**，放在右下角。字體是選字字體的 50%；超過一個字再除以
+grapheme 數，仍太寬再夾入格內，**靠左**。
+
+資料跟打完嗰隻字（`TTCmd.RELATE` 用嘅 `lastWord`），不是候選欄的
+`contextPicks()`（游標前面那字）。按一次「取消」只收起預覽
+（`TTInputMethodService` 見到 `relatePadPreviewing` 就叫 `dismissRelatePreview`，
+不清 `lastWord`）——之後按「關聯字」仍然開得到那個表。
+打完下一個有關聯字的字會重新打開。設定頁「其他 → 預覽關聯字」可關。
 
 ## 選字放入九宮格：**第一頁永遠 `1`~`9`**
 

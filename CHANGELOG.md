@@ -5,6 +5,42 @@
 
 ---
 
+## [2.2.20] — 2026-09-15
+
+### 修正：多行欄（聊天）按 Enter 會誤當成送出
+
+Discord 一類聊天欄是多行，但又標了「傳送」。以前 `⏎` 會執行傳送，或者送出
+原生 Enter 鍵（app 一樣當成送出）。而家多行一律插入換行；單行搜尋／完成／
+傳送不受影響。
+
+---
+
+## [2.2.19] — 2026-09-15
+
+### 九宮格可以預覽關聯字
+
+打完一個字、未再輸入字碼，而該字有關聯字時，1～9 格左上角會預覽撳「關聯字」
+會揀到嘅字（筆形圖縮到右下角 55%）。設定頁「其他 → 預覽關聯字」預設開；
+撳一次「取消」就收起，打下一個字會再出。
+
+---
+
+## [2.2.18] — 2026-09-15
+
+### Google Play：語音輸入唔再當咪高峰係必備硬體
+
+`RECORD_AUDIO` 會令 Play 暗示 `android.hardware.microphone` required=true，
+目錄冇標呢項嘅機就會顯示「裝置不兼容」。語音輸入係可選功能，而家改做
+`required="false"`。
+
+查過現有 AAB（2.2.17）：**冇任何 `.so`**，所以冇 `lib/arm64-v8a/` 係正常嘅
+—— 純 Kotlin app 唔分 ABI，arm64 機照裝。BundleConfig 已經係
+`PAGE_ALIGNMENT_16K`（AGP 8.13），IME service 亦早已有
+`android.view.InputMethod`。gradle 加咗 `useLegacyPackaging = false`，
+之後若加 native library 都唔會跌返 4 KB 對齊。
+
+---
+
 ## [2.2.17] — 2026-09-14
 
 ### AI 語音輸入同 AI 改寫可以用兩套唔同嘅 AI 設定

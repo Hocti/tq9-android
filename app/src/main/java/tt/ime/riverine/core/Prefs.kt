@@ -213,6 +213,11 @@ object Prefs {
     const val KEY_LONG_PRESS_SHORTCUT = "long_press_shortcut"
     /** 同音鍵左下角寫住而家打咗嘅碼（見 [showCurrCode]） */
     const val KEY_SHOW_CURR_CODE = "show_curr_code"
+    /**
+     * 未打碼、關聯字表有內容時，九宮格 1～9 左上角預覽撳「關聯字」會揀到嘅字
+     * （筆形圖縮去右下角）。預設開。
+     */
+    const val KEY_RELATE_PREVIEW = "relate_preview"
     /** 打字過程寫落 logcat（見 [InputLog]，預設熄） */
     const val KEY_INPUT_LOG = "input_log"
     const val KEY_STT_LOCALE = "stt_locale"
@@ -782,6 +787,12 @@ object Prefs {
      * 因為即時狀態緊要過返轉頭嗰個提示（見 `ChinesePadView.drawFunction`）。
      */
     fun showCurrCode(ctx: Context) = sp(ctx).getBoolean(KEY_SHOW_CURR_CODE, true)
+
+    /**
+     * 未打碼、關聯字表有內容時，九宮格 1～9 要唔要預覽撳「關聯字」會揀到嘅字。
+     * 預設開；撳一次「取消」就收起（見 `TTEngine.relatePadPreviewing`）。
+     */
+    fun relatePreview(ctx: Context) = sp(ctx).getBoolean(KEY_RELATE_PREVIEW, true)
 
     /**
      * 打字過程逐粒鍵寫落 logcat（`adb logcat -s TTInput`，見 [InputLog] 同

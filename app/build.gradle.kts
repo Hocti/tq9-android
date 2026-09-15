@@ -33,8 +33,8 @@ android {
         applicationId = "tt.ime.riverine"
         minSdk = 26
         targetSdk = 36
-        versionCode = 79
-        versionName = "2.2.17"
+        versionCode = 82
+        versionName = "2.2.20"
     }
 
     signingConfigs {
@@ -104,6 +104,13 @@ android {
 
     packaging {
         resources.excludes += "META-INF/*"
+        // 16 KB page size（Android 15+ / Play 2025-11 起要求）：
+        // 唔好 extract .so 出嚟（legacy packaging）。AGP 8.5.1+ 會將
+        // uncompressed native libs zip-align 到 16 KB。本 app 冇自己嘅
+        // JNI，呢度寫死係防止之後加咗 .so 又變返 4 KB。
+        jniLibs {
+            useLegacyPackaging = false
+        }
     }
 }
 

@@ -1189,6 +1189,9 @@ class SettingsActivity : AppCompatActivity() {
     private fun buildBehaviourSection() {
         header("其他")
         switch("輸出簡體字", Prefs.KEY_SC_OUTPUT, false)
+        switch("預覽關聯字", Prefs.KEY_RELATE_PREVIEW, true)
+        note("開啟後，打完一個字、尚未輸入下一個字碼時，九宮格 1～9 左上角會預覽該字的關聯字，筆形圖縮小至右下角。" +
+            "按一次「取消」即恢復原樣。")
         if (SHOW_LEGACY_KEY_OPTIONS) {
             switch("工具列常駐", Prefs.KEY_BAR_PINNED, true)
             note("關閉：右上角的 ☰ 改為開關整條工具列，切換關聯字與工具改按工具列最左的 ⇄。")
@@ -1363,6 +1366,9 @@ class SettingsActivity : AppCompatActivity() {
         tryField("搜尋（⏎ = ⌕）", InputType.TYPE_CLASS_TEXT, EditorInfo.IME_ACTION_SEARCH)
         tryField("完成（⏎ = ✓）", InputType.TYPE_CLASS_TEXT, EditorInfo.IME_ACTION_DONE)
         tryField("傳送（⏎ = ➤）", InputType.TYPE_CLASS_TEXT, EditorInfo.IME_ACTION_SEND)
+        tryField("多行＋傳送（⏎ 應換行）",
+            InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE,
+            EditorInfo.IME_ACTION_SEND)
         tryField("前往（⏎ = →）", InputType.TYPE_CLASS_TEXT, EditorInfo.IME_ACTION_GO)
         tryField("下一個（⏎ = ⇥）", InputType.TYPE_CLASS_TEXT, EditorInfo.IME_ACTION_NEXT)
         tryField("上一個（⏎ = ⇤）", InputType.TYPE_CLASS_TEXT, EditorInfo.IME_ACTION_PREVIOUS)

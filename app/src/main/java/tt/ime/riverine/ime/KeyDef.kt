@@ -132,7 +132,7 @@ val SEARCH_GLYPH: String by lazy { glyphOr("⌕", "搜尋") }
 
 /**
  * `⏎` 跟 `imeOptions` 換樣（見 `TTInputMethodService.enterLabelFor`）。
- * 六個動作各有自己的符號，`actionUnspecified` / `actionNone` /
+ * 六個動作各有自己的符號；多行、`actionUnspecified` / `actionNone` /
  * `IME_FLAG_NO_ENTER_ACTION` 就照出 `⏎`。
  */
 val DONE_GLYPH: String by lazy { glyphOr("✓", "完成") }

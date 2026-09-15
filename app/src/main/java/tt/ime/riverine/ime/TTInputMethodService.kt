@@ -45,6 +45,7 @@ import tt.ime.riverine.core.BarMode
 import tt.ime.riverine.core.ClipHistory
 import tt.ime.riverine.core.EmojiDict
 import tt.ime.riverine.core.EnDict
+import tt.ime.riverine.core.EnterKey
 import tt.ime.riverine.core.InputLog
 import tt.ime.riverine.core.KeyLayout
 import tt.ime.riverine.core.NextWordModel
@@ -485,13 +486,14 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
      * `⏎` 跟欄位嘅 `imeOptions` 換樣（全部單色符號，見 [SEARCH_GLYPH] 嗰段）：
      * 完成 ✓、搜尋 ⌕、傳送 ➤、前往 →、下一個 ⇥、上一個 ⇤。
      *
-     * `actionUnspecified` / `actionNone`／ multi-line（框架會加
-     * [EditorInfo.IME_FLAG_NO_ENTER_ACTION]）就照出返 `⏎` —— 嗰啲欄撳落去
-     * 係真係換行，唔好扮到似「撳咗就走」。呢度同 [enter] 嗰邊嘅條件要一模一樣。
+     * 條件問 [EnterKey.behavior]，同 [enter] 一模一樣：多行／
+     * [EditorInfo.IME_FLAG_NO_ENTER_ACTION]／未指定動作一律 `⏎`，唔好扮到似
+     * 「撳咗就走」。
      */
     private fun enterLabelFor(ei: EditorInfo?): String {
+        val inputType = ei?.inputType ?: 0
         val opts = ei?.imeOptions ?: 0
-        if ((opts and EditorInfo.IME_FLAG_NO_ENTER_ACTION) != 0) return "⏎"
+        if (EnterKey.behavior(inputType, opts) != EnterKey.Behavior.EDITOR_ACTION) return "⏎"
         return when (opts and EditorInfo.IME_MASK_ACTION) {
             EditorInfo.IME_ACTION_DONE -> DONE_GLYPH
             EditorInfo.IME_ACTION_SEARCH -> SEARCH_GLYPH
@@ -745,7 +747,15 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
     override fun onKey(key: Key) {
         when (key.action) {
             KeyAction.DIGIT -> engine.press(key.digit)
-            KeyAction.CANCEL -> engine.cmd(TTCmd.CANCEL)
+            KeyAction.CANCEL -> {
+                // 預覽開住：第一次「取消」淨係收起預覽（九宮格返筆形圖），
+                // 唔行 engine.cancel —— lastWord／關聯字表留住，之後撳「關聯字」仍然開得。
+                if (Prefs.relatePreview(this) && engine.relatePadPreviewing) {
+                    engine.dismissRelatePreview()
+                } else {
+                    engine.cmd(TTCmd.CANCEL)
+                }
+            }
             KeyAction.SHORTCUT -> engine.cmd(TTCmd.SHORTCUT)
             KeyAction.SC_TOGGLE -> toggleSc()
             KeyAction.HOMO -> engine.cmd(TTCmd.HOMO)
@@ -1087,13 +1097,17 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
         engine.onLineBreak() // 換咗行，中文 bigram 統計唔可以跨行接落去
         val ic = currentInputConnection ?: return
         val ei = currentInputEditorInfo
-        val action = ei?.imeOptions?.and(EditorInfo.IME_MASK_ACTION) ?: EditorInfo.IME_ACTION_NONE
-        val noEnter = (ei?.imeOptions?.and(EditorInfo.IME_FLAG_NO_ENTER_ACTION) ?: 0) != 0
-        if (!noEnter && action != EditorInfo.IME_ACTION_NONE && action != EditorInfo.IME_ACTION_UNSPECIFIED) {
-            ic.performEditorAction(action)
-        } else {
-            ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_ENTER))
-            ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_ENTER))
+        val inputType = ei?.inputType ?: 0
+        val opts = ei?.imeOptions ?: 0
+        when (EnterKey.behavior(inputType, opts)) {
+            // 多行／聊天欄一定要用 commitText：KEYCODE_ENTER 會被攔截成送出
+            EnterKey.Behavior.NEWLINE -> ic.commitText("\n", 1)
+            EnterKey.Behavior.EDITOR_ACTION ->
+                ic.performEditorAction(opts and EditorInfo.IME_MASK_ACTION)
+            EnterKey.Behavior.KEY_EVENT -> {
+                ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_ENTER))
+                ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_ENTER))
+            }
         }
         // 換咗行 = 新一段，下一個字母要自動大階
         clearShiftManual()

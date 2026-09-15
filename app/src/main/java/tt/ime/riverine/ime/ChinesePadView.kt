@@ -2,12 +2,14 @@ package tt.ime.riverine.ime
 
 import android.content.Context
 import android.graphics.Canvas
+import android.graphics.Paint
 import android.graphics.RectF
 import tt.ime.riverine.core.EmojiDict
 import tt.ime.riverine.core.KeyLayout
 import tt.ime.riverine.core.PadFunc
 import tt.ime.riverine.core.PagerLayout
 import tt.ime.riverine.core.Prefs
+import tt.ime.riverine.core.TTDb
 import tt.ime.riverine.core.TTEngine
 import tt.ime.riverine.swipe.GestureKeyTracker
 import kotlin.math.min
@@ -42,6 +44,15 @@ import kotlin.math.roundToInt
  * （轉輸入法嗰兩粒）就改為喺左上角畫個圖案，見 [drawFunction]。
  */
 class ChinesePadView(context: Context, private val engine: TTEngine) : KeyboardBaseView(context) {
+
+    companion object {
+        /** 筆形圖佔格子短邊幾多（置中嗰陣） */
+        private const val IMG_RATIO = 0.74f
+        /** 預覽開住：筆形圖縮至原本嘅 55%，擺右下角 */
+        private const val PREVIEW_IMG_SCALE = 0.66f
+        /** 預覽字體 = 選字字體 × 50% */
+        private const val PREVIEW_TEXT_SCALE = 0.5f
+    }
 
     interface ChineseHost {
         fun pressDigit(digit: Int)
@@ -303,14 +314,50 @@ class ChinesePadView(context: Context, private val engine: TTEngine) : KeyboardB
         }
         val pk = engine.keys[d]
         drawFace(canvas, box, faceColor(box, isDown, pk.enabled))
+        // 未打碼、關聯字表有內容：筆形圖縮去右下角，左上角預覽撳「關聯字」會揀到嘅字
+        val previewing = Prefs.relatePreview(context) && engine.relatePadPreviewing
         val img = pk.img
         if (img != null) {
-            val side = min(box.w, box.h) * 0.74f
-            dstRect.set(box.cx - side / 2f, box.cy - side / 2f, box.cx + side / 2f, box.cy + side / 2f)
+            val side = min(box.w, box.h) * IMG_RATIO * if (previewing) PREVIEW_IMG_SCALE else 1f
+            if (previewing) {
+                val r = box.right - gapPx
+                val b = box.bottom - gapPx
+                dstRect.set(r - side, b - side, r, b)
+            } else {
+                dstRect.set(box.cx - side / 2f, box.cy - side / 2f, box.cx + side / 2f, box.cy + side / 2f)
+            }
             StrokeImages.draw(canvas, context, img, dstRect, pk.dim)
         }
         if (pk.text.isNotEmpty()) drawLabel(canvas, box, pk.text, sizeRatio = 0.46f)
-        if (pk.hint.isNotEmpty()) drawCornerHint(canvas, box, pk.hint)
+        if (previewing) {
+            val prev = engine.relatePadAt(d)
+            if (prev.isNotEmpty()) drawRelatePreview(canvas, box, prev)
+        } else if (pk.hint.isNotEmpty()) {
+            drawCornerHint(canvas, box, pk.hint)
+        }
+    }
+
+    /**
+     * 左上角、靠左：正常選字字體嘅 50%；超過一個字再縮（跟 grapheme 數除），
+     * 仍然太闊就再夾入格內。
+     */
+    private fun drawRelatePreview(canvas: Canvas, box: KeyBox, s: String) {
+        val n = TTDb.splitGraphemes(s).size.coerceAtLeast(1)
+        var ratio = PREVIEW_TEXT_SCALE
+        if (n > 1) ratio /= n
+        textPaint.isFakeBoldText = false
+        textPaint.color = theme.text
+        textPaint.textAlign = Paint.Align.LEFT
+        var size = min(box.w, box.h) * ratio * fontScale
+        textPaint.textSize = size
+        val avail = box.w - gapPx * 2 - dp(4f)
+        val need = textPaint.measureText(s)
+        if (need > avail) {
+            size *= avail / need
+            textPaint.textSize = size
+        }
+        canvas.drawText(s, box.left + gapPx + dp(3f), box.top + gapPx + textPaint.textSize, textPaint)
+        textPaint.textAlign = Paint.Align.CENTER
     }
 
     private fun drawFunction(canvas: Canvas, box: KeyBox, isDown: Boolean) {
