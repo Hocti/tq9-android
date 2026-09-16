@@ -194,7 +194,7 @@
   開啟後數字行就只在數字鍵右上角寫符號，長按字母也不會再出數字。
 
 **email 欄**（`textEmailAddress` / `textWebEmailAddress`）會自動轉去英文 view，
-而且底行會出 `@` 與 `.com`。
+而且底行會出 `@`、`.` 與 `.com`。
 
 ---
 

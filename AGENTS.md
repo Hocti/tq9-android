@@ -258,7 +258,7 @@ URL／email／密碼／篩選欄（`textFilter`）不會自動大階（`autoCaps
 | 欄位 | 頁 | 底行／最左一欄 |
 | --- | --- | --- |
 | 普通文字 | 中文九宮格 | （不變） |
-| `textEmailAddress` | 英文 | `@`、`.com`（長按有 `.com.hk` 等） |
+| `textEmailAddress` | 英文 | `@`、`.`、`.com`（長按有 `.com.hk` 等；`/` 在長按 `.`） |
 | `textUri` | 英文 | 收起 `,`，改為 `/` `.` `.com` |
 | `textPassword`（連 `webPassword` / `visiblePassword`） | 英文 | 收起 `,` `/`，改為 `.` `-` `_` |
 | `phone` | 純數字 | `( ) - +` 與 `*` `#`（撥號串常用） |
@@ -294,12 +294,13 @@ URL／email／密碼／篩選欄（`textFilter`）不會自動大階（`autoCaps
 | `actionPrevious` | `⇤` | 上一 |
 | `actionUnspecified` / `actionNone` | `⏎` | — |
 
-`IME_FLAG_NO_ENTER_ACTION` 一律出 `⏎`。**`TYPE_TEXT_FLAG_MULTI_LINE` 也一律換行**
-（2026-09-15）：聊天欄經常是多行 + `actionSend`，而且會攔截 `KEYCODE_ENTER` 當送出
-—— 以前跟 `performEditorAction` 或 `sendKeyEvent(ENTER)` 就變成送出，其他鍵盤則
-`commitText("\n")` 隔行。單行的搜尋／完成／傳送仍然走 editor action。`TYPE_NULL`
-才送原生 Enter。條件全部在 `EnterKey.behavior()`（有 `EnterKeyTest`），
-**`enterLabelFor()` 與 `enter()` 都要問它**，不然會出現「鍵面寫住 ➤、按下去卻換行」。
+`IME_FLAG_NO_ENTER_ACTION` 一律出 `⏎`。**有明確動作（傳送／搜尋／完成）就執行動作**，
+不要因為欄位順便標了 `TYPE_TEXT_FLAG_MULTI_LINE`（文字可折行）就改成隔行
+（2026-09-16：先前一律換行，連真正要送出的欄都壞了）。真的要 Enter 隔行的聊天欄
+應設 `IME_FLAG_NO_ENTER_ACTION`。換行用 `commitText("\n")`，不要送
+`KEYCODE_ENTER`（有些 app 會攔截成送出）。`TYPE_NULL` 才送原生 Enter。條件全部
+在 `EnterKey.behavior()`（有 `EnterKeyTest`），**`enterLabelFor()` 與 `enter()`
+都要問它**，不然會出現「鍵面寫住 ➤、按下去卻換行」。
 
 ### 純數字頁：成頁不得長按
 

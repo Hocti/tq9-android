@@ -8,23 +8,28 @@ import tt.ime.riverine.core.EnterKey
 import tt.ime.riverine.core.EnterKey.Behavior
 
 /**
- * `⏎`：多行一律隔行；單行先跟 `imeOptions` 做搜尋／傳送。
- *
- * Discord 聊天欄 = 多行 + `IME_ACTION_SEND`（有時仲冇 `IME_FLAG_NO_ENTER_ACTION`），
- * 以前會 `performEditorAction(SEND)` 或者 `sendKeyEvent(ENTER)`，app 兩邊都當成送出。
+ * `⏎`：有明確動作（傳送／搜尋／完成）就執行動作；只有欄位自己禁止動作、
+ * 或者根本沒指定動作，先隔行。多行旗標不能蓋過「送出」。
  */
 class EnterKeyTest {
 
     private fun kind(type: Int, opts: Int) = EnterKey.behavior(type, opts)
 
-    @Test fun `多行加傳送都係換行`() {
+    @Test fun `多行加傳送仍然係傳送`() {
         val type = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE
-        assertEquals(Behavior.NEWLINE, kind(type, EditorInfo.IME_ACTION_SEND))
-        assertEquals(Behavior.NEWLINE, kind(type, EditorInfo.IME_ACTION_DONE))
+        assertEquals(Behavior.EDITOR_ACTION, kind(type, EditorInfo.IME_ACTION_SEND))
+        assertEquals(Behavior.EDITOR_ACTION, kind(type, EditorInfo.IME_ACTION_DONE))
+        assertEquals(Behavior.EDITOR_ACTION, kind(type, EditorInfo.IME_ACTION_SEARCH))
+    }
+
+    @Test fun `多行標了不准動作先換行`() {
+        val type = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE
         assertEquals(
             Behavior.NEWLINE,
             kind(type, EditorInfo.IME_ACTION_SEND or EditorInfo.IME_FLAG_NO_ENTER_ACTION),
         )
+        assertEquals(Behavior.NEWLINE, kind(type, EditorInfo.IME_ACTION_NONE))
+        assertEquals(Behavior.NEWLINE, kind(type, EditorInfo.IME_ACTION_UNSPECIFIED))
     }
 
     @Test fun `單行傳送搜尋完成仍然係動作`() {

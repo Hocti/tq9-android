@@ -258,14 +258,15 @@ class LatinPadView(context: Context) : RowsPadView(context) {
         }
         when (fieldKind) {
             LatinField.EMAIL -> {
-                // 長撳 @：可以揀常用信箱域名，第一個照舊係 @ 本身
+                // `@` 同 `.` 係電郵必用；`.com` 係常用尾巴。`/` 喺電郵極少用，
+                // 長撳 `.` 仍然揀得到（見 [PUNCT_VARIANTS]）。
                 r3.add(Key(
                     KeyAction.CHAR, label = "@", text = "@", weight = 1f,
                     variants = listOf("@", "@gmail.com", "@hotmail.com")
                 ))
                 r3.add(Key(KeyAction.SPACE, label = "␣", weight = 2.2f))
+                r3.add(punct("."))
                 r3.add(domainKey())
-                r3.add(punct("/"))
             }
             // URL 欄：`,` 在網址中幾乎用不着，收起了讓 `/` 與 `.com` 上來。
             // `.` 與 `/` 仍是 [punct]，長撳有 `: - _ ~ = ?` 這些網址常用符號。

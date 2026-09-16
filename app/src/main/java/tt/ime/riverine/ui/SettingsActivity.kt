@@ -1348,7 +1348,7 @@ class SettingsActivity : AppCompatActivity() {
      */
     private fun buildTryBox() {
         header("試打")
-        note("每種欄位的鍵盤排位都不同：email 出 @ 與 .com、網址出 / 與 .com、" +
+        note("每種欄位的鍵盤排位都不同：email 出 @、. 與 .com、網址出 /、. 與 .com、" +
             "密碼收起 , 與 / 改為 - 與 _、電話出 ( ) + #、數字欄只在 signed／decimal " +
             "才出 - 與 .。⏎ 亦會跟 imeOptions 換符號。")
         tryField("普通欄（句首會自動大階）",
@@ -1366,9 +1366,12 @@ class SettingsActivity : AppCompatActivity() {
         tryField("搜尋（⏎ = ⌕）", InputType.TYPE_CLASS_TEXT, EditorInfo.IME_ACTION_SEARCH)
         tryField("完成（⏎ = ✓）", InputType.TYPE_CLASS_TEXT, EditorInfo.IME_ACTION_DONE)
         tryField("傳送（⏎ = ➤）", InputType.TYPE_CLASS_TEXT, EditorInfo.IME_ACTION_SEND)
-        tryField("多行＋傳送（⏎ 應換行）",
+        tryField("多行＋傳送（⏎ = ➤）",
             InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE,
             EditorInfo.IME_ACTION_SEND)
+        tryField("多行＋不准動作（⏎ 應換行）",
+            InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE,
+            EditorInfo.IME_ACTION_SEND or EditorInfo.IME_FLAG_NO_ENTER_ACTION)
         tryField("前往（⏎ = →）", InputType.TYPE_CLASS_TEXT, EditorInfo.IME_ACTION_GO)
         tryField("下一個（⏎ = ⇥）", InputType.TYPE_CLASS_TEXT, EditorInfo.IME_ACTION_NEXT)
         tryField("上一個（⏎ = ⇤）", InputType.TYPE_CLASS_TEXT, EditorInfo.IME_ACTION_PREVIOUS)

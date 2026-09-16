@@ -486,9 +486,9 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
      * `⏎` 跟欄位嘅 `imeOptions` 換樣（全部單色符號，見 [SEARCH_GLYPH] 嗰段）：
      * 完成 ✓、搜尋 ⌕、傳送 ➤、前往 →、下一個 ⇥、上一個 ⇤。
      *
-     * 條件問 [EnterKey.behavior]，同 [enter] 一模一樣：多行／
-     * [EditorInfo.IME_FLAG_NO_ENTER_ACTION]／未指定動作一律 `⏎`，唔好扮到似
-     * 「撳咗就走」。
+     * 條件問 [EnterKey.behavior]，同 [enter] 一模一樣：
+     * [EditorInfo.IME_FLAG_NO_ENTER_ACTION]／未指定動作一律 `⏎`；有傳送／搜尋
+     * 就出對應符號，唔好因為多行旗標就扮換行。
      */
     private fun enterLabelFor(ei: EditorInfo?): String {
         val inputType = ei?.inputType ?: 0
@@ -1100,7 +1100,7 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
         val inputType = ei?.inputType ?: 0
         val opts = ei?.imeOptions ?: 0
         when (EnterKey.behavior(inputType, opts)) {
-            // 多行／聊天欄一定要用 commitText：KEYCODE_ENTER 會被攔截成送出
+            // 換行用 commitText：KEYCODE_ENTER 會被攔截成送出
             EnterKey.Behavior.NEWLINE -> ic.commitText("\n", 1)
             EnterKey.Behavior.EDITOR_ACTION ->
                 ic.performEditorAction(opts and EditorInfo.IME_MASK_ACTION)
