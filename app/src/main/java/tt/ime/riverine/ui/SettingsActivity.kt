@@ -51,6 +51,7 @@ import tt.ime.riverine.core.AiSlot
 import tt.ime.riverine.core.AiStt
 import tt.ime.riverine.core.BarMode
 import tt.ime.riverine.core.EngLongPress
+import tt.ime.riverine.core.GeminiLive
 import tt.ime.riverine.core.InputLog
 import tt.ime.riverine.core.KeyLayout
 import tt.ime.riverine.core.KeyPressEffect
@@ -739,47 +740,76 @@ class SettingsActivity : AppCompatActivity() {
         if (Prefs.sp(this).getBoolean(Prefs.KEY_AI_STT_ON, false)) {
             val share = Prefs.aiSttShare(this)
             val provider = Prefs.aiProvider(this, Prefs.aiSttSlot(this))
-            if (!Prefs.aiAudioCapable(provider)) {
+            val live = Prefs.aiSttLive(this)
+
+            switch("使用 Gemini Live 即時辨識", Prefs.KEY_AI_STT_LIVE, false) { rebuildAiSection() }
+            if (live) {
+                note("開啟後改用 Gemini Live 邊講邊辨識，不再整段錄音上傳。只用 Gemini，自訂 API 無效。")
+                textField("Live 模型", Prefs.KEY_AI_STT_LIVE_MODEL, GeminiLive.DEFAULT_MODEL)
+                note("預設是即時轉錄專用模型。改寫用的 flash 模型不能用在這裡。")
+                val levels = GeminiLive.ThinkingLevel.entries.toList()
+                enumPicker("思考層級", levels.map { it.label },
+                    levels.indexOf(Prefs.aiSttLiveThinking(this))) { i ->
+                    Prefs.setAiSttLiveThinking(this, levels[i])
+                }
+                note("預設為低。愈高愈準但愈慢；此 Live 模型不支援「最低」。")
+                if (provider.useCustom) {
+                    note("⚠️ Live 只連 Gemini 的 WebSocket，下面的自訂 API 不會使用。" +
+                        "請確認 API key 是 Gemini 的。")
+                }
+            } else if (!Prefs.aiAudioCapable(provider)) {
                 note("⚠️ " + (if (share) "「AI 改寫」" else "語音輸入") + "的 AI 設定使用自訂 API，" +
                     "但 Body 範本中沒有 %audio%，無法送出錄音，暫時改用系統語音辨識。" +
                     (if (share) "請關閉下面「和 AI 改寫共用 Profile」，另外設定語音用的 API。" else ""))
-            } else if (provider.key.isBlank()) {
+            }
+            if (provider.key.isBlank()) {
                 note("⚠️ 尚未設定 API key，請在下面的「AI 設定」" +
                     (if (share) "（與「AI 改寫」共用）" else "") + "貼上。")
             }
 
-            textField("Prompt（%text% = 輸入框現有內容，只作上下文；%lang% = 目標語言）",
-                Prefs.KEY_AI_STT_PROMPT, Prefs.DEFAULT_AI_STT_PROMPT, multiline = true)
-            note("預設 prompt 已要求只輸出辨識結果、逐字轉錄、中文只用繁體字，" +
-                "並把輸入框現有內容當成上下文。改動時請保留這些要求，否則 AI 容易自行加話或改寫。")
-            row(button("還原預設 Prompt") {
-                Prefs.sp(this).edit().putString(Prefs.KEY_AI_STT_PROMPT, Prefs.DEFAULT_AI_STT_PROMPT).apply()
-                rebuildAiSection()
-                toast("已還原預設 Prompt")
-            })
-            textField("中文鍵盤按語音時的 %lang%",
+            if (!live) {
+                textField("Prompt（%text% = 輸入框現有內容，只作上下文；%lang% = 目標語言）",
+                    Prefs.KEY_AI_STT_PROMPT, Prefs.DEFAULT_AI_STT_PROMPT, multiline = true)
+                note("預設 prompt 已要求只輸出辨識結果、逐字轉錄、中文只用繁體字，" +
+                    "並把輸入框現有內容當成上下文。改動時請保留這些要求，否則 AI 容易自行加話或改寫。")
+                row(button("還原預設 Prompt") {
+                    Prefs.sp(this).edit().putString(Prefs.KEY_AI_STT_PROMPT, Prefs.DEFAULT_AI_STT_PROMPT).apply()
+                    rebuildAiSection()
+                    toast("已還原預設 Prompt")
+                })
+            }
+            textField(
+                if (live) "中文鍵盤的語言（BCP-47，例如 yue-Hant-HK）"
+                else "中文鍵盤按語音時的 %lang%",
                 Prefs.KEY_AI_STT_LANG_ZH, Prefs.DEFAULT_AI_STT_LANG_ZH)
-            textField("其他鍵盤（英文／符號／數字等）按語音時的 %lang%",
+            textField(
+                if (live) "其他鍵盤的語言（BCP-47，例如 en-US）"
+                else "其他鍵盤（英文／符號／數字等）按語音時的 %lang%",
                 Prefs.KEY_AI_STT_LANG_OTHER, Prefs.DEFAULT_AI_STT_LANG_OTHER)
+            if (live) {
+                note("填了 BCP-47 語言碼就直接送給辨識；否則中文鍵盤當粵語、其他當英語。")
+            }
             note("錄音最長 " + (AiStt.MAX_RECORD_MS / 1000) + " 秒，屆時自動停止送出。" +
                 "首次使用需授權錄音權限。")
 
-            slider("短錄音改用系統辨識", 0, Prefs.MAX_AI_STT_SYS_SEC, Prefs.aiSttSysSec(this), "秒",
-                format = { if (it == 0) "關閉（一律用 AI）" else "$it 秒以內" }) { v ->
-                Prefs.sp(this).edit().putInt(Prefs.KEY_AI_STT_SYS_SEC, v).apply()
-                rebuildAiSection()
-            }
-            if (Prefs.aiSttSysSec(this) > 0) {
-                note("按下錄音時兩邊同時開始：講夠 " + Prefs.aiSttSysSec(this) +
-                    " 秒之前放手，就用系統內置的語音辨識（快、不耗 API 額度）；" +
-                    "超過就取消系統那邊，整段送去 AI。系統那邊聽不到內容時，仍會自動改用 AI。")
-                note("⚠️ 兩邊同時開麥克風要看裝置是否允許；部分裝置只會讓其中一邊收到聲音。" +
-                    "若短錄音經常失準或變慢，把這裡調成「關閉」即可回到只用 AI。")
-                switch("蓋住系統辨識的提示聲", Prefs.KEY_STT_MUTE_EARCON, true)
-                note("系統的語音辨識服務自己會播「開始／完結」兩下提示聲，" +
-                    "那是它自己的程序播的，上面的「提示音音量」管不到，也沒有 API 叫它不要播。" +
-                    "開啟這項就在錄音期間暫時靜音（媒體與系統音，不包括我們自己的提示音），" +
-                    "錄完立即還原。代價是錄音那幾秒聽不到正在播放的音樂。")
+            if (!live) {
+                slider("短錄音改用系統辨識", 0, Prefs.MAX_AI_STT_SYS_SEC, Prefs.aiSttSysSec(this), "秒",
+                    format = { if (it == 0) "關閉（一律用 AI）" else "$it 秒以內" }) { v ->
+                    Prefs.sp(this).edit().putInt(Prefs.KEY_AI_STT_SYS_SEC, v).apply()
+                    rebuildAiSection()
+                }
+                if (Prefs.aiSttSysSec(this) > 0) {
+                    note("按下錄音時兩邊同時開始：講夠 " + Prefs.aiSttSysSec(this) +
+                        " 秒之前放手，就用系統內置的語音辨識（快、不耗 API 額度）；" +
+                        "超過就取消系統那邊，整段送去 AI。系統那邊聽不到內容時，仍會自動改用 AI。")
+                    note("⚠️ 兩邊同時開麥克風要看裝置是否允許；部分裝置只會讓其中一邊收到聲音。" +
+                        "若短錄音經常失準或變慢，把這裡調成「關閉」即可回到只用 AI。")
+                    switch("蓋住系統辨識的提示聲", Prefs.KEY_STT_MUTE_EARCON, true)
+                    note("系統的語音辨識服務自己會播「開始／完結」兩下提示聲，" +
+                        "那是它自己的程序播的，上面的「提示音音量」管不到，也沒有 API 叫它不要播。" +
+                        "開啟這項就在錄音期間暫時靜音（媒體與系統音，不包括我們自己的提示音），" +
+                        "錄完立即還原。代價是錄音那幾秒聽不到正在播放的音樂。")
+                }
             }
 
             subHeader("AI 設定")

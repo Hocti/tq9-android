@@ -459,6 +459,8 @@ core/   TTDb       sqlite 存取、assets 安裝、換 db、weight prefix 統計
         AiRewrite  Gemini generateContent，改寫選了那段字
         AiStt      VoiceRecorder 錄 PCM、VoiceActivity 判斷有沒有人聲、
                    SttAudio 壓縮（AAC-LC / ADTS，無法進行壓縮就回退 WAV）
+        GeminiLive Gemini Live WebSocket 即時轉錄（`gemini-3.8-live-extended-thinking`）；
+                   setup 一定要帶 thinkingLevel（預設 LOW）；設定頁開 Live 就頂走上傳那條路
         UsageStats 另一個 sqlite（usage_stats.db，與 dataset.db 分開）：
                    連續兩個中文字的 bigram 次數、每個字輸入了多少次
         Prefs      全部設定
@@ -1129,12 +1131,35 @@ app 內所有 使用者見到的字（設定頁、toast、鍵面、空狀態提�
 那套內容一個都不會 set。（`Prefs.aiSttSysSec` 開著時 AI 那條路仍然會自己另外開
 一個 `SpeechRecognizer`，但用的是 `sysStt` 那組獨立欄位，見下面一節。）
 
-- **Gemini 或自訂 API 都得**：Gemini 用 `inline_data` 送 ADTS AAC；自訂 API 靠範本中的
+### Gemini Live 即時辨識（`Prefs.KEY_AI_STT_LIVE`，預設關）
+
+而家嗰套係整段 PCM 壓完先 `generateContent` 上傳，**套唔到** Live API
+（`stt_demo.ts` 嗰條 `ai.live.connect` WebSocket）。設定頁「使用 Gemini Live
+即時辨識」開了就**完全頂走**呢條上傳路，亦唔會開系統 STT 陪跑：
+
+- WebSocket `BidiGenerateContent`（OkHttp），16 kHz PCM 邊錄邊送
+- 預設模型 `gemini-3.8-live-extended-thinking`（同改寫嗰個 flash **分開**，flash 唔係 live 模型）
+- **跟 `stt_demo.ts`**：`responseModalities` 一定係 **AUDIO**（native audio 模型唔收 TEXT；
+  TEXT + 轉錄會變成 `AUDIO, TEXT` 被拒）。`thinkingConfig`／`speechConfig`（Zephyr）／
+  `mediaResolution` 一樣放 `generationConfig`。字靠 `inputAudioTranscription`，唔係 TEXT
+- **`thinkingConfig.thinkingLevel` 一定要帶**（唔帶 setup 就報錯）。預設 `LOW`，
+  設定頁「思考層級」揀 LOW／MEDIUM／HIGH（此模型唔支援 MINIMAL）
+- `inputAudioTranscription` + SMART；push-to-talk（`automaticActivityDetection.disabled`，
+  放手先 `activityEnd`）—— 咪掣幾時停由使用者話事
+- 語言：`%lang%` 填咗 BCP-47（`yue-Hant-HK` / `en-US`）就直接用，否則中文鍵盤粵語、其他英語
+- **只用 Gemini**。自訂 API／Whisper／prompt／短錄音改用系統辨識全部唔適用
+- `VoiceRecorder` 仍然錄埋成段做 VAD（太短／冇人聲照取消，唔等 server）
+- 計時 overlay **跟錄音走**：WebSocket 途中報錯只寫喺遮罩上，**唔好收 overlay**
+  （收咗使用者會以為錄了半秒就完，咪其實仲開住）。`onDone` 淨係放手／再撳停之後先至叫
+- 協議砌／拆喺 `GeminiLive`（有 `GeminiLiveTest`），session 喺 `GeminiLiveSession`
+
+- **Gemini 或自訂 API 都得**（Live 關咗嗰陣）：Gemini 用 `inline_data` 送 ADTS AAC；自訂 API 靠範本中的
   **`%audio%`** 放錄音 —— multipart 模式（`AiProvider.multipart`）值剛好是 `%audio%`
   那行變成檔案 `audio.m4a`，JSON 模式 `%audio%` = base64、`%audio_mime%` = MIME。
   STT 那組的預設範本是 OpenAI Whisper（`Prefs.DEFAULT_AI_STT_BODY`）。
   用緊的那組是自訂 API 但 body 沒有 `%audio%`（例如共用了改寫那組 chat 範本），
   `Prefs.aiSttOn()` 就**一律回 false**，跌回系統 STT（`Prefs.aiAudioCapable`）。
+  開了 Live 就唔再問 `%audio%`（PCM 經 WebSocket 送）。
 - 自訂 API 範本的 placeholder 用 `AiTemplate.fill()` **一次過掃一轉**，換入去的
   prompt 內容不會再被換第二次；multipart body 要**先拆行再換**（prompt 本身可以有換行）。
   兩個都有 `AiTemplateTest`。
@@ -1156,6 +1181,9 @@ app 內所有 使用者見到的字（設定頁、toast、鍵面、空狀態提�
 - **錄音及等待結果期間，整個鍵盤變灰兼無法操作**：`showBlockingOverlay()`（AI 改寫
   那個 loading 都是使用它）。所以「再按一下停」是按那塊 overlay，不是按回顆 🎤。
   高度**固定為 `root.height`**，用 MATCH_PARENT 會擴大了整個 IME window。
+  **其間電話不會休眠**：overlay／IME window `keepScreenOn` + `PARTIAL_WAKE_LOCK`
+  （`setKeepAwake`；`WAKE_LOCK` 係 normal permission）。收 overlay／停系統 STT／
+  `onDestroy` 一定要放。
 - **四個階段四種不同的提示音**（`SttTone`）：開始錄 `TONE_PROP_BEEP`、錄音結束
   `TONE_PROP_BEEP2`、成功 `TONE_PROP_ACK`、失敗 `TONE_PROP_NACK`。
   這些與 `Prefs.sound`（按鍵聲）**沒有關係**，不跟那個開關 —— 音量另有

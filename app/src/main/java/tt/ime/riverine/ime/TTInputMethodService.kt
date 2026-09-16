@@ -14,6 +14,8 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.os.PowerManager
+import android.os.SystemClock
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
@@ -26,6 +28,7 @@ import android.view.Gravity
 import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
+import android.view.WindowManager
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.ExtractedTextRequest
 import android.view.inputmethod.InputConnection
@@ -46,6 +49,8 @@ import tt.ime.riverine.core.ClipHistory
 import tt.ime.riverine.core.EmojiDict
 import tt.ime.riverine.core.EnDict
 import tt.ime.riverine.core.EnterKey
+import tt.ime.riverine.core.GeminiLive
+import tt.ime.riverine.core.GeminiLiveSession
 import tt.ime.riverine.core.InputLog
 import tt.ime.riverine.core.KeyLayout
 import tt.ime.riverine.core.NextWordModel
@@ -187,6 +192,12 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
     /** 同 [aiGeneration] 一樣：逾時之後遲到嘅回覆要當第 */
     private var sttGeneration = 0
     private var sttTimerLabel: TextView? = null
+    /** Live STT 錄音 overlay 上面即時出嘅字 */
+    private var sttLiveLabel: TextView? = null
+    /** 用緊 Gemini Live 嗰次；null = 行返 generateContent 嗰條舊路 */
+    private var liveStt: GeminiLiveSession? = null
+    /** 錄音／聆聽期間唔好熄屏；[setKeepAwake] 攞／放 */
+    private var sttWakeLock: PowerManager.WakeLock? = null
 
     // ---- 短錄音改用系統 STT（[Prefs.aiSttSysSec]）----------------------------
     /** 今次錄音陪住一齊開嗰個系統 recognizer。過咗界 cancel 咗就變返 null */
@@ -255,6 +266,7 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
         stopStt()
         cancelAiStt()
         unmuteEarcons() // 收檔前一定要還原，唔可以留低部機靜咗
+        setKeepAwake(false)
         clipboard()?.removePrimaryClipChangedListener(clipListener)
         db?.close()
         super.onDestroy()
@@ -2082,19 +2094,52 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
             setBackgroundColor(Color.argb(170, 0, 0, 0))
             isClickable = true
             isFocusable = true
+            keepScreenOn = true
             addView(content, FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT
             ).apply { gravity = Gravity.CENTER })
         }
         aiOverlay = overlay
         outer.addView(overlay, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, h))
+        setKeepAwake(true)
         return overlay
     }
 
     private fun hideAiLoading() {
-        val v = aiOverlay ?: return
-        aiOverlay = null
-        (v.parent as? ViewGroup)?.removeView(v)
+        val v = aiOverlay
+        if (v != null) {
+            aiOverlay = null
+            (v.parent as? ViewGroup)?.removeView(v)
+        }
+        if (!listening) setKeepAwake(false)
+    }
+
+    /**
+     * 錄音／系統語音聆聽期間唔好熄屏、CPU 都唔好瞓。
+     * 螢幕用 IME window 嘅 `FLAG_KEEP_SCREEN_ON`（唔使額外權限就 vis 得到）；
+     * 再加 `PARTIAL_WAKE_LOCK` 擋 OEM 仍然熄 CPU。一定要同 [setKeepAwake] false 成對。
+     */
+    private fun setKeepAwake(on: Boolean) {
+        if (::outer.isInitialized) outer.keepScreenOn = on
+        window?.window?.let { w ->
+            if (on) w.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+            else w.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        }
+        if (on) {
+            val lock = sttWakeLock ?: run {
+                val pm = getSystemService(POWER_SERVICE) as PowerManager
+                pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "tt.ime.riverine:stt").also {
+                    it.setReferenceCounted(false)
+                    sttWakeLock = it
+                }
+            }
+            if (!lock.isHeld) {
+                // 封頂：最長錄音 + 等辨識；漏咗 release 都唔會攞住一晚
+                runCatching { lock.acquire(AiStt.MAX_RECORD_MS + 120_000L) }
+            }
+        } else {
+            sttWakeLock?.let { if (it.isHeld) runCatching { it.release() } }
+        }
     }
 
     /** load fail 嗰下嘟一聲，唔靠 [Prefs.sound]（嗰個係按鍵聲，呢個係錯誤提示） */
@@ -2279,11 +2324,14 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
             override fun onRmsChanged(rmsdB: Float) {}
             override fun onBufferReceived(buffer: ByteArray?) {}
             override fun onEndOfSpeech() {}
-            override fun onError(error: Int) { listening = false; setSttLight(false); releaseRecognizer() }
+            override fun onError(error: Int) {
+                listening = false; setSttLight(false); setKeepAwake(false); releaseRecognizer()
+            }
             override fun onResults(results: Bundle?) {
                 sttBest(results)?.let { commitSttText(it) }
                 listening = false
                 setSttLight(false)
+                setKeepAwake(false)
                 releaseRecognizer()
             }
             override fun onPartialResults(partialResults: Bundle?) {}
@@ -2300,9 +2348,10 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
         }
         listening = true
         setSttLight(true)
+        setKeepAwake(true)
         toast("🎤 聆聽中…")
         runCatching { r.startListening(intent) }.onFailure {
-            listening = false; releaseRecognizer()
+            listening = false; setKeepAwake(false); releaseRecognizer()
         }
     }
 
@@ -2310,6 +2359,7 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
         if (listening) { runCatching { recognizer?.stopListening() } }
         listening = false
         setSttLight(false)
+        setKeepAwake(false)
         releaseRecognizer()
     }
 
@@ -2354,8 +2404,12 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
      * 所以「再撳一下停」係撳嗰塊 overlay，唔係撳返粒 🎤。
      */
     private fun startAiStt(hold: Boolean) {
-        if (sttBusy || sttRecorder != null) return
+        if (sttBusy || sttRecorder != null || liveStt != null) return
         if (!ensureMicPermission()) return
+        if (Prefs.aiSttLive(this)) {
+            startLiveStt(hold)
+            return
+        }
         val rec = VoiceRecorder()
         if (!rec.start()) {
             playSttTone(SttTone.FAIL)
@@ -2371,7 +2425,103 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
         // （快、免費、唔使等 upload）；過咗界就 cancel 咗系統嗰個，淨返 AI
         val sysMs = Prefs.aiSttSysSec(this) * 1000L
         sysSttDeadlineMs = if (sysMs > 0 && startSysStt()) sysMs else 0L
-        showSttRecording(hold)
+        showSttRecording(hold, live = false)
+    }
+
+    /**
+     * Gemini Live：邊錄邊送 PCM。唔開系統 STT 陪跑（Live 自己已經即時出字）。
+     */
+    private fun startLiveStt(hold: Boolean) {
+        val p = Prefs.aiProvider(this, Prefs.aiSttSlot(this))
+        val chinese = mode == PadMode.CHINESE
+        val myGen = ++sttGeneration
+        val session = GeminiLiveSession(
+            key = p.key,
+            model = Prefs.aiSttLiveModel(this),
+            langCodes = GeminiLive.langCodes(Prefs.aiSttLang(this, chinese), chinese),
+            thinking = Prefs.aiSttLiveThinking(this),
+            onInterim = { text -> sttLiveLabel?.text = text },
+            onDropped = { msg -> sttLiveLabel?.text = msg },
+            onDone = { r -> onLiveSttDone(myGen, r) },
+        )
+        liveStt = session
+        val rec = VoiceRecorder { chunk -> session.sendPcm(chunk) }
+        if (!rec.start()) {
+            session.cancel()
+            liveStt = null
+            playSttTone(SttTone.FAIL)
+            toast("開唔到麥克風，請檢查權限或其他正在錄音的程式")
+            return
+        }
+        sttRecorder = rec
+        sttHold = hold
+        sttBusy = true
+        setSttLight(true)
+        playSttTone(SttTone.START)
+        session.connect()
+        showSttRecording(hold, live = true)
+    }
+
+    private fun stopLiveStt(commit: Boolean) {
+        val rec = sttRecorder
+        sttRecorder = null
+        sttHold = false
+        stopSttTimer()
+        setSttLight(false)
+        val session = liveStt
+        val clip = if (rec != null && commit) rec.stop() else { rec?.cancel(); null }
+        if (!commit || clip == null || clip is VoiceClip.TooShort || clip is VoiceClip.Silent) {
+            session?.cancel()
+            liveStt = null
+            sttLiveLabel = null
+            sttBusy = false
+            hideAiLoading()
+            if (commit) {
+                playSttTone(SttTone.FAIL)
+                toast(if (clip is VoiceClip.Silent) "沒有聽到說話，已取消" else "錄音太短")
+            }
+            return
+        }
+        // 途中已經斷線：計時 overlay 留住咗，而家使用者先收。唔好換「辨識中」死等。
+        if (session == null || !session.finish()) {
+            liveStt = null
+            sttLiveLabel = null
+            sttBusy = false
+            hideAiLoading()
+            playSttTone(SttTone.FAIL)
+            toast("語音輸入失敗：連線已中斷")
+            return
+        }
+        playSttTone(SttTone.STOP)
+        showSttWaiting()
+    }
+
+    private fun onLiveSttDone(myGen: Int, r: Result<String>) {
+        if (myGen != sttGeneration) return
+        sttGeneration++
+        liveStt = null
+        sttLiveLabel = null
+        // 理論上 recorder 喺 finish 嗰陣已經停；萬一 session 提早 complete，都唔好留住咪
+        sttRecorder?.cancel()
+        sttRecorder = null
+        sttHold = false
+        stopSttTimer()
+        setSttLight(false)
+        sttBusy = false
+        hideAiLoading()
+        r.onSuccess { out ->
+            val text = out.trim()
+            if (text.isEmpty()) {
+                playSttTone(SttTone.FAIL)
+                toast("聽唔到內容")
+                return@onSuccess
+            }
+            playSttTone(SttTone.OK)
+            commitSttText(text)
+        }.onFailure {
+            playSttTone(SttTone.FAIL)
+            toast("語音輸入失敗：" + (it.message ?: "未知錯誤"))
+        }
     }
 
     /**
@@ -2383,6 +2533,10 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
      * 有系統 STT 陪住嗰陣會鬆返，原因見下面。）
      */
     private fun stopAiStt(commit: Boolean) {
+        if (liveStt != null) {
+            stopLiveStt(commit)
+            return
+        }
         val rec = sttRecorder ?: return
         val recMs = rec.elapsedMs // 要喺 stop() 之前攞，佢一收工個計時器就清零
         sttRecorder = null
@@ -2465,8 +2619,8 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
         return (before + after).trim()
     }
 
-    /** 錄緊嘢：成個鍵盤蓋住，中間出個計時器 */
-    private fun showSttRecording(hold: Boolean) {
+    /** 錄緊嘢：成個鍵盤蓋住，中間出個計時器。[live] 再開一行即時字幕 */
+    private fun showSttRecording(hold: Boolean, live: Boolean) {
         val timer = TextView(this).apply {
             setTextColor(Color.WHITE)
             textSize = 30f
@@ -2483,10 +2637,30 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
                 textSize = 14f
                 gravity = Gravity.CENTER
             })
+            if (live) {
+                val preview = TextView(this@TTInputMethodService).apply {
+                    setTextColor(Color.WHITE)
+                    textSize = 16f
+                    gravity = Gravity.CENTER
+                    setPadding(dpPx(16), dpPx(12), dpPx(16), 0)
+                }
+                sttLiveLabel = preview
+                addView(preview)
+            } else {
+                sttLiveLabel = null
+            }
         }
         // 撳實錄嗰種唔使理呢下撳（放手自然會停），但擺住都冇壞：
-        // 手指仲撳實住粒 🎤，成串 event 都會繼續派返俾佢，唔會落到呢度
-        showBlockingOverlay(col)?.setOnClickListener { stopAiStt(commit = true) }
+        // 手指仲撳實住粒 🎤，成串 event 都會繼續派返俾佢，唔會落到呢度。
+        // 輕觸開始：同一下 ACTION_UP 唔可以當 overlay 嘅 click（會以為錄咗半秒就完）。
+        val overlay = showBlockingOverlay(col)
+        val armedAt = SystemClock.elapsedRealtime()
+        overlay?.post {
+            overlay.setOnClickListener {
+                if (SystemClock.elapsedRealtime() - armedAt < 400L) return@setOnClickListener
+                stopAiStt(commit = true)
+            }
+        }
         updateSttTimer()
         ui.post(sttTimerTick)
     }
@@ -2536,7 +2710,10 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
     /** 唔要而家錄緊／等緊嗰次（離開個欄、service 收工）：唔叫 API，亦都唔出聲 */
     private fun cancelAiStt() {
         sttGeneration++ // 遲到嘅回覆當第
-        if (sttRecorder != null) stopAiStt(commit = false)
+        if (sttRecorder != null || liveStt != null) stopAiStt(commit = false)
+        liveStt?.cancel()
+        liveStt = null
+        sttLiveLabel = null
         stopSysSttWait() // 錄完、等緊系統嗰邊交貨嗰段都要收
         sttBusy = false
         stopSttTimer()

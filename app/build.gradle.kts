@@ -33,8 +33,8 @@ android {
         applicationId = "tt.ime.riverine"
         minSdk = 26
         targetSdk = 36
-        versionCode = 83
-        versionName = "2.2.21"
+        versionCode = 88
+        versionName = "2.2.22"
     }
 
     signingConfigs {
@@ -118,5 +118,7 @@ dependencies {
     implementation("androidx.core:core-ktx:1.13.1")
     implementation("androidx.appcompat:appcompat:1.7.0")
     implementation("com.google.android.material:material:1.12.0")
+    // Gemini Live STT 用 WebSocket（`generateContent` 嗰條 HTTP 路行唔到即時串流）
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
     testImplementation("junit:junit:4.13.2")
 }

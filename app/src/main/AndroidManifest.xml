@@ -12,6 +12,8 @@
     <!-- 開系統語音辨識嗰陣暫時靜音，遮住佢自己嗰兩下提示聲（見 TTInputMethodService.muteEarcons）。
          normal permission，安裝就有，唔會問使用者。 -->
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+    <!-- 錄音期間唔好熄屏／瞓機（見 TTInputMethodService.setKeepAwake）。normal permission。 -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
 
     <queries>
         <intent>

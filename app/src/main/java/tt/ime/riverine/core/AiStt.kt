@@ -29,6 +29,9 @@ import kotlin.math.sqrt
  * 用 [Prefs.aiSttSlot] 嗰套 provider 設定：Gemini 用 `inline_data` 送 ADTS AAC；
  * 自訂 API 送 m4a，範本入面 `%audio%` 話事段錄音放喺邊（見 `AiRewrite.callCustom`）。
  * 範本冇 `%audio%` 嘅話 [Prefs.aiSttOn] 一律當閂咗，跌返落系統內置嗰個 STT。
+ *
+ * 開咗 [Prefs.KEY_AI_STT_LIVE] 就唔行呢條上傳路，改 [GeminiLiveSession]
+ * 經 WebSocket 即時串 PCM（見嗰個檔）。
  */
 object AiStt {
 
@@ -97,7 +100,11 @@ sealed interface VoiceClip {
  * 特登唔用 `MediaRecorder`：佢一定要寫落檔案，而且各家機出嚟嘅容器唔一定啱
  * Gemini 收。呢度自己攞原始 PCM，之後想包 WAV 定 encode 落 AAC 都由 [SttAudio] 話事。
  */
-class VoiceRecorder(private val sampleRate: Int = 16_000) {
+class VoiceRecorder(
+    private val sampleRate: Int = 16_000,
+    /** 每讀到一嚿 PCM 就叫一次（錄音 thread）。Live STT 用嚟即時送上 WebSocket */
+    private val onChunk: ((ByteArray) -> Unit)? = null,
+) {
 
     private var record: AudioRecord? = null
     private var thread: Thread? = null
@@ -143,7 +150,11 @@ class VoiceRecorder(private val sampleRate: Int = 16_000) {
         thread = Thread {
             while (running) {
                 val n = runCatching { r.read(buf, 0, buf.size) }.getOrDefault(-1)
-                if (n > 0) synchronized(pcm) { pcm.write(buf, 0, n) } else if (n < 0) break
+                if (n > 0) {
+                    val chunk = buf.copyOf(n)
+                    synchronized(pcm) { pcm.write(chunk) }
+                    onChunk?.invoke(chunk)
+                } else if (n < 0) break
             }
         }.also { it.start() }
         return true

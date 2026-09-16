@@ -360,6 +360,14 @@ object Prefs {
      */
     const val KEY_AI_STT_ON = "ai_stt_on"
     const val KEY_AI_STT_PROMPT = "ai_stt_prompt"
+    /**
+     * 用 Gemini Live（WebSocket 即時串流）取代整段錄音再 `generateContent` 嗰條路。
+     * 開咗就唔會再行而家嗰套上傳，亦唔會開系統 STT 陪跑。見 `GeminiLiveSession`。
+     */
+    const val KEY_AI_STT_LIVE = "ai_stt_live"
+    const val KEY_AI_STT_LIVE_MODEL = "ai_stt_live_model"
+    /** Live setup 嘅 `thinkingLevel`；預設 LOW。見 [GeminiLive.ThinkingLevel]。 */
+    const val KEY_AI_STT_LIVE_THINKING = "ai_stt_live_thinking"
 
     /**
      * 短過幾多秒嘅錄音改用系統內置嗰個 `SpeechRecognizer`（快、免費、唔使等
@@ -943,9 +951,27 @@ object Prefs {
     /**
      * AI 語音輸入開唔開。用緊嗰套設定送唔到錄音（[aiAudioCapable]）就一律當閂咗，
      * 跌返落系統內置嗰個 STT —— 就算個 pref 之前開過都係。
+     *
+     * Gemini Live 唔使 `%audio%` 範本（PCM 經 WebSocket 送），所以開咗 Live 就
+     * 唔再問 [aiAudioCapable]。
      */
     fun aiSttOn(ctx: Context) =
-        sp(ctx).getBoolean(KEY_AI_STT_ON, false) && aiAudioCapable(aiProvider(ctx, aiSttSlot(ctx)))
+        sp(ctx).getBoolean(KEY_AI_STT_ON, false) &&
+            (aiSttLive(ctx) || aiAudioCapable(aiProvider(ctx, aiSttSlot(ctx))))
+
+    /** 見 [KEY_AI_STT_LIVE] */
+    fun aiSttLive(ctx: Context) = sp(ctx).getBoolean(KEY_AI_STT_LIVE, false)
+
+    /** Live 專用模型，同改寫／自訂 API 嗰個 model 欄分開（flash 唔係 live 模型） */
+    fun aiSttLiveModel(ctx: Context): String =
+        sp(ctx).getString(KEY_AI_STT_LIVE_MODEL, GeminiLive.DEFAULT_MODEL)!!
+            .ifBlank { GeminiLive.DEFAULT_MODEL }
+
+    fun aiSttLiveThinking(ctx: Context): GeminiLive.ThinkingLevel =
+        GeminiLive.ThinkingLevel.fromPref(sp(ctx).getString(KEY_AI_STT_LIVE_THINKING, null))
+
+    fun setAiSttLiveThinking(ctx: Context, level: GeminiLive.ThinkingLevel) =
+        sp(ctx).edit().putString(KEY_AI_STT_LIVE_THINKING, level.name).apply()
 
     fun aiSttPrompt(ctx: Context): String =
         sp(ctx).getString(KEY_AI_STT_PROMPT, DEFAULT_AI_STT_PROMPT)!!.ifBlank { DEFAULT_AI_STT_PROMPT }

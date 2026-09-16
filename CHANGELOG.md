@@ -5,6 +5,56 @@
 
 ---
 
+## [2.2.26] — 2026-09-16
+
+### Gemini Live 改回 AUDIO（與示範一致）
+
+`gemini-3.8-live-extended-thinking` 只支援 AUDIO。先前用 TEXT 做轉錄，server 當成
+AUDIO+TEXT 拒絕。而家跟 `stt_demo.ts`：AUDIO、思考層級、Zephyr 聲線；文字仍由
+`inputAudioTranscription` 出。
+
+---
+
+## [2.2.25] — 2026-09-16
+
+### Gemini Live 可選思考層級
+
+`gemini-3.8-live-extended-thinking` 一定要帶 `thinkingLevel`，未設定會連線失敗。
+預設為低（與示範相同）；設定頁「語音輸入」可改選低／中／高。
+
+---
+
+## [2.2.24] — 2026-09-16
+
+### 錄音期間電話不會休眠
+
+語音輸入（Live／上傳／系統辨識）進行時螢幕保持亮起，避免計時遮罩還在、裝置卻先睡著。
+錄完或取消立即恢復。
+
+---
+
+## [2.2.23] — 2026-09-16
+
+### 修正：Gemini Live 錄音計時一閃就冇
+
+Live 連線一報錯／關閉就收埋全鍵盤遮罩，但麥克風其實仲開住，看起來似錄了半秒就完。
+而家計時會留到再按一下停止；途中斷線只在遮罩上顯示原因。
+
+---
+
+## [2.2.22] — 2026-09-16
+
+### AI 語音輸入可以改用 Gemini Live
+
+設定頁「語音輸入」多了「使用 Gemini Live 即時辨識」。開啟後不再整段錄音上傳，
+改為邊講邊經 WebSocket 串流（預設 `gemini-3.8-live-extended-thinking`），錄音時鍵盤上
+會即時出字。只用 Gemini，自訂 API、prompt、以及「短錄音改用系統辨識」都不適用。
+
+而家那套 `generateContent` 上傳與 Live API 不是同一條路，不能直接套用，所以
+這是獨立選項，預設關閉。
+
+---
+
 ## [2.2.21] — 2026-09-16
 
 ### 修正：標了「送出」的欄按 Enter 變成隔行
