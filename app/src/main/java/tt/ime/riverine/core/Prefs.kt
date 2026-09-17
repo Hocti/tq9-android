@@ -24,6 +24,7 @@ enum class PadGroup { CJK, LATIN }
  *
  * **唔係每個都成日揀得**，見 [Prefs.alignOptions] —— [SPLIT] 淨係英數鍵盤
  * 兼且螢幕夠闊先出現，而嗰陣就輪到 [LEFT_GAP] / [RIGHT_GAP] 收起。
+ * [FLOATING] 兩組喺闊 screen 都有，窄咗就自動停。
  */
 enum class PadAlign(val label: String) {
     STRETCH("拉闊"),
@@ -45,7 +46,19 @@ enum class PadAlign(val label: String) {
      * （闊 screen 打橫捧住部機，兩隻姆指各顧一邊）。
      * 兩橛都係 `contentW / 2` 咁闊，所以拉闊拉窄一樣係拖粒大細掣。
      */
-    SPLIT("左右拆開")
+    SPLIT("左右拆開"),
+
+    /**
+     * 浮動：成個鍵盤變成可以拖去螢幕任何位置嘅細窗。
+     * **淨係闊 screen**（`> [Prefs.SPLIT_MIN_WIDTH_DP]`）先揀得 —— 轉直變窄就
+     * 唔再喺 [Prefs.alignOptions] 入面，[Prefs.align] 會當「拉闊」，自動停用。
+     *
+     * 最底有條 handle：左彈系統輸入法選單、左中調整大小、中間拖去郁（X／Y）、
+     * 右收起鍵盤。工具列嗰粒顯示方式**照轉**（浮動時仍可轉返置左／右）。
+     * 入浮動嗰下中英兩組一齊 FLOATING，闊高度各用各嘅 [Prefs.floatWidthScale]／
+     * [Prefs.floatHeightScale]（英文可以闊、中文可以窄）。
+     */
+    FLOATING("浮動")
 }
 
 /**
@@ -191,6 +204,12 @@ object Prefs {
     const val KEY_ALIGN = "key_align"              // PadAlign.name
     const val KEY_HEIGHT_SCALE = "key_height_scale" // 成個鍵盤高度倍數（拉高／拉低）
     const val KEY_WIDTH_SCALE = "key_width_scale"  // 中文本體闊度倍數（靠左／靠右嗰陣左右拉）
+    /** 浮動窗位置 0～1（[screenKey]，打直打橫各存一套） */
+    const val KEY_FLOAT_X = "float_x"
+    const val KEY_FLOAT_Y = "float_y"
+    /** 浮動窗闊／高倍數（[profKey]，螢幕 × [PadGroup]）。未寫過就跟返貼底嗰套 */
+    const val KEY_FLOAT_W_SCALE = "float_w_scale"
+    const val KEY_FLOAT_H_SCALE = "float_h_scale"
     const val KEY_H_RATIO = "key_h_ratio"          // 中文格仔高度 / 闊度
     const val KEY_GAP_DP = "key_gap_dp"
     const val KEY_FONT_SCALE = "key_font_scale"
@@ -485,11 +504,23 @@ object Prefs {
      *
      * [PadAlign.CENTER]（置中）**兩邊都揀得到** —— 拉窄咗企中間，
      * 闊 screen 同窄 screen 一樣用得着。
+     *
+     * [PadAlign.FLOATING] **淨係闊 screen** 先有（中英兩組都得）。窄咗（轉直）
+     * 就唔喺 list 入面，[align] 會當「拉闊」—— 唔使另外寫「停用浮動」嗰步。
      */
     fun alignOptions(ctx: Context, g: PadGroup): List<PadAlign> =
-        if (g == PadGroup.LATIN && screenWidthDp(ctx) > SPLIT_MIN_WIDTH_DP)
+        alignOptions(screenWidthDp(ctx) > SPLIT_MIN_WIDTH_DP, g)
+
+    /**
+     * 純邏輯版（唔使 [Context]），畀 unit test 盯死闊／窄 × 兩組嘅可選 list。
+     * 鍵盤嗰邊永遠行上面嗰個 [alignOptions] overload。
+     */
+    fun alignOptions(wide: Boolean, g: PadGroup): List<PadAlign> {
+        val base = if (wide && g == PadGroup.LATIN)
             listOf(PadAlign.STRETCH, PadAlign.SPLIT, PadAlign.CENTER)
         else listOf(PadAlign.STRETCH, PadAlign.LEFT_GAP, PadAlign.RIGHT_GAP, PadAlign.CENTER)
+        return if (wide) base + PadAlign.FLOATING else base
+    }
 
     /** 撳一下粒大細掣：喺 [alignOptions] 入面轉去下一個 */
     fun nextAlign(ctx: Context, g: PadGroup): PadAlign {
@@ -618,6 +649,39 @@ object Prefs {
 
     fun setAlign(ctx: Context, a: PadAlign, g: PadGroup = PadGroup.CJK) =
         sp(ctx).edit().putString(profKey(ctx, KEY_ALIGN, g), a.name).apply()
+
+    /** 浮動窗水平位置（0 = 靠左、1 = 靠右），每個螢幕尺寸各存一套 */
+    fun floatX(ctx: Context) = sp(ctx).getFloat(screenKey(ctx, KEY_FLOAT_X), 0.5f).coerceIn(0f, 1f)
+    fun setFloatX(ctx: Context, v: Float) =
+        sp(ctx).edit().putFloat(screenKey(ctx, KEY_FLOAT_X), v.coerceIn(0f, 1f)).apply()
+
+    /** 浮動窗垂直位置（0 = 靠頂、1 = 貼底）。預設貼底。 */
+    fun floatY(ctx: Context) = sp(ctx).getFloat(screenKey(ctx, KEY_FLOAT_Y), 1f).coerceIn(0f, 1f)
+    fun setFloatY(ctx: Context, v: Float) =
+        sp(ctx).edit().putFloat(screenKey(ctx, KEY_FLOAT_Y), v.coerceIn(0f, 1f)).apply()
+
+    /**
+     * 浮動窗闊度倍數。未寫過就跟返而家嗰組 [widthScale] —— 由貼底轉入去浮動
+     * 嗰下，大細同之前拉過嘅闊度接得上。
+     */
+    fun floatWidthScale(ctx: Context, g: PadGroup = PadGroup.CJK) =
+        sp(ctx).getFloat(profKey(ctx, KEY_FLOAT_W_SCALE, g), widthScale(ctx, g))
+            .coerceIn(MIN_WIDTH_SCALE, MAX_WIDTH_SCALE)
+
+    fun setFloatWidthScale(ctx: Context, v: Float, g: PadGroup = PadGroup.CJK) =
+        sp(ctx).edit()
+            .putFloat(profKey(ctx, KEY_FLOAT_W_SCALE, g), v.coerceIn(MIN_WIDTH_SCALE, MAX_WIDTH_SCALE))
+            .apply()
+
+    /** 浮動窗高度倍數。未寫過就跟返 [heightScale]。 */
+    fun floatHeightScale(ctx: Context, g: PadGroup = PadGroup.CJK) =
+        sp(ctx).getFloat(profKey(ctx, KEY_FLOAT_H_SCALE, g), heightScale(ctx, g))
+            .coerceIn(MIN_HEIGHT_SCALE, MAX_HEIGHT_SCALE)
+
+    fun setFloatHeightScale(ctx: Context, v: Float, g: PadGroup = PadGroup.CJK) =
+        sp(ctx).edit()
+            .putFloat(profKey(ctx, KEY_FLOAT_H_SCALE, g), v.coerceIn(MIN_HEIGHT_SCALE, MAX_HEIGHT_SCALE))
+            .apply()
 
     fun scOutput(ctx: Context) = sp(ctx).getBoolean(KEY_SC_OUTPUT, false)
     fun setScOutput(ctx: Context, v: Boolean) = sp(ctx).edit().putBoolean(KEY_SC_OUTPUT, v).apply()

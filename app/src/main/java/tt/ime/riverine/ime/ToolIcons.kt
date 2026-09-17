@@ -52,6 +52,18 @@ enum class ToolIcon {
     /** 顯示方式「置中」：兩邊都有牆，一橛鍵盤企喺正中間，兩邊各留一條罅 */
     ALIGN_CENTER,
 
+    /** 顯示方式「浮動」：一格鍵盤離開底邊，浮喺畫面中間 */
+    ALIGN_FLOAT,
+
+    /** 浮動模式：調整大細（一格鍵盤 + 四角向外嘅箭嘴） */
+    RESIZE,
+
+    /** 浮動 handle 左邊：一副細鍵盤，返去貼底 */
+    KEYBOARD,
+
+    /** 浮動 handle 右邊：向下箭嘴，收起鍵盤 */
+    CHEVRON_DOWN,
+
     /**
      * 地球：轉輸入法。畫喺 `Eng` 粒鍵左上角（＝長撳做乜），
      * 所以特登畫得簡單 —— 一個圓、一條赤道、一個經線橢圓，
@@ -122,6 +134,10 @@ class ToolIconDrawable(private val icon: ToolIcon, color: Int) : Drawable() {
             ToolIcon.ALIGN_WIDE -> drawAlign(canvas, left = true, both = true)
             ToolIcon.ALIGN_SPLIT -> drawSplit(canvas)
             ToolIcon.ALIGN_CENTER -> drawCenter(canvas)
+            ToolIcon.ALIGN_FLOAT -> drawFloat(canvas)
+            ToolIcon.RESIZE -> drawResize(canvas)
+            ToolIcon.KEYBOARD -> drawKeyboard(canvas)
+            ToolIcon.CHEVRON_DOWN -> drawChevronDown(canvas)
             ToolIcon.GLOBE -> drawGlobe(canvas)
             ToolIcon.GLOBE_LIST -> drawGlobeList(canvas)
             ToolIcon.COPY -> drawCopy(canvas)
@@ -251,6 +267,59 @@ class ToolIconDrawable(private val icon: ToolIcon, color: Int) : Drawable() {
         stroke.strokeWidth = wall
         rect.set(7.4f, 7.4f, 16.6f, 16.6f)
         canvas.drawRoundRect(rect, 1.5f, 1.5f, fill)
+    }
+
+    /**
+     * 「浮動」：底有一條牆（貼底鍵盤嘅位置），上面一橛細鍵盤離開咗條牆 ——
+     * 一眼分得開「置中」（中間一橛夾喺兩條牆之間）。
+     */
+    private fun drawFloat(canvas: Canvas) {
+        val wall = stroke.strokeWidth
+        stroke.strokeWidth = wall * 1.35f
+        canvas.drawLine(3.2f, 20.6f, 20.8f, 20.6f, stroke)
+        stroke.strokeWidth = wall
+        rect.set(6.2f, 3.4f, 17.8f, 15.2f)
+        canvas.drawRoundRect(rect, 1.6f, 1.6f, fill)
+    }
+
+    /** 一格鍵盤 + 左上／右下兩支向外箭嘴 —— 「調整大小」 */
+    private fun drawResize(canvas: Canvas) {
+        rect.set(7.2f, 7.2f, 16.8f, 16.8f)
+        canvas.drawRoundRect(rect, 1.6f, 1.6f, stroke)
+        path.reset()
+        path.moveTo(3.2f, 9.2f); path.lineTo(3.2f, 3.2f); path.lineTo(9.2f, 3.2f)
+        path.moveTo(3.2f, 3.2f); path.lineTo(8.2f, 8.2f)
+        path.moveTo(20.8f, 14.8f); path.lineTo(20.8f, 20.8f); path.lineTo(14.8f, 20.8f)
+        path.moveTo(20.8f, 20.8f); path.lineTo(15.8f, 15.8f)
+        canvas.drawPath(path, stroke)
+    }
+
+    /** 細鍵盤外框 + 三行鍵 */
+    private fun drawKeyboard(canvas: Canvas) {
+        rect.set(2.4f, 6.2f, 21.6f, 17.8f)
+        canvas.drawRoundRect(rect, 2f, 2f, stroke)
+        val thin = stroke.strokeWidth
+        stroke.strokeWidth = thin * 0.75f
+        for (r in 0..1) {
+            val y = 8.6f + r * 3.4f
+            for (c in 0..3) {
+                val x = 4.4f + c * 4.1f
+                rect.set(x, y, x + 2.8f, y + 2.2f)
+                canvas.drawRoundRect(rect, 0.5f, 0.5f, stroke)
+            }
+        }
+        rect.set(7.2f, 15.2f, 16.8f, 16.6f)
+        canvas.drawRoundRect(rect, 0.5f, 0.5f, fill)
+        stroke.strokeWidth = thin
+    }
+
+    /** 向下箭嘴（收起） */
+    private fun drawChevronDown(canvas: Canvas) {
+        path.reset()
+        path.moveTo(5.2f, 8.4f)
+        path.lineTo(12f, 16.2f)
+        path.lineTo(18.8f, 8.4f)
+        canvas.drawPath(path, stroke)
     }
 
     /** 地球：圓框 + 赤道 + 一個窄橢圓做經線 */

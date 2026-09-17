@@ -482,6 +482,9 @@ ime/    TTInputMethodService   IME 主體，所有 view 的 host
         ClipboardListView       長按「貼上」之後蓋在 padHolder 上面的 overlay
         PadMetrics              尺寸與顯示方式計算
         OptionBarsView          上面工具列（三段：關／關聯字／工具）
+        FloatHandleView         浮動窗底條 handle（輸入法選單／調整大小／拖／收起）
+        FloatResizeOverlay      浮動調整大小遮罩（蓋住鍵盤；X 橫排、Y 直排）
+        FloatGeom               浮動位置分數 ↔ pixel（純函數，有 unit test）
 ui/     SettingsActivity / MicPermissionActivity
 ```
 
@@ -534,13 +537,15 @@ padding **一定要一起改**（`lines`），否則兩行一起出的時候上�
 **兩行共用同一高度**，在 `CANDIDATES` 與 `TOOLS` 之間轉一樣不會跳
 （`BOTH` 當然會高一倍，那是使用者自己按出來的）。
 
-**但再粗都不可以粗過下面一行鍵**（2026-09-11 使用者要求：「打橫縮到很小時，
-功能 bar 還是很粗」）。`refreshBars()` 每次將
-`TTInputMethodService.keyRowHeightPx()`（＝`PadMetrics.padHeightPx` ÷ 現在那塊
-pad 的 `rowCount`）放入 `OptionBarsView.keyRowHeightPx`，
-`CandChip.barHeightPx(ctx, chip, rowH)` 就按它封頂（底線 28dp，再矮就按不中）。
-封了頂那陣**關聯字要跟着縮細**（`OptionBarsView.applyBarSize()`，最細 60%）——
-不縮就會被 `AT_MOST` 迫窄，個字裁頂兼且上下不對稱（見 `CandChip` 那個 doc）。
+**但再粗都不可以粗過而家呢組一行鍵的 80%**（2026-09-17：打橫時 42dp 的 bar
+會高過下面的鍵）。中英各用各的 `PadMetrics` 行高（英文 5 行、中文 4 行）。
+`CandChip.barHeightPx` 封頂在 `rowH × BAR_TO_KEY_RATIO(0.8)`。浮動底列 handle
+跟功能表一行的實際高度。轉鍵盤（中↔英）要 **立刻** 清 cache 重算，不要承繼
+上一組的高度等關聯字更新才跳。
+
+封了頂那陣**關聯字要跟着縮細**（`OptionBarsView.applyBarSize()`，最細 60%）。
+縮完仍高過條 bar 就**加高條 bar**（下限 = chip + 上下 1dp margin），不要裁走
+字的下半。chip 上下 padding 是 2dp（另加墨水偏移），Y 方向 margin 1dp。
 
 一組之內 `rowCount` 是固定的（中文與純數字都是 4 行、英文與符號都是 5 行），
 所以轉頁一樣不會跳高跳低。加新版面時要留意這點。
@@ -642,12 +647,27 @@ gravity 跟 `PadAlign` 反過來放置）：上面一（兩）行功能按鍵，
 側邊欄沒有 `⇄`（關聯字與工具同時顯示，不用切）。`switchMode()` 個
 `padHolder.removeAllViews()` 會同時 detach 了它，最後那句 `refreshBars()` 會補回。
 
-### 鍵盤永遠貼近底
+### 鍵盤永遠貼近底（浮動除外）
 
-`PadMetrics` 沒有 `extraBottom`／`Prefs.floatY`。`PadAlign.FLOATING` 已刪除
-（自由移動那顆無效，`Prefs.floatX`／`ChinesePadView.nudgeFloat` 一起清了）——
-目前 `PadAlign` 有 `STRETCH`／`LEFT_GAP`／`RIGHT_GAP`／`CENTER`／`SPLIT`，
-`OptionBarsView` 個 sizeBtn 按一下就轉下一個（可選哪幾個見 `Prefs.alignOptions`）。拖動**兩個方向都都有對應功能**
+貼底嗰幾個顯示方式，`PadMetrics` 沒有 `extraBottom`。目前 `PadAlign` 有
+`STRETCH`／`LEFT_GAP`／`RIGHT_GAP`／`CENTER`／`SPLIT`／**`FLOATING`**。
+`OptionBarsView` 個 sizeBtn 按一下就轉下一個（可選哪幾個見 `Prefs.alignOptions`）。
+
+**`PadAlign.FLOATING` 只在闊 screen（`> SPLIT_MIN_WIDTH_DP`）出現**，中英兩組都有。
+窄了（轉直）就不在 `alignOptions` 內，`Prefs.align()` 當「拉闊」，自動停用。
+IME window 鋪滿螢幕但背景透明，`onComputeInsets` 把 content insets 拉到窗底
+（下面的 app 不被夾高），只張卡那個矩形吃觸摸。拖動範圍用螢幕像素，**不要**用
+當時 IME window 幾高 —— wrap_content 時 Y 會夾死在 0，位置亦會忽高忽低。
+
+最底一條 handle：**左**彈系統輸入法選單、**左中**調整大小、**中**拖去移動（X／Y
+都得）、**右**收起鍵盤。工具列那顆顯示方式**照轉下一個**（浮動時仍可轉返置左／
+右／置中）；入浮動時中英兩組一齊 `FLOATING`，闊／高各用各的
+`floatWidthScale`／`floatHeightScale`（英文可以較闊、中文較窄）。
+
+調整大小是蓋住張卡的 overlay（確定／取消疊在鍵盤底，**不要**加高張卡，否則
+預覽不到拉高之後實際幾高）。X 橫排（－ X ＋）、Y 直排（＋ 在上、－ 在下）。
+
+拖動**兩個方向都都有對應功能**
 （拖動超過 8dp 就鎖定方向，不會輕微斜向移動就兩樣一起改）：
 
 - **上下** = `Prefs.heightScale`（0.6~1.8）。`PadMetrics.cellH` 與
@@ -753,9 +773,10 @@ key 照留回做預設值**（`sp.getFloat(profKey(...), sp.getFloat(舊 key, 1f
 
 `Prefs.alignOptions(ctx, group)` 提示知**目前可選邊多個**顯示方式：
 
-- `LATIN` + 螢幕寬過 `Prefs.SPLIT_MIN_WIDTH_DP`（500dp）→ `STRETCH`、`SPLIT`、`CENTER`
+- `LATIN` + 螢幕寬過 `Prefs.SPLIT_MIN_WIDTH_DP`（500dp）→ `STRETCH`、`SPLIT`、`CENTER`、`FLOATING`
   （靠左／靠右時收合 —— 這麼寬的螢幕靠近一邊，另一邊那部分空間就是浪費了）
-- 其餘（`CJK`、或者窄螢幕）→ `STRETCH`、`LEFT_GAP`、`RIGHT_GAP`、`CENTER`，沒有 `SPLIT`
+- 其餘闊螢幕（中文那組）→ `STRETCH`、`LEFT_GAP`、`RIGHT_GAP`、`CENTER`、`FLOATING`
+- 窄螢幕 → `STRETCH`、`LEFT_GAP`、`RIGHT_GAP`、`CENTER`，沒有 `SPLIT`／`FLOATING`
 
 `CENTER`（置中，2026-09-11 使用者要求）**兩邊都可以選**：它不佔一邊，純粹是
 「拉窄之後站中間」，寬螢幕與窄螢幕一樣用得著。
@@ -767,7 +788,8 @@ key 照留回做預設值**（`sp.getFloat(profKey(...), sp.getFloat(舊 key, 1f
 2. **`Prefs.nextAlign()`** 才是「按一下轉下一個」，`PadAlign.next()` 已刪除 ——
    自己 `ordinal + 1` 就會轉到不得選那個。
 3. `OptionBarsView` / `SidePanelView` 兩個 `refreshAlignLabel()` 個 `when` 都要寫齊
-   （側邊欄是中文專用，不會進入 `SPLIT`，但一樣要有那個 branch）。
+   （側邊欄是中文專用，不會進入 `SPLIT`／`FLOATING`，但一樣要有那個 branch）。
+   `FLOATING` 的圖案是 `ALIGN_FLOAT`（一條底線 + 浮起的方塊），按一下仍轉下一個。
 
 排位在 `RowsPadView.buildLayout()`：每行用 `splitRow()` 由左邊夾達一半 weight
 斬開（`asdfg` | `hjkl`、`⇧zxcv` | `bnm⌫`），兩半各 `PadMetrics.halfW` 這麼寬，

@@ -7,6 +7,7 @@ import tt.ime.riverine.core.PadGroup
 import tt.ime.riverine.core.Prefs
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.roundToInt
 
 /**
  * 鍵盤本體嘅尺寸計算。
@@ -63,7 +64,11 @@ class PadMetrics(
         val hRatio = Prefs.keyHeightRatio(ctx)
         // 高度**唔跟**闊度倍數行：左右拉淨係應該改到闊度，唔可以順手拉埋高度
         // （上下拉係另一件事，行 Prefs.heightScale）
-        heightScale = autoCapped(ctx, unit * hRatio, Prefs.heightScale(ctx, group), group)
+        val wantH = if (align == PadAlign.FLOATING) Prefs.floatHeightScale(ctx, group)
+            else Prefs.heightScale(ctx, group)
+        // 浮動窗自己有大細掣，唔好再用「闊 screen 未校過就封半個螢幕」嗰個 cap
+        heightScale = if (align == PadAlign.FLOATING) wantH
+            else autoCapped(ctx, unit * hRatio, wantH, group)
         cellH = unit * hRatio * heightScale
         // 本體再窄都要有 [MIN_CONTENT_DP] 咁闊（螢幕本身窄過呢個數就用盡螢幕）——
         // 拉到得幾格咁窄嘅鍵盤，每粒鍵細過隻手指，根本撳唔中
@@ -74,9 +79,12 @@ class PadMetrics(
         val maxContent =
             if (align == PadAlign.SPLIT) max(minContent, availW - dp(MIN_SPLIT_GAP_DP))
             else availW.toFloat()
-        val ws = Prefs.widthScale(ctx, group)
+        val ws = if (align == PadAlign.FLOATING) Prefs.floatWidthScale(ctx, group)
+            else Prefs.widthScale(ctx, group)
         contentW = when {
-            align == PadAlign.STRETCH -> availW.toFloat()
+            // 拉闊、同埋浮動窗入面：用盡 [availW]。浮動嗰陣張卡已經係想要嗰個闊度
+            // （見 [floatingWidthPx]），入面啲鍵再縮一次就變雙重倍數。
+            align == PadAlign.STRETCH || align == PadAlign.FLOATING -> availW.toFloat()
             // 英數鍵盤：一行行排，格仔闊度同高度冇關係，所以闊度**直接由倍數線性拉**
             // ——最窄 [MIN_CONTENT_DP]、最闊用盡成個螢幕，成段都拉得到。
             // （跟九宮格嗰條「`unit` × 倍數」就會俾 `unit` 封住頂，闊 screen 拉極
@@ -98,6 +106,7 @@ class PadMetrics(
             PadAlign.LEFT_GAP -> slack                                 // 左邊留白 → 內容貼右
             PadAlign.CENTER -> slack / 2f                              // 兩邊各留一半白
             PadAlign.SPLIT -> 0f                                       // 兩橛各自貼邊，見 RowsPadView
+            PadAlign.FLOATING -> 0f                                    // 張卡就係成個鍵盤闊
         }
     }
 
@@ -159,6 +168,35 @@ class PadMetrics(
          */
         fun padHeightPx(ctx: Context, availW: Int, group: PadGroup = PadGroup.CJK): Float =
             PadMetrics(ctx, availW, group = group).totalHeight
+
+        /**
+         * 浮動窗應該幾闊：用 [Prefs.floatWidthScale] 行返「置中」嗰條拉闊公式，
+         * 但係以**成個螢幕**做 [availW]（唔係張卡自己）。張卡 set 咗呢個闊度之後，
+         * 入面啲 pad 見 [PadAlign.FLOATING] 就用盡張卡，唔會再縮一次。
+         */
+        fun floatingWidthPx(ctx: Context, screenW: Int, group: PadGroup): Int {
+            val dm = ctx.resources.displayMetrics
+            fun dp(v: Float) = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, v, dm)
+            val cols = 5
+            val rows = 4
+            val maxW = min(screenW.toFloat(), dp(Prefs.maxWidthDp(ctx).toFloat()))
+            val maxH = dp(Prefs.maxHeightDp(ctx).toFloat())
+            val scale = Prefs.keyScale(ctx)
+            var unit = min(maxW / cols, maxH / rows) * scale
+            unit = min(unit, screenW.toFloat() / cols)
+            unit = max(unit, dp(32f))
+            val minContent = min(dp(MIN_CONTENT_DP), screenW.toFloat())
+            val maxContent = screenW.toFloat()
+            val ws = Prefs.floatWidthScale(ctx, group)
+            val w = if (group == PadGroup.LATIN) {
+                val t = ((ws - Prefs.MIN_WIDTH_SCALE) /
+                    (Prefs.MAX_WIDTH_SCALE - Prefs.MIN_WIDTH_SCALE)).coerceIn(0f, 1f)
+                minContent + (maxContent - minContent) * t
+            } else {
+                max(min(unit * ws * cols, maxContent), minContent)
+            }
+            return w.roundToInt().coerceIn(minContent.roundToInt(), screenW)
+        }
 
         /** 一行行嗰啲鍵盤（英文／符號／emoji）用嘅行高 */
         fun rowHeightPx(ctx: Context, rowHeightDp: Float, rowCount: Int): Float {

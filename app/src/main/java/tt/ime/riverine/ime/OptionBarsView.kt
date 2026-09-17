@@ -21,6 +21,7 @@ import tt.ime.riverine.core.PadGroup
 import tt.ime.riverine.core.Prefs
 import kotlin.math.abs
 import kotlin.math.max
+import kotlin.math.min
 import kotlin.math.roundToInt
 
 /**
@@ -107,7 +108,12 @@ class OptionBarsView(context: Context) : LinearLayout(context) {
      * 所以「靠左／靠右／拉闊」個圖案要跟返而家嗰組（見 [refreshAlignLabel]）。
      */
     var padGroup: PadGroup = PadGroup.CJK
-        set(v) { if (field != v) { field = v; refreshAlignLabel() } }
+        set(v) {
+            if (field == v) return
+            field = v
+            barSizeFor = "" // 轉組一定要重新度：中英 chip／字體唔同，唔可以承繼舊高度
+            refreshAlignLabel()
+        }
 
     /**
      * 工具列而家有邊幾粒（連埋佢哋各自嘅短撳／長撳功能）。
@@ -189,13 +195,23 @@ class OptionBarsView(context: Context) : LinearLayout(context) {
     /** 關聯字而家幾大（sp）。跟 [padGroup] 嗰組嘅字體設定，見 [Prefs.candTextSp] */
     private var candSp = 0f
 
+    /** 一行 bar 而家幾高（px）。浮動底列跟呢個數，轉鍵盤即刻對得齊。 */
+    val lineHeightPx: Int get() = candLine.layoutParams?.height ?: 0
+
     /**
-     * 下面鍵盤**一行鍵**幾高（px，0 = 未知）。條 bar 唔可以粗過佢 ——
-     * 打橫縮細嗰陣一行鍵得三十幾 dp，一條 42dp 嘅 bar 就變咗成個鍵盤最粗嗰橛。
-     * 由 host 每次 `refreshBars()` 擺落嚟（見 `TTInputMethodService.keyRowHeightPx`），
-     * 真正跟住佢計嗰度喺 [applyBarSize]。
+     * 下面鍵盤**一行鍵**幾高（px，0 = 未知）。條 bar 跟呢個數 × 八成封頂。
+     * 由 host 每次 `refreshBars()` 擺落嚟（見 `TTInputMethodService.keyRowHeightPx`）。
      */
     var keyRowHeightPx = 0
+
+    /**
+     * 轉鍵盤：清 cache，下一句 [refreshFontScale] 一定重新度高度／chip。
+     */
+    fun invalidateBarSize() { barSizeFor = "" }
+
+    /** 圖案跟條 bar 高度縮；打橫嗰陣唔可以仲用寫死 21dp（會大過下面啲鍵） */
+    private var toolIconPx = dp(ICON_DP).roundToInt()
+    private var facePx = dp(15f)
 
     /** 俾一行鍵封頂嗰陣，啲關聯字再縮都唔可以細過呢個 sp（細過就睇唔到） */
     private val minCandSp = Prefs.CAND_TEXT_SP * 0.6f
@@ -366,7 +382,7 @@ class OptionBarsView(context: Context) : LinearLayout(context) {
             val f = slot.tap
             val v = TextView(context)
             v.gravity = Gravity.CENTER
-            v.textSize = 15f
+            v.setTextSize(TypedValue.COMPLEX_UNIT_PX, facePx)
             // 工具列冇長撳（[KeyLayout.TOOLS_HAVE_LONG]），所以粒 key 冇 longAction ——
             // 撳實嗰下一律跌落粒掣自己嗰個內置動作（見 [Listener.onToolLong]）
             val key = f.toKey()
@@ -459,7 +475,7 @@ class OptionBarsView(context: Context) : LinearLayout(context) {
         if (spec == null) { v.background = chipBg(faceColor); return }
         v.text = ""
         v.contentDescription = spec.second
-        v.background = iconChip(chipBg(faceColor), spec.first, dp(ICON_DP).roundToInt(), theme.text)
+        v.background = iconChip(chipBg(faceColor), spec.first, toolIconPx, theme.text)
     }
 
     fun applyTheme(t: Theme) {
@@ -681,17 +697,30 @@ class OptionBarsView(context: Context) : LinearLayout(context) {
         barSizeFor = input
         var sp = want
         var c = CandChip.measure(context, sp, padGroup)
-        val h = CandChip.barHeightPx(context, c, keyRowHeightPx)
-        val need = c.chipH + dp(CandChip.MARGIN_DP * 2)
+        var h = CandChip.barHeightPx(context, c, keyRowHeightPx)
+        val vGap = dp(CandChip.MARGIN_Y_DP * 2)
+        var need = c.chipH + vGap
+        // 行鍵封咗頂 → 縮字。縮到 [minCandSp] 都仲高過條 bar，就**拉高條 bar**
+        // （唔好裁走字嘅下半）
         if (need > h) {
             sp = max(want * h / need, minCandSp)
             c = CandChip.measure(context, sp, padGroup)
+            need = c.chipH + vGap
+            h = CandChip.resolveHeight(h, need.roundToInt())
         }
-        if (sp == candSp && h == candLine.layoutParams?.height) return false
+        val icon = min(dp(ICON_DP), (h - gap() * 2) * 0.9f).roundToInt().coerceAtLeast(1)
         candSp = sp
         chip = c
+        toolIconPx = icon
         // 兩行一定要一樣高，唔係兩行一齊出嗰陣上下唔對稱
         for (line in lines) line.layoutParams = line.layoutParams.also { it.height = h }
+        // ⇄ ✖ ▼ 同工具掣面嗰幾個字：條 bar 矮過 15sp 就要跟住縮，唔係裁頂
+        facePx = min(dp(15f), h * 0.42f).coerceAtLeast(dp(10f))
+        for (v in listOf(expandBtn, closeBtn, switchBtn, candSwitchBtn, collapseBtn) +
+            toolBtns.map { it.view }) {
+            v.setTextSize(TypedValue.COMPLEX_UNIT_PX, facePx)
+            styleTool(v, theme.keyFaceAlt)
+        }
         // 粒 ▲ 跟一行關聯字咁高，所以啲字一縮細就要度過
         refreshCollapseBtn()
         return true
@@ -735,14 +764,19 @@ class OptionBarsView(context: Context) : LinearLayout(context) {
 
     /** 夠用就淨改 text，唔夠先加，多咗就 hide 多嗰啲 */
     private fun syncStrip(source: List<String>) {
-        val gap = dp(CandChip.MARGIN_DP).toInt()
+        val gx = dp(CandChip.MARGIN_DP).toInt()
+        val gy = dp(CandChip.MARGIN_Y_DP).toInt()
         var j = 0
         for ((i, w) in source.withIndex()) {
             if (w.isEmpty()) continue
-            val view = if (j < stripPool.size) stripPool[j] else {
+            val view = if (j < stripPool.size) {
+                stripPool[j].also { v ->
+                    (v.layoutParams as? LayoutParams)?.setMargins(gx, gy, gx, gy)
+                }
+            } else {
                 TextView(context).also {
                     val lp = LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT)
-                    lp.setMargins(gap, gap, gap, gap)
+                    lp.setMargins(gx, gy, gx, gy)
                     lp.gravity = Gravity.CENTER_VERTICAL
                     strip.addView(it, lp)
                     stripPool.add(it)
@@ -766,6 +800,7 @@ class OptionBarsView(context: Context) : LinearLayout(context) {
             PadAlign.RIGHT_GAP -> ToolIcon.ALIGN_LEFT to "靠左"
             PadAlign.SPLIT -> ToolIcon.ALIGN_SPLIT to "左右拆開"
             PadAlign.CENTER -> ToolIcon.ALIGN_CENTER to "置中"
+            PadAlign.FLOATING -> ToolIcon.ALIGN_FLOAT to "浮動"
         }
         styleTool(v, theme.keyFaceAlt)
     }

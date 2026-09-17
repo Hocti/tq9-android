@@ -57,7 +57,7 @@ class CandFlowView(context: Context) : ViewGroup(context) {
         TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, v, resources.displayMetrics)
 
     private val hGap = dp(CandChip.MARGIN_DP).toInt()
-    private val vGap = dp(CandChip.MARGIN_DP).toInt()
+    private val vGap = dp(CandChip.MARGIN_Y_DP).toInt()
 
     /** chip 左右 padding／最窄幾多，同條 bar 收埋嗰行一模一樣（見 [styleChip]） */
     private val padH = dp(10f).roundToInt()

@@ -52,10 +52,13 @@ class CandChip private constructor(
     companion object {
 
         /** chip 上下 padding（未計 [padTop] / [padBottom] 嗰個唔對稱修正） */
-        const val PAD_DP = 6f
+        const val PAD_DP = 2f
 
-        /** chip 四邊嘅 margin */
+        /** chip 左右 margin */
         const val MARGIN_DP = 3f
+
+        /** chip 上下 margin：打橫條 bar 好矮，Y 方向少留位，字先有位畫 */
+        const val MARGIN_Y_DP = 1f
 
         /**
          * 條 bar 再矮都要咁高。以前係寫死嘅高度 —— 啲功能掣（✖／⇄／▼／工具列）
@@ -113,26 +116,35 @@ class CandChip private constructor(
         }
 
         /**
-         * 條 bar 再粗都唔可以粗過一行鍵，但係都要撳得中，所以封頂之後仲有呢條底線。
-         * 鍵盤縮到每行矮過呢個數，條 bar 就唔再跟落去。
+         * 功能表／浮動底列 ＝ 中文一粒鍵高度 × 呢個比例（2026-09-17）。
+         * 打橫嗰陣一行鍵已經好矮，條 bar 再同鍵一樣高（甚至粗過鍵）就佔太多位。
          */
-        const val MIN_CAPPED_BAR_DP = 28f
+        const val BAR_TO_KEY_RATIO = 0.8f
 
         /**
-         * 條 bar 幾高：一個 chip 連上下 margin，最矮 [MIN_BAR_DP]。
+         * 條 bar 幾高：一個 chip 連上下 [MARGIN_Y_DP]，最矮 [MIN_BAR_DP]。
          * 一定要夠位擺得落成個 chip，唔係就會俾 `AT_MOST` 迫窄（見成個 class 嘅講法）。
          *
-         * [rowH] = 下面鍵盤**一行鍵**幾高（px，0 = 未知就唔封頂）。條 bar 唔可以粗過
-         * 一行鍵 —— 打橫縮細嗰陣一行鍵得三十幾 dp，[MIN_BAR_DP] 嗰條 42dp 就會變成
-         * 成個鍵盤最粗嗰橛，睇落好突兀（2026-09-11 user 踩到）。封咗頂嗰陣啲關聯字
-         * 要跟住縮細，唔係就會俾迫窄，嗰件事喺 `OptionBarsView.applyBarSize` 度做。
+         * [rowH] = 而家呢組鍵盤**一行鍵**幾高（px，0 = 未知就唔封頂）。條 bar 封頂
+         * 喺佢嘅 [BAR_TO_KEY_RATIO]（八成），但係**唔可以矮過 [chip] 本身** ——
+         * 矮過就會裁走字嘅下半（2026-09-17）。
          */
         fun barHeightPx(ctx: Context, chip: CandChip, rowH: Int = 0): Int {
             val dm = ctx.resources.displayMetrics
             fun dp(v: Float) = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, v, dm)
-            val natural = max(dp(MIN_BAR_DP), chip.chipH + dp(MARGIN_DP * 2))
-            if (rowH <= 0) return natural.roundToInt()
-            return min(natural, max(rowH.toFloat(), dp(MIN_CAPPED_BAR_DP))).roundToInt()
+            val glyphMin = chip.chipH + dp(MARGIN_Y_DP * 2)
+            val natural = max(dp(MIN_BAR_DP), glyphMin)
+            return capToKeyRow(natural, rowH)
         }
+
+        /** 純函數：自然高度同「一行鍵 × 八成」取細。 */
+        fun capToKeyRow(natural: Float, keyRowH: Int, ratio: Float = BAR_TO_KEY_RATIO): Int {
+            if (keyRowH <= 0) return natural.roundToInt()
+            return min(natural, keyRowH * ratio).roundToInt().coerceAtLeast(1)
+        }
+
+        /** 封頂之後仍要夠高擺得落已縮細嘅字（唔好裁下半）。 */
+        fun resolveHeight(capped: Int, glyphMin: Int): Int =
+            max(capped, glyphMin.coerceAtLeast(1))
     }
 }

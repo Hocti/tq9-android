@@ -311,6 +311,7 @@ class SidePanelView(context: Context) : LinearLayout(context) {
             PadAlign.RIGHT_GAP -> ToolIcon.ALIGN_LEFT to "靠左"
             PadAlign.SPLIT -> ToolIcon.ALIGN_SPLIT to "左右拆開"
             PadAlign.CENTER -> ToolIcon.ALIGN_CENTER to "置中"
+            PadAlign.FLOATING -> ToolIcon.ALIGN_FLOAT to "浮動"
         }
         styleTool(v, theme.keyFaceAlt)
     }
