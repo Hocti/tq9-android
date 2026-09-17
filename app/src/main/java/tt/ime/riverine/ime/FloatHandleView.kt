@@ -7,6 +7,7 @@ import android.util.TypedValue
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
+import android.view.ViewOutlineProvider
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -16,8 +17,8 @@ import kotlin.math.roundToInt
  * 浮動鍵盤最底嗰條 handle：
  *
  *  - 左：彈系統輸入法選單（[Listener.onFloatImePicker]）
- *  - 左中：調整大小（[Listener.onFloatResize]）
- *  - 中：拖去郁張卡（[Listener.onFloatDragBy]）—— X／Y 都得
+ *  - 中左：取消浮動，返去貼底（[Listener.onFloatDock]）—— 功能表開住就搬走
+ *  - 中：拖去郁張卡（[Listener.onFloatDragBy]）—— X／Y 都得；撳／拖都出四角
  *  - 右：收起鍵盤（[Listener.onFloatHide]）
  */
 @SuppressLint("ViewConstructor")
@@ -25,12 +26,14 @@ class FloatHandleView(context: Context) : LinearLayout(context) {
 
     interface Listener {
         fun onFloatImePicker()
-        fun onFloatResize()
+        fun onFloatDock()
         fun onFloatHide()
         fun onFloatDragStart()
         /** 由 DOWN 起計嘅總位移（px），唔係逐格增量 */
         fun onFloatDragBy(dxPx: Float, dyPx: Float)
         fun onFloatDragEnd()
+        /** 撳／拖中間條 pill：出四隻拉大細嘅角 */
+        fun onFloatBarEngage()
     }
 
     var listener: Listener? = null
@@ -39,9 +42,10 @@ class FloatHandleView(context: Context) : LinearLayout(context) {
         set(v) { field = v; applyTheme() }
 
     private var barH = dp(HEIGHT_DP).roundToInt()
+    private var bottomRadius = 0f
 
     private val imeBtn = TextView(context)
-    private val resizeBtn = TextView(context)
+    private val dockBtn = TextView(context)
     private val hideBtn = TextView(context)
     private val dragArea = FrameLayout(context)
     private val pill = View(context)
@@ -50,15 +54,17 @@ class FloatHandleView(context: Context) : LinearLayout(context) {
         orientation = HORIZONTAL
         gravity = Gravity.CENTER_VERTICAL
         minimumHeight = barH
+        clipToOutline = true
+        outlineProvider = ViewOutlineProvider.BACKGROUND
         val side = barH
 
         styleSide(imeBtn, ToolIcon.GLOBE_LIST, "選擇輸入法")
         imeBtn.setOnClickListener { listener?.onFloatImePicker() }
         addView(imeBtn, LayoutParams(side, LayoutParams.MATCH_PARENT))
 
-        styleSide(resizeBtn, ToolIcon.RESIZE, "調整大小")
-        resizeBtn.setOnClickListener { listener?.onFloatResize() }
-        addView(resizeBtn, LayoutParams(side, LayoutParams.MATCH_PARENT))
+        styleSide(dockBtn, ToolIcon.KEYBOARD, "取消浮動")
+        dockBtn.setOnClickListener { listener?.onFloatDock() }
+        addView(dockBtn, LayoutParams(side, LayoutParams.MATCH_PARENT))
 
         pill.background = pillBg()
         dragArea.addView(pill, FrameLayout.LayoutParams(
@@ -91,7 +97,7 @@ class FloatHandleView(context: Context) : LinearLayout(context) {
         }
         val sideLp = LayoutParams(hPx, LayoutParams.MATCH_PARENT)
         imeBtn.layoutParams = sideLp
-        resizeBtn.layoutParams = LayoutParams(hPx, LayoutParams.MATCH_PARENT)
+        dockBtn.layoutParams = LayoutParams(hPx, LayoutParams.MATCH_PARENT)
         hideBtn.layoutParams = LayoutParams(hPx, LayoutParams.MATCH_PARENT)
         val pillH = (hPx * 0.12f).roundToInt().coerceAtLeast(2)
         val pillW = (hPx * 0.9f).roundToInt().coerceAtLeast(pillH * 4)
@@ -103,10 +109,34 @@ class FloatHandleView(context: Context) : LinearLayout(context) {
         applyTheme()
     }
 
+    /** 功能表開住就收埋「取消浮動」，唔好底同上面各出一粒。 */
+    fun setDockVisible(show: Boolean) {
+        val v = if (show) VISIBLE else GONE
+        if (dockBtn.visibility == v) return
+        dockBtn.visibility = v
+    }
+
+    /**
+     * 底下兩隻角跟張卡內側圓角（外圓角減 padding），唔係條 bar 方角
+     * 同張卡圓角撞埋一齊。
+     */
+    fun setBottomCornerRadius(rPx: Float) {
+        val r = rPx.coerceAtLeast(0f)
+        if (r == bottomRadius) return
+        bottomRadius = r
+        applyTheme()
+    }
+
     fun applyTheme() {
-        setBackgroundColor(theme.keyFaceAlt)
+        background = GradientDrawable().apply {
+            setColor(theme.keyFaceAlt)
+            cornerRadii = floatArrayOf(
+                0f, 0f, 0f, 0f,
+                bottomRadius, bottomRadius, bottomRadius, bottomRadius
+            )
+        }
         styleSide(imeBtn, ToolIcon.GLOBE_LIST, "選擇輸入法")
-        styleSide(resizeBtn, ToolIcon.RESIZE, "調整大小")
+        styleSide(dockBtn, ToolIcon.KEYBOARD, "取消浮動")
         styleSide(hideBtn, ToolIcon.CHEVRON_DOWN, "收起鍵盤")
         pill.background = pillBg()
     }
@@ -142,6 +172,7 @@ class FloatHandleView(context: Context) : LinearLayout(context) {
                 downRawY = e.rawY
                 dragging = false
                 parent?.requestDisallowInterceptTouchEvent(true)
+                listener?.onFloatBarEngage()
                 listener?.onFloatDragStart()
             }
             MotionEvent.ACTION_MOVE -> {

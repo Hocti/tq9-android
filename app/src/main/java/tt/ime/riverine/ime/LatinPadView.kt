@@ -1,7 +1,6 @@
 package tt.ime.riverine.ime
 
 import android.content.Context
-import tt.ime.riverine.core.BarMode
 import tt.ime.riverine.core.Prefs
 import tt.ime.riverine.swipe.GestureKeyTracker
 import kotlin.math.max
@@ -18,15 +17,10 @@ enum class ShiftState { OFF, ON, LOCK }
 enum class LatinField { NORMAL, EMAIL, URI, PASSWORD }
 
 /**
- * 英文底行嗰粒 [KeyAction.BAR_HIDE] 而家寫乜。四段各有各字面，
- * 講嘅係**撳完會點**（見 [BAR_HIDE_GLYPH] 嗰段 doc）。
+ * 英文底行嗰粒 [KeyAction.BAR_HIDE] 而家寫乜。只負責 show／hide 上面條 bar。
  */
-private fun LatinPadView.barCycleGlyph(): String = when {
-    Prefs.barHidden(context) -> BAR_SHOW_GLYPH
-    Prefs.barMode(context) == BarMode.CANDIDATES -> BAR_TOOLS_GLYPH
-    Prefs.barMode(context) == BarMode.TOOLS -> BAR_BOTH_GLYPH
-    else -> BAR_HIDE_GLYPH
-}
+private fun LatinPadView.barToggleGlyph(): String =
+    if (Prefs.barHidden(context)) BAR_SHOW_GLYPH else BAR_HIDE_GLYPH
 
 /**
  * 長撳字母彈出嘅變體：淨係各國重音寫法。
@@ -248,13 +242,13 @@ class LatinPadView(context: Context) : RowsPadView(context) {
         // 中文九宮格嗰粒地方鬆啲，個 hint 照留。
         r3.add(Key(KeyAction.TO_SYMBOL, label = "?123", weight = 1.3f,
             longAction = KeyAction.TO_NUMBER))
-        // 闊 keyboard（打橫／摺機內屏／平板）先有：上面條 bar 嘅四段循環（見
-        // [barCycleGlyph] 同 `TTInputMethodService.cycleBarWithHide`）。
+        // 闊 keyboard（打橫／摺機內屏／平板）先有：上面條 bar 嘅收起／打開
+        // （見 [barToggleGlyph] 同 `TTInputMethodService.toggleBarHidden`）。
         // 打橫本來就矮，條 bar 佔嗰橛位好肉赤，但係窄機收起咗就等於打盲舖
         // （打字提示同滑出嚟嗰個字全部喺條 bar 度），所以窄嗰陣粒掣唔會出現
         // ——窄機得返條 bar 自己嗰粒 `⇄`，三段循環，收唔起。
         if (Prefs.barToggleAllowed(context)) {
-            r3.add(Key(KeyAction.BAR_HIDE, label = barCycleGlyph(), weight = 1f))
+            r3.add(Key(KeyAction.BAR_HIDE, label = barToggleGlyph(), weight = 1f))
         }
         when (fieldKind) {
             LatinField.EMAIL -> {

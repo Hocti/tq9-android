@@ -9,6 +9,7 @@ import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.graphics.Color
 import android.graphics.drawable.ColorDrawable
+import android.graphics.drawable.GradientDrawable
 import android.media.AudioManager
 import android.media.ToneGenerator
 import android.os.Build
@@ -27,8 +28,10 @@ import android.text.InputType
 import android.util.Log
 import android.view.Gravity
 import android.view.KeyEvent
+import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
+import android.view.ViewOutlineProvider
 import android.view.Window
 import android.view.WindowManager
 import android.view.inputmethod.EditorInfo
@@ -57,6 +60,7 @@ import tt.ime.riverine.core.InputLog
 import tt.ime.riverine.core.KeyLayout
 import tt.ime.riverine.core.NextWordModel
 import tt.ime.riverine.core.PadAlign
+import tt.ime.riverine.core.PadChrome
 import tt.ime.riverine.core.PadGroup
 import tt.ime.riverine.core.PagerLayout
 import tt.ime.riverine.core.Prefs
@@ -89,7 +93,7 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
     private lateinit var floatCard: FrameLayout
     private lateinit var floatColumn: LinearLayout
     private lateinit var floatHandle: FloatHandleView
-    private lateinit var resizeOverlay: FloatResizeOverlay
+    private lateinit var cornerOverlay: FloatCornerOverlay
     private lateinit var root: LinearLayout
     private lateinit var bars: OptionBarsView
     private lateinit var padHolder: FrameLayout
@@ -104,6 +108,8 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
      * 唔夠窄就一路係 null／detach 咗，成套行為同以前一模一樣。
      */
     private var sidePanel: SidePanelView? = null
+    /** 闊 screen 非浮動：中文／純數字留白最外側嗰欄四粒 chrome 掣 */
+    private var chromeRail: WideChromeRail? = null
     /** 關聯字 bar 拉大咗：`bars.expandedView` 蓋住成個鍵盤（見 [onExpandChanged]） */
     private var candidatesExpanded = false
     private var aiOverlay: View? = null
@@ -111,9 +117,14 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
 
     /** 而家 IME window 係咪已經擺成浮動嗰套（同 pref 對唔上就要 [applyFloatMode]） */
     private var floatActive = false
-    private var floatResizing = false
-    private var resizeSavedW = 1f
-    private var resizeSavedH = 1f
+    /** 四隻拉大細嘅角出咗未 */
+    private var floatCornersOn = false
+    private var floatCornerDragging = false
+    private var cornerWhich = FloatGeom.Corner.BR
+    private var cornerStartX = 0
+    private var cornerStartY = 0
+    private var cornerStartW = 0
+    private var cornerStartH = 0
     /** 入浮動之前每組各自嗰個顯示方式；離開浮動／轉中英都用返 */
     private val dockedAlign = HashMap<PadGroup, PadAlign>()
     private var dragStartX = 0
@@ -303,7 +314,12 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
         applyThemeToPads() // 啲 pad cache 住唔會跟住 recreate，要自己補返色
         Thread { StrokeImages.preload(this) }.start()
 
-        root = LinearLayout(this).apply {
+        root = object : LinearLayout(this) {
+            override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
+                if (ev.actionMasked == MotionEvent.ACTION_DOWN) hideFloatCorners()
+                return super.dispatchTouchEvent(ev)
+            }
+        }.apply {
             orientation = LinearLayout.VERTICAL
             setBackgroundColor(theme.background)
         }
@@ -334,17 +350,21 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 chromeBarHeightPx().coerceAtLeast(dpPx(FloatHandleView.HEIGHT_DP.roundToInt()))))
         }
-        resizeOverlay = FloatResizeOverlay(this).apply {
-            listener = floatResizeListener
+        cornerOverlay = FloatCornerOverlay(this).apply {
+            listener = floatCornerListener
             theme = this@TTInputMethodService.theme
             visibility = View.GONE
         }
         floatCard = FrameLayout(this).apply {
-            setBackgroundColor(theme.background)
+            outlineProvider = ViewOutlineProvider.BACKGROUND
             addView(floatColumn, FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT))
-            addView(resizeOverlay, FrameLayout.LayoutParams(0, 0))
+            addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
+                clampFloatCardIfNeeded()
+                syncFloatCorners()
+            }
         }
+        styleFloatCard(isFloating())
 
         // 包多層 FrameLayout：AI 處理緊嗰陣要喺呢層加返個 disable overlay 蓋晒成個鍵盤，
         // root 本身係 LinearLayout（bars 疊 padHolder），冇得喺度再疊多層
@@ -352,8 +372,12 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
         // 底下俾導覽列（「收起鍵盤／轉鍵盤」嗰條）閃開嘅位係呢層嘅 padding，
         // 冇底色就會透見住下面個 app，一忽色唔同好突兀 —— 補返鍵盤自己個底色
         outer.setBackgroundColor(theme.background)
+        outer.clipChildren = false
+        outer.clipToPadding = false
         outer.addView(floatCard, FrameLayout.LayoutParams(
             FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT))
+        outer.addView(cornerOverlay, FrameLayout.LayoutParams(
+            FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT))
 
         // targetSdk 35+ 之後 IME window 一路去到螢幕最底，要自己閃開導覽列
         ViewCompat.setOnApplyWindowInsetsListener(outer) { v, insets ->
@@ -368,16 +392,13 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
             sysInsetR = cut.right
             sysInsetB = if (nav.bottom > 0) nav.bottom else fallbackNavBarPx()
             if (isFloating()) v.setPadding(0, 0, 0, 0) else v.setPadding(0, 0, 0, sysInsetB)
-            if (isFloating() && !floatDragging && !floatResizing && ::floatCard.isInitialized)
+            if (isFloating() && !floatDragging && !floatCornerDragging && ::floatCard.isInitialized)
                 layoutFloatCard(fromPrefs = true)
             insets
         }
 
         switchMode(mode, force = true)
         applyFloatMode()
-        floatColumn.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
-            if (floatResizing) syncResizeOverlayBounds()
-        }
         return outer
     }
 
@@ -414,8 +435,10 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
             outInsets.touchableInsets = Insets.TOUCHABLE_INSETS_REGION
             val loc = IntArray(2)
             floatCard.getLocationInWindow(loc)
+            val extra = if (floatCornersOn) dpPx(FloatCornerOverlay.OUTSET_DP.roundToInt()) else 0
             outInsets.touchableRegion.set(
-                loc[0], loc[1], loc[0] + floatCard.width, loc[1] + floatCard.height
+                loc[0] - extra, loc[1] - extra,
+                loc[0] + floatCard.width + extra, loc[1] + floatCard.height + extra
             )
             return
         }
@@ -427,8 +450,9 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
 
     private val floatHandleListener = object : FloatHandleView.Listener {
         override fun onFloatImePicker() { showImePicker() }
-        override fun onFloatResize() = enterResizeMode()
+        override fun onFloatDock() = leaveFloatingToDocked()
         override fun onFloatHide() { requestHideSelf(0) }
+        override fun onFloatBarEngage() = showFloatCorners()
         override fun onFloatDragStart() {
             if (!::floatCard.isInitialized) return
             floatDragging = true
@@ -437,7 +461,7 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
             dragStartY = lp.topMargin
         }
         override fun onFloatDragBy(dxPx: Float, dyPx: Float) {
-            if (!::floatCard.isInitialized || floatResizing) return
+            if (!::floatCard.isInitialized || floatCornerDragging) return
             val lp = floatCard.layoutParams as FrameLayout.LayoutParams
             val (screenW, screenH) = floatViewport()
             val (x, y) = FloatGeom.clamp(
@@ -448,6 +472,7 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
             lp.leftMargin = x
             lp.topMargin = y
             floatCard.layoutParams = lp
+            syncFloatCorners()
         }
         override fun onFloatDragEnd() {
             floatDragging = false
@@ -456,27 +481,25 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
         }
     }
 
-    private val floatResizeListener = object : FloatResizeOverlay.Listener {
-        override fun onNudgeWidth(deltaScale: Float) {
-            val g = padGroup
-            Prefs.setFloatWidthScale(this@TTInputMethodService,
-                Prefs.floatWidthScale(this@TTInputMethodService, g) + deltaScale, g)
-            relayoutPads()
-            layoutFloatCard(fromPrefs = false)
-            saveFloatPos()
-            syncResizeOverlayBounds()
+    private val floatCornerListener = object : FloatCornerOverlay.Listener {
+        override fun onCornerDragStart(corner: FloatGeom.Corner) {
+            if (!::floatCard.isInitialized) return
+            floatCornerDragging = true
+            cornerWhich = corner
+            val lp = floatCard.layoutParams as FrameLayout.LayoutParams
+            cornerStartX = lp.leftMargin
+            cornerStartY = lp.topMargin
+            cornerStartW = floatCard.width.takeIf { it > 0 } ?: lp.width
+            cornerStartH = floatCard.height.takeIf { it > 0 } ?: estimateFloatHeight(cornerStartW)
         }
-        override fun onNudgeHeight(deltaScale: Float) {
-            val g = padGroup
-            Prefs.setFloatHeightScale(this@TTInputMethodService,
-                Prefs.floatHeightScale(this@TTInputMethodService, g) + deltaScale, g)
-            relayoutPads()
-            layoutFloatCard(fromPrefs = false)
-            saveFloatPos()
-            syncResizeOverlayBounds()
+        override fun onCornerDragBy(corner: FloatGeom.Corner, dxPx: Float, dyPx: Float) {
+            applyCornerResize(corner, dxPx.roundToInt(), dyPx.roundToInt())
         }
-        override fun onResizeConfirm() = exitResizeMode(keep = true)
-        override fun onResizeCancel() = exitResizeMode(keep = false)
+        override fun onCornerDragEnd() {
+            floatCornerDragging = false
+            saveFloatPos()
+            syncFloatCorners()
+        }
     }
 
     /**
@@ -490,37 +513,87 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
         val entering = floating && !floatActive
         val leaving = !floating && floatActive
         if (leaving || entering) {
-            exitResizeMode(keep = true)
+            hideFloatCorners()
             hideOverlay()
             if (candidatesExpanded) onExpandChanged(false)
         }
         floatActive = floating
         floatHandle.visibility = if (floating) View.VISIBLE else View.GONE
         floatHandle.theme = theme
-        resizeOverlay.theme = theme
+        if (::cornerOverlay.isInitialized) cornerOverlay.theme = theme
         if (floating) {
             outer.setBackgroundColor(Color.TRANSPARENT)
-            floatCard.setBackgroundColor(theme.background)
             outer.setPadding(0, 0, 0, 0)
-            floatCard.elevation = dpPx(8).toFloat()
         } else {
             outer.setBackgroundColor(theme.background)
-            floatCard.setBackgroundColor(theme.background)
             outer.setPadding(0, 0, 0, sysInsetB)
-            floatCard.elevation = 0f
         }
+        styleFloatCard(floating)
         applyImeWindow(floating)
         applyInputViewSize(floating)
         applyChromeBarHeights()
         // 已經喺浮動入面就跟 pref 擺位（窗由 wrap 變 MATCH_PARENT 嗰下
         // 唔跟 pref 會 topMargin=0，張卡飛去螢幕頂）。拖／resize 緊唔好搶。
-        layoutFloatCard(fromPrefs = floating && !floatDragging && !floatResizing)
+        layoutFloatCard(fromPrefs = floating && !floatDragging && !floatCornerDragging)
         updateFullscreenMode()
         outer.requestLayout()
         bars.refreshAlignLabel()
+        bars.refreshFloatDockLabel()
         if (floating) outer.post {
-            if (isFloating() && !floatDragging && !floatResizing) layoutFloatCard(fromPrefs = true)
+            if (isFloating() && !floatDragging && !floatCornerDragging) layoutFloatCard(fromPrefs = true)
         }
+        if (leaving || entering) settleAfterFloatMode()
+    }
+
+    /**
+     * 入／出浮動嗰下窗同張卡未即刻量到真闊，[refreshBars] 會用舊闊誤判側邊欄。
+     * 等一個 layout pass 再重排一次。
+     */
+    private fun settleAfterFloatMode() {
+        scheduleSizeRecheck()
+        if (!::padHolder.isInitialized) return
+        padHolder.post {
+            if (isFloating()) {
+                if (!floatDragging && !floatCornerDragging) layoutFloatCard(fromPrefs = false)
+            } else {
+                relayoutPads()
+            }
+            refreshBars()
+        }
+    }
+
+    /** 浮動張卡：四邊 [FLOAT_PAD_DP]、圓角 [FLOAT_CORNER_DP]；貼底就冇。 */
+    private fun styleFloatCard(floating: Boolean) {
+        if (!::floatCard.isInitialized) return
+        val pad = if (floating) dpPx(FLOAT_PAD_DP) else 0
+        floatCard.setPadding(pad, pad, pad, pad)
+        floatCard.elevation = if (floating) dpPx(8).toFloat() else 0f
+        floatCard.clipToOutline = floating
+        val innerR = if (floating)
+            dpPx(FLOAT_CORNER_DP - FLOAT_PAD_DP).toFloat().coerceAtLeast(0f) else 0f
+        if (floating) {
+            val r = dpPx(FLOAT_CORNER_DP).toFloat()
+            floatCard.background = GradientDrawable().apply {
+                setColor(theme.background)
+                cornerRadius = r
+            }
+        } else {
+            floatCard.setBackgroundColor(theme.background)
+        }
+        if (::floatColumn.isInitialized) {
+            if (floating) {
+                floatColumn.background = GradientDrawable().apply {
+                    setColor(theme.background)
+                    cornerRadius = innerR
+                }
+                floatColumn.clipToOutline = true
+                floatColumn.outlineProvider = ViewOutlineProvider.BACKGROUND
+            } else {
+                floatColumn.background = null
+                floatColumn.clipToOutline = false
+            }
+        }
+        if (::floatHandle.isInitialized) floatHandle.setBottomCornerRadius(innerR)
     }
 
     /** 浮動要成個螢幕咁高先至拖得上落；貼底就 wrap，唔好留一舊透明喺上面。 */
@@ -565,8 +638,12 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
     private fun floatViewport(): Pair<Int, Int> {
         val dm = resources.displayMetrics
         val decor = window?.window?.decorView
-        val w = decor?.width?.takeIf { it >= dm.widthPixels / 2 } ?: dm.widthPixels
-        val h = decor?.height?.takeIf { it >= dm.heightPixels / 2 } ?: dm.heightPixels
+        // 窗未轉到 MATCH_PARENT 之前 decor 得返鍵盤咁高，唔好當佢係螢幕 ——
+        // 半個螢幕嗰條線喺打橫時好易誤收 wrap_content，張卡就會擺出畫面。
+        val w = if (decor != null && decor.width >= dm.widthPixels - 8) decor.width
+            else dm.widthPixels
+        val h = if (decor != null && decor.height >= dm.heightPixels - 8) decor.height
+            else dm.heightPixels
         return w to h
     }
 
@@ -574,6 +651,10 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
         if (!::floatCard.isInitialized) return
         val lp = floatCard.layoutParams as? FrameLayout.LayoutParams ?: return
         if (!isFloating()) {
+            if (lp.width == FrameLayout.LayoutParams.MATCH_PARENT &&
+                lp.height == FrameLayout.LayoutParams.WRAP_CONTENT &&
+                lp.leftMargin == 0 && lp.topMargin == 0 &&
+                lp.gravity == Gravity.NO_GRAVITY) return
             lp.width = FrameLayout.LayoutParams.MATCH_PARENT
             lp.height = FrameLayout.LayoutParams.WRAP_CONTENT
             lp.gravity = Gravity.NO_GRAVITY
@@ -583,11 +664,11 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
             return
         }
         val (screenW, screenH) = floatViewport()
-        val cardW = PadMetrics.floatingWidthPx(this, screenW, padGroup)
-        lp.width = cardW
-        lp.height = FrameLayout.LayoutParams.WRAP_CONTENT
+        val innerW = PadMetrics.floatingWidthPx(this, screenW, padGroup)
+        val cardW = innerW + floatCard.paddingLeft + floatCard.paddingRight
         lp.gravity = Gravity.TOP or Gravity.START
-        val cardH = floatCard.height.takeIf { it > 0 } ?: estimateFloatHeight(cardW)
+        lp.height = FrameLayout.LayoutParams.WRAP_CONTENT
+        val cardH = floatCardHeight(cardW)
         val (x, y) = if (fromPrefs) {
             FloatGeom.fromFrac(
                 Prefs.floatX(this), Prefs.floatY(this), cardW, cardH,
@@ -599,9 +680,46 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
                 screenW, screenH, sysInsetL, sysInsetT, sysInsetR, sysInsetB
             )
         }
+        if (lp.width == cardW && lp.leftMargin == x && lp.topMargin == y &&
+            lp.height == FrameLayout.LayoutParams.WRAP_CONTENT &&
+            lp.gravity == (Gravity.TOP or Gravity.START)) return
+        lp.width = cardW
         lp.leftMargin = x
         lp.topMargin = y
         floatCard.layoutParams = lp
+    }
+
+    /**
+     * 張卡量完真實高度之後再夾一次。入浮動嗰下 [floatCard.height] 仲未包
+     * handle／padding，擺喺底就會伸出畫面；layout 之後呢度拉返入嚟。
+     */
+    private fun clampFloatCardIfNeeded() {
+        if (!isFloating() || floatDragging || floatCornerDragging) return
+        if (!::floatCard.isInitialized) return
+        val w = floatCard.width
+        val h = floatCard.height
+        if (w <= 0 || h <= 0) return
+        val lp = floatCard.layoutParams as? FrameLayout.LayoutParams ?: return
+        val (screenW, screenH) = floatViewport()
+        val (x, y) = FloatGeom.clamp(
+            lp.leftMargin, lp.topMargin, w, h,
+            screenW, screenH, sysInsetL, sysInsetT, sysInsetR, sysInsetB
+        )
+        if (x == lp.leftMargin && y == lp.topMargin) return
+        lp.leftMargin = x
+        lp.topMargin = y
+        floatCard.layoutParams = lp
+        saveFloatPos()
+    }
+
+    /** 量到嘅高度若未包埋 handle，用估算，避免第一次就擺出底。 */
+    private fun floatCardHeight(cardW: Int): Int {
+        val estimated = estimateFloatHeight(cardW)
+        val measured = floatCard.height
+        if (measured <= 0) return estimated
+        val handleReady = ::floatHandle.isInitialized &&
+            floatHandle.visibility == View.VISIBLE && floatHandle.height > 0
+        return if (isFloating() && !handleReady) max(measured, estimated) else measured
     }
 
     private fun saveFloatPos() {
@@ -619,59 +737,84 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
     }
 
     private fun estimateFloatHeight(cardW: Int): Int {
-        val padH = PadMetrics.padHeightPx(this, cardW, padGroup)
+        val innerW = (cardW - floatCard.paddingLeft - floatCard.paddingRight).coerceAtLeast(1)
+        val padH = PadMetrics.padHeightPx(this, innerW, padGroup)
         val barH = if (::bars.isInitialized && bars.visibility == View.VISIBLE)
             bars.height.takeIf { it > 0 } ?: dpPx(47) else 0
         val handleH = if (::floatHandle.isInitialized)
             floatHandle.layoutParams?.height?.takeIf { it > 0 } ?: chromeBarHeightPx()
         else chromeBarHeightPx()
-        return (padH + barH + handleH).roundToInt()
+        return (padH + barH + handleH).roundToInt() +
+            floatCard.paddingTop + floatCard.paddingBottom
     }
 
-    private fun enterResizeMode() {
-        if (!isFloating() || floatResizing || !::resizeOverlay.isInitialized) return
-        floatResizing = true
+    private fun showFloatCorners() {
+        if (!isFloating() || !::cornerOverlay.isInitialized) return
+        if (!floatCornersOn) {
+            floatCornersOn = true
+            cornerOverlay.theme = theme
+            cornerOverlay.visibility = View.VISIBLE
+            updateFullscreenMode()
+        }
+        syncFloatCorners()
+    }
+
+    private fun hideFloatCorners() {
+        if (!floatCornersOn && !floatCornerDragging) return
+        floatCornersOn = false
+        floatCornerDragging = false
+        if (::cornerOverlay.isInitialized) cornerOverlay.visibility = View.GONE
+        updateFullscreenMode()
+    }
+
+    private fun syncFloatCorners() {
+        if (!floatCornersOn || !::cornerOverlay.isInitialized || !::floatCard.isInitialized) return
+        cornerOverlay.syncToCard(floatCard)
+    }
+
+    /**
+     * 對角釘住，跟手指改 [Prefs.floatWidthScale]／[Prefs.floatHeightScale]。
+     * 闊度用螢幕做 avail（同 [PadMetrics.floatingWidthPx]）；高度用張卡內寬。
+     */
+    private fun applyCornerResize(corner: FloatGeom.Corner, dxPx: Int, dyPx: Int) {
+        if (!::floatCard.isInitialized || !isFloating()) return
+        val (dw, dh) = FloatGeom.sizeDelta(corner, dxPx, dyPx)
+        val (screenW, screenH) = floatViewport()
+        val pad = floatCard.paddingLeft + floatCard.paddingRight
+        val padV = floatCard.paddingTop + floatCard.paddingBottom
+        val barH = if (::bars.isInitialized && bars.visibility == View.VISIBLE)
+            bars.height.coerceAtLeast(0) else 0
+        val handleH = if (::floatHandle.isInitialized && floatHandle.visibility == View.VISIBLE)
+            floatHandle.height.coerceAtLeast(0) else 0
+        val minInner = PadMetrics.MIN_CONTENT_DP.let { dpPx(it.roundToInt()) }
+            .coerceAtMost(screenW)
+        val minW = minInner + pad
+        val minH = dpPx(80) + padV
+        val wantW = (cornerStartW + dw).coerceIn(minW, screenW)
+        val wantH = (cornerStartH + dh).coerceIn(minH, screenH)
+        val innerW = (wantW - pad).coerceAtLeast(1)
+        val padH = (wantH - barH - handleH - padV).coerceAtLeast(dpPx(80))
         val g = padGroup
-        resizeSavedW = Prefs.floatWidthScale(this, g)
-        resizeSavedH = Prefs.floatHeightScale(this, g)
-        resizeOverlay.theme = theme
-        resizeOverlay.visibility = View.VISIBLE
-        syncResizeOverlayBounds()
-        floatColumn.post { if (floatResizing) syncResizeOverlayBounds() }
-    }
-
-    private fun exitResizeMode(keep: Boolean) {
-        if (!::resizeOverlay.isInitialized) return
-        if (floatResizing && !keep) {
-            val g = padGroup
-            Prefs.setFloatWidthScale(this, resizeSavedW, g)
-            Prefs.setFloatHeightScale(this, resizeSavedH, g)
-            relayoutPads()
-            layoutFloatCard(fromPrefs = false)
-        }
-        floatResizing = false
-        resizeOverlay.visibility = View.GONE
-        val lp = resizeOverlay.layoutParams as? FrameLayout.LayoutParams
-        if (lp != null) {
-            lp.width = 0
-            lp.height = 0
-            resizeOverlay.layoutParams = lp
-        }
-    }
-
-    /** 遮罩抄 column 大細，疊喺鍵盤上面 —— 唔加入 column，先唔會拉高張卡。 */
-    private fun syncResizeOverlayBounds() {
-        if (!::resizeOverlay.isInitialized || !::floatColumn.isInitialized) return
-        val w = floatColumn.width
-        val h = floatColumn.height
-        if (w <= 0 || h <= 0) return
-        val lp = resizeOverlay.layoutParams as? FrameLayout.LayoutParams ?: return
-        lp.width = w
-        lp.height = h
+        Prefs.setFloatWidthScale(this, PadMetrics.floatWidthScaleFor(this, screenW, innerW, g), g)
+        Prefs.setFloatHeightScale(this, PadMetrics.floatHeightScaleFor(this, innerW, padH, g), g)
+        relayoutPads()
+        val cardW = innerW + pad
+        val (nx, ny) = FloatGeom.anchoredTopLeft(
+            corner, cornerStartX, cornerStartY, cornerStartW, cornerStartH, cardW, wantH
+        )
+        val lp = floatCard.layoutParams as FrameLayout.LayoutParams
+        val (x, y) = FloatGeom.clamp(
+            nx, ny, cardW, wantH, screenW, screenH,
+            sysInsetL, sysInsetT, sysInsetR, sysInsetB
+        )
         lp.gravity = Gravity.TOP or Gravity.START
-        lp.leftMargin = 0
-        lp.topMargin = 0
-        resizeOverlay.layoutParams = lp
+        lp.width = cardW
+        lp.height = FrameLayout.LayoutParams.WRAP_CONTENT
+        lp.leftMargin = x
+        lp.topMargin = y
+        floatCard.layoutParams = lp
+        applyChromeBarHeights()
+        syncFloatCorners()
     }
 
     /** 入浮動：兩組一齊 FLOATING，各自記低先前嗰個貼底排位。 */
@@ -689,11 +832,34 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
         Prefs.setAlign(this, next, g)
         for (pg in PadGroup.entries) {
             if (pg == g) continue
-            val opts = Prefs.alignOptions(this, pg).filter { it != PadAlign.FLOATING }
-            val want = dockedAlign[pg]?.takeIf { it in opts } ?: PadAlign.STRETCH
+            val opts = Prefs.alignCycleOptions(this, pg)
+            val want = dockedAlign[pg]?.takeIf { it in opts } ?: Prefs.alignFallback(this, pg)
             Prefs.setAlign(this, want, pg)
         }
-        exitResizeMode(keep = true)
+        hideFloatCorners()
+    }
+
+    /** chrome／底列「取消浮動」：還原入浮動之前嗰個貼底排位。 */
+    private fun leaveFloatingToDocked() {
+        val g = padGroup
+        val opts = Prefs.alignCycleOptions(this, g)
+        val want = dockedAlign[g]?.takeIf { it in opts } ?: Prefs.alignFallback(this, g)
+        leaveFloating(want)
+        applyFloatMode()
+        relayoutPads()
+        bars.refreshAlignLabel()
+        refreshBars()
+    }
+
+    /** 闊 screen chrome 粒浮動掣：兩組一齊入浮動。 */
+    private fun enterFloatingFromChrome() {
+        if (Prefs.screenWidthDp(this) <= Prefs.SPLIT_MIN_WIDTH_DP) return
+        if (isFloating()) return
+        enterFloatingBoth()
+        applyFloatMode()
+        relayoutPads()
+        bars.refreshAlignLabel()
+        refreshBars()
     }
 
     private fun overlayHost(): ViewGroup =
@@ -717,6 +883,7 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
         numberPad?.applyTheme(theme)
         emojiPad?.applyTheme(theme)
         sidePanel?.applyTheme(theme)
+        chromeRail?.theme = theme
     }
 
     /**
@@ -731,11 +898,11 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
             theme = fresh
             StrokeImages.configure(theme.dark)
             root.setBackgroundColor(theme.background)
-            if (::floatCard.isInitialized) floatCard.setBackgroundColor(theme.background)
+            if (::floatCard.isInitialized) styleFloatCard(isFloating())
             if (isFloating()) outer.setBackgroundColor(Color.TRANSPARENT)
             else outer.setBackgroundColor(theme.background)
             if (::floatHandle.isInitialized) floatHandle.theme = theme
-            if (::resizeOverlay.isInitialized) resizeOverlay.theme = theme
+            if (::cornerOverlay.isInitialized) cornerOverlay.theme = theme
             bars.applyTheme(theme)
         }
         applyThemeToPads()
@@ -843,7 +1010,7 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
         super.onFinishInputView(finishingInput)
         ui.removeCallbacks(sizeRecheck)
         stopStt()
-        exitResizeMode(keep = true)
+        hideFloatCorners()
         // 個欄冇咗就冇地方入返段字，唔好嘥個 API call（亦都唔好留住支咪）
         cancelAiStt()
         finishLatinComposing()
@@ -982,7 +1149,8 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
         refreshPanelLayout(emojiPad)
         refreshExpandedLayout()
         applyChromeBarHeights()
-        if (isFloating() && !floatDragging) layoutFloatCard(fromPrefs = false)
+        if (::padHolder.isInitialized) refreshChromeRail()
+        if (isFloating() && !floatDragging && !floatCornerDragging) layoutFloatCard(fromPrefs = false)
     }
 
     // ---- 開鍵盤嗰下再度多次尺寸 --------------------------------------------
@@ -1168,9 +1336,12 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
             KeyAction.SYM_PAGE -> symbolPad?.let { it.page = 1 - it.page }
             KeyAction.IME_SWITCH -> switchIme()
             KeyAction.IME_PICKER -> showImePicker()
+            KeyAction.HIDE_IME -> requestHideSelf(0)
+            KeyAction.FLOAT ->
+                if (isFloating()) leaveFloatingToDocked() else enterFloatingFromChrome()
             KeyAction.STT -> toggleStt()
             KeyAction.OPTION -> toggleBar()
-            KeyAction.BAR_HIDE -> cycleBarWithHide()
+            KeyAction.BAR_HIDE -> toggleBarHidden()
             KeyAction.BACKSPACE -> backspace()
             KeyAction.SPACE -> space()
             KeyAction.ENTER -> enter()
@@ -1723,7 +1894,7 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
      * 而且空出嚟嗰邊要留返俾側邊欄（見 [refreshSidePanel]）。
      */
     private fun panelLayoutParams(height: Int): FrameLayout.LayoutParams {
-        val w = if (padHolder.width > 0) padHolder.width else resources.displayMetrics.widthPixels
+        val w = metricsWidth()
         val m = if (w > 0) PadMetrics(this, w, group = padGroup) else null
         val gravity = when (m?.align) {
             PadAlign.RIGHT_GAP -> Gravity.START   // 右邊留白 → 貼左
@@ -1742,7 +1913,7 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
      */
     private fun padInsets(): Pair<Int, Int> {
         if (!::padHolder.isInitialized) return 0 to 0
-        val w = if (padHolder.width > 0) padHolder.width else resources.displayMetrics.widthPixels
+        val w = metricsWidth()
         if (w <= 0) return 0 to 0
         val m = PadMetrics(this, w, group = padGroup)
         val slack = (w - m.contentW).roundToInt().coerceAtLeast(0)
@@ -1852,28 +2023,17 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
 
     /**
      * 英文底行嗰粒（淨係闊 keyboard 先有，見 [Prefs.barToggleAllowed]）：
-     * **四段循環**（2026-09-11 user 要求）——
-     * 關聯字 → 工具 → 兩行一齊 → **收起**，跟住由頭嚟過。
+     * **收起／打開**上面條 bar，唔再行四段循環。
      *
-     * 即係話佢同切換掣（[onSwitchView]）行同一個圈，淨係多咗「收起」嗰段。
-     * **收起淨係呢粒做得到** —— 窄機根本冇呢粒鍵，收起咗就等於打盲舖。
-     *
-     * 粒掣自己個字面每段都唔同（見 `LatinPadView.barCycleGlyph`），所以要重砌塊英文 pad。
+     * 關聯字 ⇄ 工具 ⇄ 兩行一齊仍然係條 bar 最左嗰粒 `⇄`（[onSwitchView]）。
+     * 收起咗之後再撳 `▾` 就由而家嗰段出返嚟（收起之前係工具就仍然係工具）。
      */
-    private fun cycleBarWithHide() {
-        when {
-            // 收起咗 → 出返嚟，由第一段（關聯字）開始
-            Prefs.barHidden(this) -> {
-                Prefs.setBarHidden(this, false)
-                barMode = BarMode.CANDIDATES
-                Prefs.setBarMode(this, barMode)
-            }
-            // 行完三段 → 收起
-            barMode == BarMode.BOTH -> Prefs.setBarHidden(this, true)
-            else -> {
-                barMode = barMode.nextVisible()
-                Prefs.setBarMode(this, barMode)
-            }
+    private fun toggleBarHidden() {
+        val hide = !Prefs.barHidden(this)
+        Prefs.setBarHidden(this, hide)
+        if (!hide && barMode == BarMode.OFF) {
+            barMode = BarMode.CANDIDATES
+            Prefs.setBarMode(this, barMode)
         }
         latinPad?.rebuild()
         refreshBars()
@@ -1895,7 +2055,7 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
             barMode = barMode.nextVisible()
         }
         Prefs.setBarMode(this, barMode)
-        latinPad?.rebuild() // 英文底行嗰粒個字面跟住而家喺邊段行
+        latinPad?.rebuild() // 收起／打開時底行 ▴／▾ 要換字面
         refreshBars()
         chinesePad?.invalidate() // 常駐模式：右上角嗰粒著燈與否跟住呢個狀態行
     }
@@ -1932,7 +2092,7 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
         if (mode == PadMode.SYMBOL || mode == PadMode.NUMBER) effective = BarMode.TOOLS
         // emoji 表／剪貼簿嗰陣冇關聯字可以出，索性成行出工具，唔好淨係得粒 ✖ 吉住
         if (specialPad) effective = BarMode.TOOLS
-        // 闊 keyboard 收起咗成條 bar（英文底行嗰粒，見 [cycleBarWithHide]；
+        // 闊 keyboard 收起咗成條 bar（英文底行嗰粒，見 [toggleBarHidden]；
         // 打橫仲要係預設收起，見 [Prefs.barHidden]）。**四款鍵盤都跟**：
         // 出返嚟嘅入口除咗嗰粒鍵，仲有任何一粒切換掣（見 [onSwitchView]）。
         // 擺喺最後 —— 上面三條（搵 emoji／滑完揀字／emoji 表同剪貼簿）都要越過佢。
@@ -1972,6 +2132,7 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
 
         if (refreshSidePanel(geom, cands)) {
             bars.visibility = View.GONE
+            refreshChromeRail()
             return
         }
 
@@ -2009,9 +2170,15 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
         // 大細／貼邊分咗兩組存，粒「靠左／靠右」掣要拉、要著返邊個樣，
         // 都係跟而家見緊嗰組（見 [padGroup]）
         bars.refreshAlignLabel()
+        bars.refreshFloatDockLabel()
         // 條 bar 高度淨係跟關聯字嘅字體行（見 [OptionBarsView.barHeightFor]），
         // 唔會因為有冇關聯字、而家喺邊一段而跳高跳低
         bars.visibility = if (effective == BarMode.OFF) View.GONE else View.VISIBLE
+        if (::floatHandle.isInitialized) {
+            val toolsOpen = isFloating() && bars.visibility == View.VISIBLE && effective.hasTools
+            floatHandle.setDockVisible(!toolsOpen)
+        }
+        refreshChromeRail()
     }
 
     /**
@@ -2037,13 +2204,24 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
     private fun metricsWidth(): Int {
         val screenW = resources.displayMetrics.widthPixels
         if (isFloating()) {
-            val lpW = if (::floatCard.isInitialized)
-                (floatCard.layoutParams as? FrameLayout.LayoutParams)?.width ?: 0 else 0
-            if (lpW > 0) return lpW
+            if (::floatCard.isInitialized) {
+                val inner = floatCard.width - floatCard.paddingLeft - floatCard.paddingRight
+                if (inner > 0) return inner
+                val lpW = (floatCard.layoutParams as? FrameLayout.LayoutParams)?.width ?: 0
+                if (lpW > 0) {
+                    val fromLp = lpW - floatCard.paddingLeft - floatCard.paddingRight
+                    if (fromLp > 0) return fromLp
+                }
+            }
             return PadMetrics.floatingWidthPx(this, floatViewport().first, padGroup)
         }
+        // 貼底：IME 應該用盡成個窗闊。啱啱出浮動嗰下 [padHolder] 可能仲係張卡嗰個細闊。
         val holder = if (::padHolder.isInitialized) padHolder.width else 0
-        return holder.takeIf { it > 0 } ?: screenW
+        val outerW = if (::outer.isInitialized) outer.width else 0
+        val full = outerW.takeIf { it > 0 } ?: screenW
+        if (holder <= 0) return full
+        if (full > 0 && holder < full * 3 / 4) return full
+        return holder
     }
 
     /** 浮動底列跟功能表一行嘅實際高度；未度到就用一行鍵嘅八成。 */
@@ -2141,13 +2319,16 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
         val lp = FrameLayout.LayoutParams(geom.slackPx, geom.heightPx).apply {
             // 「靠右」= 內容貼右、左邊留白 → 側邊欄擺左邊，反之亦然
             gravity = if (geom.atStart) Gravity.START else Gravity.END
+            // chrome 四粒掣佔最外側一欄，側邊欄讓開
+            if (geom.atStart) leftMargin = geom.railPx else rightMargin = geom.railPx
         }
         val old = panel.layoutParams as? FrameLayout.LayoutParams
         if (panel.parent !== padHolder) {
             (panel.parent as? ViewGroup)?.removeView(panel)
             padHolder.addView(panel, lp)
         } else if (old == null || old.width != lp.width || old.height != lp.height ||
-            old.gravity != lp.gravity) {
+            old.gravity != lp.gravity || old.leftMargin != lp.leftMargin ||
+            old.rightMargin != lp.rightMargin) {
             panel.layoutParams = lp
         }
         panel.refreshFontScale()
@@ -2161,25 +2342,77 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
         return true
     }
 
-    /** 側邊欄擺喺邊、幾大 */
-    private class SideGeom(val slackPx: Int, val heightPx: Int, val atStart: Boolean)
+    /** 側邊欄擺喺邊、幾大。[railPx] = 最外側 chrome 欄預留（冇就 0） */
+    private class SideGeom(
+        val slackPx: Int,
+        val heightPx: Int,
+        val atStart: Boolean,
+        val railPx: Int = 0,
+    )
 
     /** null = 唔夠窄／唔啱模式，照用返上面條 bar */
     private fun sideGeom(): SideGeom? {
         if (mode != PadMode.CHINESE || !::padHolder.isInitialized) return null
         val align = Prefs.align(this)
-        // 「拉闊」冇位空出嚟；「置中」空出嚟嗰啲位一開二，兩邊都窄過擺得落工具掣，
-        // 所以兩個都照用返上面條 bar
-        if (align == PadAlign.STRETCH || align == PadAlign.CENTER ||
-            align == PadAlign.FLOATING || align == PadAlign.SPLIT) return null
-        val w = padHolder.width.takeIf { it > 0 } ?: resources.displayMetrics.widthPixels
+        // 「拉闊」冇位空出嚟；浮動／左右拆開／置中都唔用側邊欄。
+        // 置中（打橫都係）功能表留喺上面，唔好搬去左邊。
+        if (align == PadAlign.STRETCH || align == PadAlign.FLOATING ||
+            align == PadAlign.SPLIT || align == PadAlign.CENTER) return null
+        val w = metricsWidth()
         if (w <= 0) return null
         val m = PadMetrics(this, w)
         if (m.contentW > w * Prefs.SIDE_PANEL_MAX_RATIO) return null
         val slack = (w - m.contentW).roundToInt()
         if (slack <= 0) return null
-        // 「靠右」（LEFT_GAP）= 內容貼右、左邊留白 → 側邊欄擺喺最左
-        return SideGeom(slack, m.totalHeight.roundToInt(), align == PadAlign.LEFT_GAP)
+        val railPx = if (PadChrome.wantCjkRail(this, PadGroup.CJK, true))
+            chromeRailWidthPx(m) else 0
+        val panelW = slack - railPx
+        if (panelW <= dpPx(48)) return null
+        val atStart = align != PadAlign.RIGHT_GAP
+        return SideGeom(panelW, m.totalHeight.roundToInt(), atStart, railPx)
+    }
+
+    private fun chromeRailWidthPx(m: PadMetrics? = null): Int {
+        val w = metricsWidth()
+        val metrics = m ?: PadMetrics(this, w)
+        return metrics.cellW.roundToInt().coerceAtLeast(1)
+    }
+
+    private fun refreshChromeRail() {
+        if (!::padHolder.isInitialized) return
+        val cjkPad = mode == PadMode.CHINESE || mode == PadMode.NUMBER
+        if (!PadChrome.wantCjkRail(this, padGroup, cjkPad)) {
+            removeChromeRail()
+            return
+        }
+        val w = metricsWidth()
+        if (w <= 0) { removeChromeRail(); return }
+        val m = PadMetrics(this, w)
+        val railW = chromeRailWidthPx(m)
+        val h = m.totalHeight.roundToInt().coerceAtLeast(1)
+        val atStart = m.align != PadAlign.RIGHT_GAP
+        val rail = chromeRail ?: WideChromeRail(this).also {
+            it.listener = this
+            it.theme = theme
+            chromeRail = it
+        }
+        val lp = FrameLayout.LayoutParams(railW, h).apply {
+            gravity = if (atStart) Gravity.START else Gravity.END
+        }
+        val old = rail.layoutParams as? FrameLayout.LayoutParams
+        if (rail.parent !== padHolder) {
+            (rail.parent as? ViewGroup)?.removeView(rail)
+            padHolder.addView(rail, lp)
+        } else if (old == null || old.width != lp.width || old.height != lp.height ||
+            old.gravity != lp.gravity) {
+            rail.layoutParams = lp
+        }
+        rail.refreshAlignLabel()
+    }
+
+    private fun removeChromeRail() {
+        val r = chromeRail ?: return
+        (r.parent as? ViewGroup)?.removeView(r)
     }
 
     private fun removeSidePanel() {
@@ -2281,16 +2514,12 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
 
     override fun onCycleAlign() {
         val g = padGroup
-        val cur = Prefs.align(this, g)
-        val next = Prefs.nextAlign(this, g)
-        when {
-            next == PadAlign.FLOATING -> enterFloatingBoth()
-            cur == PadAlign.FLOATING -> leaveFloating(next)
-            else -> Prefs.setAlign(this, next, g)
-        }
+        if (Prefs.align(this, g) == PadAlign.FLOATING) return
+        Prefs.setAlign(this, Prefs.nextAlign(this, g), g)
         applyFloatMode()
         relayoutPads()
         bars.refreshAlignLabel()
+        chromeRail?.refreshAlignLabel()
         refreshBars()
     }
 
@@ -3413,5 +3642,9 @@ class TTInputMethodService : android.inputmethodservice.InputMethodService(),
         private const val SIZE_RECHECK_TRIES = 3
         /** 一輪入面最多重排幾多次（見 [recheckPadSize]），唔係就可能一路重排落去 */
         private const val SIZE_MAX_FIXES = 2
+        /** 浮動張卡四邊空隙（dp） */
+        private const val FLOAT_PAD_DP = 3
+        /** 浮動張卡圓角（dp） */
+        private const val FLOAT_CORNER_DP = 12
     }
 }

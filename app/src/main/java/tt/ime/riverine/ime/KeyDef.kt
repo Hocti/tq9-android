@@ -42,13 +42,17 @@ enum class KeyAction {
     AI,           // 用 AI 改寫揀咗嘅字
     IME_SWITCH,   // 地球：直接跳去下一個輸入法
     IME_PICKER,   // 彈出系統嘅輸入法選單（長撳 Eng 揀得，見 [tt.ime.riverine.core.EngLongPress]）
+    /** 收起成個鍵盤（`InputMethodService.requestHideSelf`） */
+    HIDE_IME,
+    /** 入／出浮動顯示方式（闊 screen；已經浮動就係取消浮動） */
+    FLOAT,
     STT,          // 語音輸入
     OPTION,       // 上面條 bar 三段循環：關聯字 → 工具 → 兩行一齊
     /**
-     * 上面條 bar **四段**循環：關聯字 → 工具 → 兩行一齊 → 收起。
+     * 上面條 bar **收起／打開**（唔再行四段循環）。
      * 淨係闊 keyboard 嘅英文底行先有呢粒（見
-     * [tt.ime.riverine.core.Prefs.barToggleAllowed] 同 `LatinPadView.rows`），
-     * 即係話「收起」淨係嗰度做得到。
+     * [tt.ime.riverine.core.Prefs.barToggleAllowed] 同 `LatinPadView.rows`）。
+     * 關聯字 ⇄ 工具 ⇄ 兩行一齊仍然係條 bar 最左嗰粒 `⇄`。
      */
     BAR_HIDE,
     BACKSPACE,
@@ -115,17 +119,14 @@ private fun glyphOr(glyph: String, fallback: String): String =
     if (android.graphics.Paint().hasGlyph(glyph)) glyph else fallback
 
 /**
- * 英文底行那顆按鍵（`KeyAction.BAR_HIDE`）四段循環的字面 ——
- * 關聯字 → 工具 → 兩行一齊 → 收起（見 `LatinPadView.barCycleGlyph`）。
+ * 英文底行那顆按鍵（`KeyAction.BAR_HIDE`）的字面 —— 只負責 show／hide
+ * 上面那條 bar（見 `LatinPadView.barToggleGlyph`）。
  *
- * 字面講的一律是**按完會怎樣**：`⇄` 轉去工具、`⇅` 兩行一齊、`▴` 收上去、
- * `▾` 拉回來。收起那對用細三角（`▴` U+25B4 / `▾` U+25BE），與候選欄那顆
- * 拉大的 `▼` 分得開；字型沒有細那對就跌回大三角。
+ * `▴` 收上去、`▾` 拉回來。用細三角（`▴` U+25B4 / `▾` U+25BE），與候選欄
+ * 那顆拉大的 `▼` 分得開；字型沒有細那對就跌回大三角。
  */
 val BAR_HIDE_GLYPH: String by lazy { glyphOr("▴", "▲") }
 val BAR_SHOW_GLYPH: String by lazy { glyphOr("▾", "▼") }
-val BAR_TOOLS_GLYPH: String by lazy { glyphOr("⇄", "工具") }
-val BAR_BOTH_GLYPH: String by lazy { glyphOr("⇅", "兩行") }
 
 /** 「搜尋」個樣（`⌕` U+2315）：搜尋欄的 `⏎` 與 emoji 表那粒搵字掣兩處都用它 */
 val SEARCH_GLYPH: String by lazy { glyphOr("⌕", "搜尋") }

@@ -86,6 +86,10 @@ class KeyLayoutTest {
         assertNotNull(KeyLayout.checkDrop(def, leftTap0, PadFunc.ALIGN))
     }
 
+    @Test fun `浮動鍵盤擺唔入左右欄`() {
+        assertNotNull(KeyLayout.checkDrop(def, leftTap0, PadFunc.FLOAT))
+    }
+
     @Test fun `改變大小喺工具列之內調得位`() {
         // 同工具列第二格對調 —— 一路都係喺工具列，所以准
         assertNull(KeyLayout.checkDrop(

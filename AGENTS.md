@@ -198,14 +198,12 @@ log 由 `core/InputLog` 出，**兩個開關任選其一**（預設兩個都關�
   **英文那顆沒有左上角提示字**（2026-08-29 使用者要求）：鍵面本身已經四文字符，
   底行每顆都窄，再擠壓個 `123` 落左上角就擠在一起。中文九宮格那顆空間較寬鬆，
   個 `hint` 照留 —— 兩處不一致是特意的。
-- **`?123` 右邊那顆只在寬 keyboard 出現**（2026-09-11 使用者要求）：它是上面那條
-  bar 的**四段循環**（`KeyAction.BAR_HIDE` → `TTInputMethodService.cycleBarWithHide`）——
-  關聯字 → 工具 → 兩行一齊 → **收起**，然後從頭再來。即是與切換掣（`⇄`）走同一個
-  圈，只是多了「收起」那一段，而**收起只有這顆做得到**。
+- **`?123` 右邊那顆只在寬 keyboard 出現**（2026-09-11 使用者要求）：它只負責
+  **收起／打開**上面那條 bar（`KeyAction.BAR_HIDE` → `toggleBarHidden`），
+  不再走四段循環。關聯字 ⇄ 工具 ⇄ 兩行一齊仍然是條 bar 最左那顆 `⇄`。
 
-  個字面講的一律是「按完會怎樣」（`LatinPadView.barCycleGlyph()`）：
-  `⇄` 轉去工具、`⇅` 兩行一齊、`▴` 收上去、`▾` 拉回來。每按一下都要
-  `latinPad?.rebuild()`，否則字面停在上一段。
+  字面：`▴` 收上去、`▾` 拉回來。每按一下都要 `latinPad?.rebuild()`，否則
+  字面停在上一狀態。
 
   「寬」＝ `Prefs.barToggleAllowed()`，與「左右拆開」揀不揀得到是同一條線
   （`SPLIT_MIN_WIDTH_DP`，500dp）。窄機**不會**出現這顆，條 bar 收不起 ——
@@ -215,7 +213,7 @@ log 由 `core/InputLog` 出，**兩個開關任選其一**（預設兩個都關�
   `Prefs.barHidden()` 每個螢幕尺寸各自存（`Prefs.screenKey()`），所以打橫收起了
   轉回打直不會一起收埋。**打橫未按過就預設收起** —— 打橫本來就矮，首次開鍵盤
   連條 bar 遮住整個螢幕（使用者報）。叫得回來的入口有兩個：這顆鍵，以及**任何一顆
-  切換掣**（`onSwitchView()` 見到收起了就先放回來再走第一段，否則中文頁那顆 `⇄`
+  切換掣**（`onSwitchView()` 見到收起了就先放回來，否則中文頁那顆 `⇄`
   按極都沒有反應——中文頁沒有「收起」那顆鍵）。
 
   搜尋 emoji、滑完等揀字、emoji 表／剪貼簿三種情況一律越過它（見
@@ -464,6 +462,7 @@ core/   TTDb       sqlite 存取、assets 安裝、換 db、weight prefix 統計
         UsageStats 另一個 sqlite（usage_stats.db，與 dataset.db 分開）：
                    連續兩個中文字的 bigram 次數、每個字輸入了多少次
         Prefs      全部設定
+        PadChrome  闊 screen 非浮動時強加的四粒 chrome 掣（浮動／貼邊／輸入法表／收起）
 swipe/  GestureKeyTracker   中文九宮格滑動中間鍵判定（純 Kotlin，有 unit test）
         GestureDecoder      英文 swipe 認字：AOSP 手勢輸入那套概念的 Kotlin 版
                    （軌跡 vs 關聯字理想路徑做形狀比對，不是逐格判斷按了哪個鍵）
@@ -482,9 +481,10 @@ ime/    TTInputMethodService   IME 主體，所有 view 的 host
         ClipboardListView       長按「貼上」之後蓋在 padHolder 上面的 overlay
         PadMetrics              尺寸與顯示方式計算
         OptionBarsView          上面工具列（三段：關／關聯字／工具）
-        FloatHandleView         浮動窗底條 handle（輸入法選單／調整大小／拖／收起）
-        FloatResizeOverlay      浮動調整大小遮罩（蓋住鍵盤；X 橫排、Y 直排）
-        FloatGeom               浮動位置分數 ↔ pixel（純函數，有 unit test）
+        WideChromeRail          闊 screen 中文／純數字留白最外側那欄四粒 chrome
+        FloatHandleView         浮動窗底條 handle（輸入法選單／取消浮動／拖／收起）
+        FloatCornerOverlay      浮動四角藍色圓角（拖就改大細）
+        FloatGeom               浮動位置分數 ↔ pixel，同埋四角對角釘住（有 unit test）
 ui/     SettingsActivity / MicPermissionActivity
 ```
 
@@ -632,8 +632,23 @@ gravity 跟 `PadAlign` 反過來放置）：上面一（兩）行功能按鍵，
 
 入口是 `refreshBars()` 開頭那句 `if (refreshSidePanel(cands)) { … return }`。
 
-**`PadAlign.CENTER`（置中）沒有側邊欄**（`sideGeom()` 與 `STRETCH` 一起回 `null`）：
-空出來那些位置一開二，兩邊各一半，哪邊都窄過放得下工具按鍵，所以照用回上面工具列。
+**`PadAlign.CENTER`（置中）沒有側邊欄**（`sideGeom()` 一律回 `null`）：
+空出來那些位置一開二，兩邊都窄過放得下工具按鍵，所以照用回上面工具列。
+闊 screen 非浮動時最左仍有 `WideChromeRail` 四粒掣；置左就把那欄排到最右。
+
+### 闊螢幕 chrome（2026-09-17）
+
+打橫而非浮動時，系統在鍵盤底的「轉輸入法／收起鍵盤」會消失，所以鍵盤自己補。
+四粒一律是：浮動、置左／中／右（或英文的拉闊／置中／分割）、輸入法選擇表、
+收起鍵盤。`PadChrome` 是唯一出處 —— 功能表已有的就隱藏。
+
+- **中文／純數字**：`WideChromeRail` 打直四粒，高度 = 鍵盤本體。置右或置中
+  排最左，置左排最右。置中功能表留在上面，不搬去左邊。
+- **英文／符號**：插在工具列最左（`⇄` 後面）。
+- **收起鍵盤**（`PadFunc.HIDE_KEYBOARD`）可以放進功能表；**浮動**
+  （`PadFunc.FLOAT`）只能放工具列。
+- 入／出浮動都是獨立掣，不再經「改變大小」循環。功能表開着時「取消浮動」
+  在工具列；沒開就在底列。
 
 **高度一定要固定為 `PadMetrics.totalHeight`（＝中文九宮格幾高），
 不可以用 `MATCH_PARENT`。** `padHolder` 是 `wrap_content` 的 `FrameLayout`：
@@ -651,21 +666,30 @@ gravity 跟 `PadAlign` 反過來放置）：上面一（兩）行功能按鍵，
 
 貼底嗰幾個顯示方式，`PadMetrics` 沒有 `extraBottom`。目前 `PadAlign` 有
 `STRETCH`／`LEFT_GAP`／`RIGHT_GAP`／`CENTER`／`SPLIT`／**`FLOATING`**。
-`OptionBarsView` 個 sizeBtn 按一下就轉下一個（可選哪幾個見 `Prefs.alignOptions`）。
+`OptionBarsView` 個 sizeBtn 按一下就轉下一個（可選哪幾個見 `Prefs.alignCycleOptions`）。
+入／出浮動**不是**這個循環的一段，是獨立掣（見下面「闊螢幕 chrome」）。
 
 **`PadAlign.FLOATING` 只在闊 screen（`> SPLIT_MIN_WIDTH_DP`）出現**，中英兩組都有。
-窄了（轉直）就不在 `alignOptions` 內，`Prefs.align()` 當「拉闊」，自動停用。
+窄了（轉直）就不在 `alignOptions` 內，`Prefs.align()` 當 fallback，自動停用。
 IME window 鋪滿螢幕但背景透明，`onComputeInsets` 把 content insets 拉到窗底
 （下面的 app 不被夾高），只張卡那個矩形吃觸摸。拖動範圍用螢幕像素，**不要**用
 當時 IME window 幾高 —— wrap_content 時 Y 會夾死在 0，位置亦會忽高忽低。
+入浮動要等張卡量完真實高度再 `FloatGeom.clamp`（handle／padding 未量就擺底
+會伸出畫面）；viewport 亦不要把尚未鋪滿的 decor 當成螢幕。張卡四邊
+`FLOAT_PAD_DP`（3dp）padding、圓角 `FLOAT_CORNER_DP`（12dp），`clipToOutline`。
+底列下面兩隻角跟內側圓角（12−3=9dp），不要留方角對住張卡的圓角。
+離開浮動後 `padHolder` 可能仍是張卡的闊，要等 layout 再 `refreshBars()`，
+否則置左／置右會誤用上面那條 bar。
 
-最底一條 handle：**左**彈系統輸入法選單、**左中**調整大小、**中**拖去移動（X／Y
-都得）、**右**收起鍵盤。工具列那顆顯示方式**照轉下一個**（浮動時仍可轉返置左／
-右／置中）；入浮動時中英兩組一齊 `FLOATING`，闊／高各用各的
-`floatWidthScale`／`floatHeightScale`（英文可以較闊、中文較窄）。
+最底一條 handle：**左**彈系統輸入法選單、**取消浮動**（功能表開着就搬去
+上面工具列）、**中**拖去移動（X／Y 都得）、**右**收起鍵盤。按一下或拖
+底列中間，四角外側出藍色圓角，拉動即改大小；按鍵盤任何位置就收起。
+浮動時工具列那顆「改變大小」要隱藏（入浮動已是獨立掣）。入浮動時中英
+兩組一齊 `FLOATING`，闊／高各用各的 `floatWidthScale`／`floatHeightScale`
+（英文可以較闊、中文較窄）。
 
-調整大小是蓋住張卡的 overlay（確定／取消疊在鍵盤底，**不要**加高張卡，否則
-預覽不到拉高之後實際幾高）。X 橫排（－ X ＋）、Y 直排（＋ 在上、－ 在下）。
+四隻角對角釘住（`FloatGeom.anchoredTopLeft`），不要再用蓋住鍵盤的
+＋－ overlay。
 
 拖動**兩個方向都都有對應功能**
 （拖動超過 8dp 就鎖定方向，不會輕微斜向移動就兩樣一起改）：
@@ -771,25 +795,27 @@ key 照留回做預設值**（`sp.getFloat(profKey(...), sp.getFloat(舊 key, 1f
 
 ### `PadAlign.SPLIT`：英數鍵盤在寬 screen 拆做兩半
 
-`Prefs.alignOptions(ctx, group)` 提示知**目前可選邊多個**顯示方式：
+`Prefs.alignCycleOptions(ctx, group)` 是「改變大小」撳一下轉得邊幾個（**不含浮動**）：
 
-- `LATIN` + 螢幕寬過 `Prefs.SPLIT_MIN_WIDTH_DP`（500dp）→ `STRETCH`、`SPLIT`、`CENTER`、`FLOATING`
-  （靠左／靠右時收合 —— 這麼寬的螢幕靠近一邊，另一邊那部分空間就是浪費了）
-- 其餘闊螢幕（中文那組）→ `STRETCH`、`LEFT_GAP`、`RIGHT_GAP`、`CENTER`、`FLOATING`
+- `LATIN` + 螢幕寬過 `Prefs.SPLIT_MIN_WIDTH_DP`（500dp）→ `STRETCH`、`CENTER`、`SPLIT`
+- 闊螢幕中文那組 → `RIGHT_GAP`（置左）、`CENTER`、`LEFT_GAP`（置右），**沒有拉闊**
 - 窄螢幕 → `STRETCH`、`LEFT_GAP`、`RIGHT_GAP`、`CENTER`，沒有 `SPLIT`／`FLOATING`
 
+`Prefs.alignOptions` = 上面那表 + 闊 screen 的 `FLOATING`（入／出浮動是獨立掣，
+見 `PadChrome`）。舊 profile 存住不在 list 內的值：闊 screen 中文的「拉闊」跌去
+置中，其餘當 `STRETCH`。
+
 `CENTER`（置中，2026-09-11 使用者要求）**兩邊都可以選**：它不佔一邊，純粹是
-「拉窄之後站中間」，寬螢幕與窄螢幕一樣用得著。
+「拉窄之後站中間」，寬螢幕與窄螢幕一樣用得著。功能表一律在上面，沒有側邊欄。
 
 三樣內容然後這資料表行，加新 mode 記得三樣一起改：
 
-1. **`Prefs.align()` 會過濾**：儲存的值不在 `alignOptions` 內就當 `STRETCH`
+1. **`Prefs.align()` 會過濾**：儲存的值不在 `alignOptions` 內就當 fallback
    （摺機開合／橫向之後可選擇的內容會變，舊 profile 不可以強行用寫入）。
-2. **`Prefs.nextAlign()`** 才是「按一下轉下一個」，`PadAlign.next()` 已刪除 ——
-   自己 `ordinal + 1` 就會轉到不得選那個。
-3. `OptionBarsView` / `SidePanelView` 兩個 `refreshAlignLabel()` 個 `when` 都要寫齊
-   （側邊欄是中文專用，不會進入 `SPLIT`／`FLOATING`，但一樣要有那個 branch）。
-   `FLOATING` 的圖案是 `ALIGN_FLOAT`（一條底線 + 浮起的方塊），按一下仍轉下一個。
+2. **`Prefs.nextAlign()`** 才是「按一下轉下一個」，行 `alignCycleOptions` ——
+   **不會轉去浮動**。`PadAlign.next()` 已刪除。
+3. `OptionBarsView` / `SidePanelView` / `WideChromeRail` 的 `refreshAlignLabel()`
+   個 `when` 都要寫齊。浮動的圖案是 `ALIGN_FLOAT`。
 
 排位在 `RowsPadView.buildLayout()`：每行用 `splitRow()` 由左邊夾達一半 weight
 斬開（`asdfg` | `hjkl`、`⇧zxcv` | `bnm⌫`），兩半各 `PadMetrics.halfW` 這麼寬，
@@ -1462,9 +1488,9 @@ grapheme 數，仍太寬再夾入格內，**靠左**。
    自己的按住動作（「貼上」開剪貼簿歷史、🎤 一路錄、「改變大小」拉到最闊），
    再讓人配一個上去一定撞。`normalise()` 會強行把 tools 的 `long` 清成 `NONE`
 1. **擺得去哪**：`␣`／`⌫`／`⏎`／`⇄` 只能在左右欄（條工具列會在窄螢幕
-   變側邊欄，那時找不到它們）；「改變大小」與「中文鍵盤」相反，只能在工具列
-   （「改變大小」不是按一下就算，要**在那顆按鍵上直接拖**才拉得動鍵盤大小，
-   九宮格那套沒有這種拖法）。
+   變側邊欄，那時找不到它們）；「改變大小」／「浮動鍵盤」與「中文鍵盤」相反，
+   只能在工具列（「改變大小」不是按一下就算，要**在那顆按鍵上直接拖**才拉得動
+   鍵盤大小，九宮格那套沒有這種拖法）。
    **四顆轉鍵盤的（`Eng`／`?123`／`123`／`中`）兩邊都擺得**（2026-09-13
    使用者要求）：它們做的都是「轉去另一個鍵盤」，與工具列本來就擺得的
    「中文鍵盤」同一件事。`Eng` 照舊是必用鍵（規矩 4），所以左右欄一定仍有一顆，

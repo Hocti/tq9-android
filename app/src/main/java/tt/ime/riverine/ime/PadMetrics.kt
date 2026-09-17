@@ -52,13 +52,7 @@ class PadMetrics(
         val dm = ctx.resources.displayMetrics
         fun dp(v: Float) = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, v, dm)
 
-        val maxW = min(availW.toFloat(), dp(Prefs.maxWidthDp(ctx).toFloat()))
-        val maxH = dp(Prefs.maxHeightDp(ctx).toFloat())
-        val scale = Prefs.keyScale(ctx)
-
-        var unit = min(maxW / cols, maxH / rows) * scale
-        unit = min(unit, availW.toFloat() / cols)
-        unit = max(unit, dp(32f))
+        val unit = baseUnitPx(ctx, availW, cols, rows)
 
         // 正方格喺手機上面太高，預設壓扁 20%（設定入面可以校）
         val hRatio = Prefs.keyHeightRatio(ctx)
@@ -66,7 +60,7 @@ class PadMetrics(
         // （上下拉係另一件事，行 Prefs.heightScale）
         val wantH = if (align == PadAlign.FLOATING) Prefs.floatHeightScale(ctx, group)
             else Prefs.heightScale(ctx, group)
-        // 浮動窗自己有大細掣，唔好再用「闊 screen 未校過就封半個螢幕」嗰個 cap
+        // 浮動窗四角可以拉大細，唔好再用「闊 screen 未校過就封半個螢幕」嗰個 cap
         heightScale = if (align == PadAlign.FLOATING) wantH
             else autoCapped(ctx, unit * hRatio, wantH, group)
         cellH = unit * hRatio * heightScale
@@ -179,12 +173,7 @@ class PadMetrics(
             fun dp(v: Float) = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, v, dm)
             val cols = 5
             val rows = 4
-            val maxW = min(screenW.toFloat(), dp(Prefs.maxWidthDp(ctx).toFloat()))
-            val maxH = dp(Prefs.maxHeightDp(ctx).toFloat())
-            val scale = Prefs.keyScale(ctx)
-            var unit = min(maxW / cols, maxH / rows) * scale
-            unit = min(unit, screenW.toFloat() / cols)
-            unit = max(unit, dp(32f))
+            val unit = baseUnitPx(ctx, screenW, cols, rows)
             val minContent = min(dp(MIN_CONTENT_DP), screenW.toFloat())
             val maxContent = screenW.toFloat()
             val ws = Prefs.floatWidthScale(ctx, group)
@@ -196,6 +185,50 @@ class PadMetrics(
                 max(min(unit * ws * cols, maxContent), minContent)
             }
             return w.roundToInt().coerceIn(minContent.roundToInt(), screenW)
+        }
+
+        /**
+         * 想要嘅浮動內寬 → [Prefs.floatWidthScale]。同 [floatingWidthPx] 對調。
+         */
+        fun floatWidthScaleFor(ctx: Context, screenW: Int, innerW: Int, group: PadGroup): Float {
+            val dm = ctx.resources.displayMetrics
+            fun dp(v: Float) = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, v, dm)
+            val cols = 5
+            val minContent = min(dp(MIN_CONTENT_DP), screenW.toFloat())
+            val maxContent = screenW.toFloat()
+            val w = innerW.toFloat().coerceIn(minContent, maxContent)
+            return if (group == PadGroup.LATIN) {
+                val span = (maxContent - minContent).coerceAtLeast(1f)
+                val t = ((w - minContent) / span).coerceIn(0f, 1f)
+                Prefs.MIN_WIDTH_SCALE + t * (Prefs.MAX_WIDTH_SCALE - Prefs.MIN_WIDTH_SCALE)
+            } else {
+                val unit = baseUnitPx(ctx, screenW, cols, 4)
+                val den = (unit * cols).coerceAtLeast(1f)
+                (w / den).coerceIn(Prefs.MIN_WIDTH_SCALE, Prefs.MAX_WIDTH_SCALE)
+            }
+        }
+
+        /**
+         * 想要嘅鍵盤本體高度 → [Prefs.floatHeightScale]。
+         * [availW] 用張卡內寬（[PadMetrics] 計 `unit` 跟呢個闊）。
+         */
+        fun floatHeightScaleFor(ctx: Context, availW: Int, padHeightPx: Int, group: PadGroup): Float {
+            val unit = baseUnitPx(ctx, availW, cols = 5, rows = 4)
+            val hRatio = Prefs.keyHeightRatio(ctx)
+            val base = unit * hRatio * 4f
+            if (base <= 1f) return Prefs.floatHeightScale(ctx, group)
+            return (padHeightPx / base).coerceIn(Prefs.MIN_HEIGHT_SCALE, Prefs.MAX_HEIGHT_SCALE)
+        }
+
+        private fun baseUnitPx(ctx: Context, availW: Int, cols: Int, rows: Int): Float {
+            val dm = ctx.resources.displayMetrics
+            fun dp(v: Float) = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, v, dm)
+            val maxW = min(availW.toFloat(), dp(Prefs.maxWidthDp(ctx).toFloat()))
+            val maxH = dp(Prefs.maxHeightDp(ctx).toFloat())
+            val scale = Prefs.keyScale(ctx)
+            var unit = min(maxW / cols, maxH / rows) * scale
+            unit = min(unit, availW.toFloat() / cols)
+            return max(unit, dp(32f))
         }
 
         /** 一行行嗰啲鍵盤（英文／符號／emoji）用嘅行高 */

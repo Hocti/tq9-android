@@ -30,6 +30,8 @@ fun PadFunc.action(): KeyAction = when (this) {
     PadFunc.BAR_SWITCH -> KeyAction.OPTION
     PadFunc.IME_NEXT -> KeyAction.IME_SWITCH
     PadFunc.IME_PICKER -> KeyAction.IME_PICKER
+    PadFunc.HIDE_KEYBOARD -> KeyAction.HIDE_IME
+    PadFunc.FLOAT -> KeyAction.FLOAT
     PadFunc.NEXT_PAGE -> KeyAction.NEXT_PAGE
     PadFunc.PREV_PAGE -> KeyAction.PREV_PAGE
     PadFunc.SELECT_ALL -> KeyAction.SELECT_ALL
@@ -55,6 +57,8 @@ fun PadFunc.toolIcon(): ToolIcon? = when (this) {
     PadFunc.AI -> ToolIcon.AI
     PadFunc.IME_NEXT -> ToolIcon.GLOBE
     PadFunc.IME_PICKER -> ToolIcon.GLOBE_LIST
+    PadFunc.HIDE_KEYBOARD -> ToolIcon.CHEVRON_DOWN
+    PadFunc.FLOAT -> ToolIcon.ALIGN_FLOAT
     PadFunc.COPY -> ToolIcon.COPY
     PadFunc.CUT -> ToolIcon.CUT
     PadFunc.SELECT_ALL -> ToolIcon.SELECT_ALL
@@ -95,6 +99,8 @@ fun PadFunc.toKey(long: PadFunc = PadFunc.NONE): Key = Key(
 fun longIconOf(a: KeyAction): ToolIcon? = when (a) {
     KeyAction.IME_SWITCH -> ToolIcon.GLOBE
     KeyAction.IME_PICKER -> ToolIcon.GLOBE_LIST
+    KeyAction.HIDE_IME -> ToolIcon.CHEVRON_DOWN
+    KeyAction.FLOAT -> ToolIcon.ALIGN_FLOAT
     KeyAction.COPY -> ToolIcon.COPY
     KeyAction.CUT -> ToolIcon.CUT
     KeyAction.SELECT_ALL -> ToolIcon.SELECT_ALL

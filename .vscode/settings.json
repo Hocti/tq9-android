@@ -1,0 +1,14 @@
+{
+  "kotlin.java.home": "/opt/android-studio/jbr",
+  "kotlin.languageServer.watchFiles": [
+    "**/*.kt",
+    "**/*.kts",
+    "**/*.java",
+    "**/pom.xml",
+    "**/build.gradle",
+    "**/build.gradle.kts",
+    "**/settings.gradle",
+    "**/settings.gradle.kts",
+    "kls-classpath.sh"
+  ]
+}

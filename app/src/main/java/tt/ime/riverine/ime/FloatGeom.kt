@@ -9,9 +9,36 @@ import kotlin.math.roundToInt
  */
 object FloatGeom {
 
+    /** 浮動張卡四隻角；拖一隻 = 對角釘住、呢隻郁。 */
+    enum class Corner { TL, TR, BL, BR }
+
+    /**
+     * 手指由 DOWN 起嘅位移 → 張卡闊／高應該加幾多。
+     * 左角向左拖、上角向上拖 = 拉大。
+     */
+    fun sizeDelta(corner: Corner, dx: Int, dy: Int): Pair<Int, Int> {
+        val dw = if (corner == Corner.TL || corner == Corner.BL) -dx else dx
+        val dh = if (corner == Corner.TL || corner == Corner.TR) -dy else dy
+        return dw to dh
+    }
+
+    /**
+     * 對角釘住之後，新大細對應嘅左上角。
+     * 拖右下：左上唔郁。拖左上：右下唔郁，所以 left/top 跟住減。
+     */
+    fun anchoredTopLeft(
+        corner: Corner,
+        x: Int, y: Int, oldW: Int, oldH: Int, newW: Int, newH: Int
+    ): Pair<Int, Int> {
+        val nx = if (corner == Corner.TL || corner == Corner.BL) x + (oldW - newW) else x
+        val ny = if (corner == Corner.TL || corner == Corner.TR) y + (oldH - newH) else y
+        return nx to ny
+    }
+
     /**
      * 將張卡嘅左上角夾返入可用範圍（螢幕減四邊 inset：status bar／導覽列／cutout）。
      * 張卡高過可用高度就釘喺頂；闊過就釘喺左。
+     * 張卡本身擺得落就保證四邊都喺畫面入面。
      */
     fun clamp(
         x: Int, y: Int, cardW: Int, cardH: Int,

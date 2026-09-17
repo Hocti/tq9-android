@@ -13,6 +13,7 @@ import android.widget.ScrollView
 import android.widget.TextView
 import tt.ime.riverine.core.KeyLayout
 import tt.ime.riverine.core.PadAlign
+import tt.ime.riverine.core.PadChrome
 import tt.ime.riverine.core.PadFunc
 import tt.ime.riverine.core.PadGroup
 import tt.ime.riverine.core.Prefs
@@ -100,7 +101,7 @@ class SidePanelView(context: Context) : LinearLayout(context) {
         closeBtn.minWidth = dp(40f).roundToInt()
         closeBtn.minHeight = dp(36f).roundToInt()
         toolFlow.addView(closeBtn)
-        rebuildTools(KeyLayout.load(context).tools)
+        rebuildTools(PadChrome.visibleToolSlots(context, PadGroup.CJK))
 
         candFlow.setPadding(dp(4f).toInt(), dp(2f).toInt(), dp(4f).toInt(), dp(4f).toInt())
         candFlow.onPick = { listener?.onPickCandidate(it) }
@@ -166,6 +167,7 @@ class SidePanelView(context: Context) : LinearLayout(context) {
         }
         for (b in toolBtns) { b.view.setTextColor(theme.text); styleTool(b.view, theme.keyFaceAlt) }
         refreshAlignLabel()
+        refreshFloatDockLabel()
         refreshAiLook()
         refreshCopyLook()
         refreshSttLook()
@@ -179,7 +181,7 @@ class SidePanelView(context: Context) : LinearLayout(context) {
 
     /** 設定頁改咗排位先重砌（見 [OptionBarsView.refreshTools]） */
     fun refreshTools() {
-        val want = KeyLayout.load(context).tools
+        val want = PadChrome.visibleToolSlots(context, PadGroup.CJK)
         if (want != toolSlots) rebuildTools(want)
     }
 
@@ -202,6 +204,7 @@ class SidePanelView(context: Context) : LinearLayout(context) {
             styleTool(v, t.keyFaceAlt)
         }
         refreshAlignLabel()
+        refreshFloatDockLabel()
         refreshAiLook()
         refreshCopyLook()
         refreshSttLook()
@@ -313,6 +316,14 @@ class SidePanelView(context: Context) : LinearLayout(context) {
             PadAlign.CENTER -> ToolIcon.ALIGN_CENTER to "置中"
             PadAlign.FLOATING -> ToolIcon.ALIGN_FLOAT to "浮動"
         }
+        styleTool(v, theme.keyFaceAlt)
+    }
+
+    fun refreshFloatDockLabel() {
+        val v = btnOf(PadFunc.FLOAT) ?: return
+        val dock = Prefs.align(context) == PadAlign.FLOATING
+        icons[v] = if (dock) ToolIcon.KEYBOARD to "取消浮動"
+            else ToolIcon.ALIGN_FLOAT to PadFunc.FLOAT.label
         styleTool(v, theme.keyFaceAlt)
     }
 

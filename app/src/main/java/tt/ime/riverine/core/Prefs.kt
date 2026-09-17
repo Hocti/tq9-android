@@ -22,9 +22,10 @@ enum class PadGroup { CJK, LATIN }
 /**
  * 顯示方式：鍵盤本體超過 max size 之後可以 toggle 的狀態。
  *
- * **唔係每個都成日揀得**，見 [Prefs.alignOptions] —— [SPLIT] 淨係英數鍵盤
+ * **唔係每個都成日揀得**，見 [Prefs.alignCycleOptions] —— [SPLIT] 淨係英數鍵盤
  * 兼且螢幕夠闊先出現，而嗰陣就輪到 [LEFT_GAP] / [RIGHT_GAP] 收起。
- * [FLOATING] 兩組喺闊 screen 都有，窄咗就自動停。
+ * [FLOATING] 闊 screen 仍然用得，但**唔再喺「改變大小」個圈入面**：入／出
+ * 浮動係獨立掣（見 `PadChrome`）。
  */
 enum class PadAlign(val label: String) {
     STRETCH("拉闊"),
@@ -36,8 +37,8 @@ enum class PadAlign(val label: String) {
      * 靠一邊係為咗單手，置中就係為咗打字企中間唔歪 —— 闊 screen（平板／打橫）
      * 尤其啱用。拉闊拉窄一樣係拖粒大細掣（[Prefs.widthScale] 照用）。
      *
-     * 呢個顯示方式**冇側邊欄**：空出嚟嗰啲位一開二，兩邊都窄過擺得落工具掣，
-     * 所以照用返上面條 bar（見 `TTInputMethodService.sideGeom`）。
+     * 闊 screen 非浮動時，左邊（置右／置中）或右邊（置左）會有功能表＋候選，
+     * 最外側再加一欄 chrome 四粒掣（見 `PadChrome`）。
      */
     CENTER("置中（兩邊留白）"),
 
@@ -53,8 +54,9 @@ enum class PadAlign(val label: String) {
      * **淨係闊 screen**（`> [Prefs.SPLIT_MIN_WIDTH_DP]`）先揀得 —— 轉直變窄就
      * 唔再喺 [Prefs.alignOptions] 入面，[Prefs.align] 會當「拉闊」，自動停用。
      *
-     * 最底有條 handle：左彈系統輸入法選單、左中調整大小、中間拖去郁（X／Y）、
-     * 右收起鍵盤。工具列嗰粒顯示方式**照轉**（浮動時仍可轉返置左／右）。
+     * 入／出浮動係獨立掣，唔再經「改變大小」循環。最底有條 handle：左彈系統
+     * 輸入法選單、取消浮動（功能表開住就搬上去）、中間拖去郁（X／Y）。
+     * 撳／拖底列會喺四角出藍色圓角，拉動即改大細；撳返鍵盤就收。
      * 入浮動嗰下中英兩組一齊 FLOATING，闊高度各用各嘅 [Prefs.floatWidthScale]／
      * [Prefs.floatHeightScale]（英文可以闊、中文可以窄）。
      */
@@ -67,9 +69,10 @@ enum class PadAlign(val label: String) {
  * [CANDIDATES]／[TOOLS]／[BOTH] 係切換掣（`⇄`）一路撳落去嗰個圈 ——
  * 關聯字 → 工具 → **兩行一齊**（2026-09-11 user 要求，關聯字嗰行喺工具嗰行上面）。
  *
- * [OFF]（收起成條 bar）**淨係闊 screen 入得到**：英文底行嗰粒 `▴` 撳到第四下先至
- * 收起（見 [barHidden] 同 `TTInputMethodService.toggleLatinBar`）。窄機收唔起 ——
- * 打字提示、滑出嚟嗰個字、關聯字全部喺條 bar 度，收起咗就等於打盲舖。
+ * [OFF]（收起成條 bar）**淨係闊 screen 入得到**：英文底行嗰粒 `▴` 撳一下
+ * 就收起／打開（見 [barHidden] 同 `TTInputMethodService.toggleBarHidden`）。
+ * 窄機收唔起 —— 打字提示、滑出嚟嗰個字、關聯字全部喺條 bar 度，收起咗
+ * 就等於打盲舖。
  *
  * enum 個 `name` 存落 SharedPreferences（[Prefs.KEY_BAR_MODE]），改名等於現有
  * user 嗰個狀態失效；加喺最後就冇所謂。
@@ -416,28 +419,22 @@ object Prefs {
      * 都係垃圾，所以逐條寫死唔准做乜。`%text%` 會換成輸入框而家嘅內容（上下文），
      * `%lang%` 換成目標語言（見 [KEY_AI_STT_LANG_ZH]）。
      */
-    const val DEFAULT_AI_STT_PROMPT =
-        "You are a speech-to-text transcription engine. Transcribe the attached audio " +
-        "recording. The expected spoken language is: %lang%\n" +
-        "\n" +
-        "Rules, all mandatory:\n" +
-        "1. Output ONLY the transcription itself. No preamble, no closing remark, " +
-        "no explanation, no apology, no quotation marks, no markdown, and no label " +
-        "such as \"Transcription:\".\n" +
-        "2. Transcribe verbatim. Do NOT translate, paraphrase, summarise, reorder, " +
-        "shorten, expand, or \"improve\" the wording in any way.\n" +
-        "3. The ONLY corrections allowed are removing obvious stutters, repeated " +
-        "false starts, and filler sounds.\n" +
-        "4. Keep the speaker's own words, including English words, numbers, slang and " +
-        "proper nouns, exactly as spoken.\n" +
-        "5. Write any Chinese in Traditional Chinese characters (Hong Kong usage) only, " +
-        "never Simplified. Add natural punctuation.\n" +
-        "6. If the audio contains no intelligible speech, output nothing at all.\n" +
-        "\n" +
-        "The text below is what is already typed in the input field. It is context " +
-        "only - do NOT repeat it, translate it, or include any part of it in your " +
-        "output:\n" +
-        "%text%"
+    const val DEFAULT_AI_STT_PROMPT = """
+You are a speech-to-text engine. Transcribe the attached audio accurately.
+
+Spoken language: %lang%
+- Write Cantonese with Traditional Chinese characters, using colloquial Cantonese characters (e.g. 係、唔、佢、嘅).
+- Keep English words in English exactly as spoken.
+- Do not translate, summarise or add anything that was not said.
+- 如說得支支誤誤，略為修正為流暢版，但改動要小
+- user is developer, may be many tech term, and talking AI prompt.
+- 內容要自動隔行分段，如提多類似多項，就自動加上 `1.xxx
+2.yyy`這樣的分段
+- 如環境有其他人說話，無視似是雜音的背景聲，只集中在主說話者所說的
+- 如語調改變，或內容和本身前文後理無關，留意是否user在直接提示輸出的格式。聽到`句號`,`隔行`等自動變成相應符號，而非打出來。如在最前或最尾說`輸出成mark down`,`將以上全譯成日文`,`將上零碎idea整理成流暢文章`，也應視為不是輸出內容，而是輸出格式。
+
+Additional context from the user:
+%text%"""
 
     /**
      * 一套 provider 設定（[AiProvider]：key／model／自訂範本）打包做一個 profile，
@@ -496,17 +493,30 @@ object Prefs {
     const val SPLIT_MIN_WIDTH_DP = 500
 
     /**
-     * 呢組鍵盤而家揀得邊幾個顯示方式。
+     * 呢組鍵盤「改變大小」撳一下轉得邊幾個（**唔包浮動**）。
      *
-     * 闊 screen（`> [SPLIT_MIN_WIDTH_DP]`）嘅**英數鍵盤**冇「靠左／靠右」：
-     * 咁闊嘅螢幕再靠實一邊，另一邊嗰大橛位就係嘥咗，拆開兩橛兩隻姆指啱用好多。
-     * 其餘情況（中文那組、或者窄螢幕）就係「拉闊／靠右／靠左」。
+     * 闊 screen 嘅**英數鍵盤**：拉闊／置中／左右拆開。冇「靠左／靠右」——
+     * 咁闊嘅螢幕再靠實一邊，另一邊嗰大橛位就係嘥咗。
+     * 闊 screen 嘅**中文／純數字**：置左／置中／置右，冇「拉闊」—— 置左置右
+     * 嘅留白擺側邊欄同 chrome 四粒掣；置中功能表留喺上面。
+     * 其餘情況（窄螢幕）就係「拉闊／靠右／靠左／置中」。
      *
-     * [PadAlign.CENTER]（置中）**兩邊都揀得到** —— 拉窄咗企中間，
-     * 闊 screen 同窄 screen 一樣用得着。
-     *
-     * [PadAlign.FLOATING] **淨係闊 screen** 先有（中英兩組都得）。窄咗（轉直）
-     * 就唔喺 list 入面，[align] 會當「拉闊」—— 唔使另外寫「停用浮動」嗰步。
+     * [PadAlign.FLOATING] 闊 screen 仍然用得，但係獨立掣（見 [alignOptions]），
+     * 唔喺呢個圈入面。
+     */
+    fun alignCycleOptions(ctx: Context, g: PadGroup): List<PadAlign> =
+        alignCycleOptions(screenWidthDp(ctx) > SPLIT_MIN_WIDTH_DP, g)
+
+    fun alignCycleOptions(wide: Boolean, g: PadGroup): List<PadAlign> = when {
+        wide && g == PadGroup.LATIN ->
+            listOf(PadAlign.STRETCH, PadAlign.CENTER, PadAlign.SPLIT)
+        wide && g == PadGroup.CJK ->
+            listOf(PadAlign.RIGHT_GAP, PadAlign.CENTER, PadAlign.LEFT_GAP)
+        else -> listOf(PadAlign.STRETCH, PadAlign.LEFT_GAP, PadAlign.RIGHT_GAP, PadAlign.CENTER)
+    }
+
+    /**
+     * 全部合法嘅顯示方式（循環 + 闊 screen 嘅浮動）。[align] 用嚟過濾存低嘅值。
      */
     fun alignOptions(ctx: Context, g: PadGroup): List<PadAlign> =
         alignOptions(screenWidthDp(ctx) > SPLIT_MIN_WIDTH_DP, g)
@@ -516,17 +526,30 @@ object Prefs {
      * 鍵盤嗰邊永遠行上面嗰個 [alignOptions] overload。
      */
     fun alignOptions(wide: Boolean, g: PadGroup): List<PadAlign> {
-        val base = if (wide && g == PadGroup.LATIN)
-            listOf(PadAlign.STRETCH, PadAlign.SPLIT, PadAlign.CENTER)
-        else listOf(PadAlign.STRETCH, PadAlign.LEFT_GAP, PadAlign.RIGHT_GAP, PadAlign.CENTER)
-        return if (wide) base + PadAlign.FLOATING else base
+        val cycle = alignCycleOptions(wide, g)
+        return if (wide) cycle + PadAlign.FLOATING else cycle
     }
 
-    /** 撳一下粒大細掣：喺 [alignOptions] 入面轉去下一個 */
+    /** 撳一下粒大細掣：喺 [alignCycleOptions] 入面轉去下一個（唔會入浮動） */
     fun nextAlign(ctx: Context, g: PadGroup): PadAlign {
-        val opts = alignOptions(ctx, g)
-        return opts[(opts.indexOf(align(ctx, g)) + 1) % opts.size]
+        val opts = alignCycleOptions(ctx, g)
+        val cur = align(ctx, g)
+        val i = opts.indexOf(cur).let { if (it < 0) 0 else it }
+        return opts[(i + 1) % opts.size]
     }
+
+    /**
+     * 存住嗰個顯示方式唔喺 [alignOptions] 入面嗰陣跌去邊個。
+     * 闊 screen 中文冇「拉闊」：舊 profile 存住 [PadAlign.STRETCH] 就置中。
+     */
+    fun alignFallback(wide: Boolean, g: PadGroup): PadAlign {
+        val cycle = alignCycleOptions(wide, g)
+        return if (PadAlign.STRETCH !in cycle && PadAlign.CENTER in cycle) PadAlign.CENTER
+        else PadAlign.STRETCH
+    }
+
+    fun alignFallback(ctx: Context, g: PadGroup): PadAlign =
+        alignFallback(screenWidthDp(ctx) > SPLIT_MIN_WIDTH_DP, g)
 
     // ---- typed accessors -------------------------------------------------
 
@@ -635,7 +658,7 @@ object Prefs {
     const val SIDE_PANEL_MAX_RATIO = 0.60f
 
     /**
-     * 存住嗰個顯示方式，但係**唔喺 [alignOptions] 入面就當「拉闊」** ——
+     * 存住嗰個顯示方式，但係**唔喺 [alignOptions] 入面就當 fallback** ——
      * 摺機打開／打橫嗰陣可揀嘅嘢會變（見 [alignOptions]），
      * 舊 profile 或者舊版留低嘅值唔可以夾硬繼續用。
      */
@@ -644,7 +667,7 @@ object Prefs {
         val stored = runCatching {
             PadAlign.valueOf(sp(ctx).getString(profKey(ctx, KEY_ALIGN, g), fallback)!!)
         }.getOrDefault(PadAlign.STRETCH)
-        return if (stored in alignOptions(ctx, g)) stored else PadAlign.STRETCH
+        return if (stored in alignOptions(ctx, g)) stored else alignFallback(ctx, g)
     }
 
     fun setAlign(ctx: Context, a: PadAlign, g: PadGroup = PadGroup.CJK) =

@@ -32,8 +32,8 @@ enum class FuncPlace { BOTH, SIDE_ONLY, TOOL_ONLY }
  *
  * [face] 係鍵面嗰幾隻字，**全部寫中文，一個彩色 emoji 都冇** —— 鍵面其餘全部
  * 單色，夾一粒彩色 emoji 好突兀，而且好多機嘅 emoji 字型會畫到成粒鍵咁大。
- * [face] 吉嘅（[IME_NEXT]／[IME_PICKER]／[ALIGN]）就改為畫個**單色圖案**
- * 喺粒鍵正中（見 `ime/ToolIcons.kt` 嘅 `PadFunc.toolIcon`）。
+ * [face] 吉嘅（[IME_NEXT]／[IME_PICKER]／[ALIGN]／[FLOAT]／[HIDE_KEYBOARD]）
+ * 就改為畫個**單色圖案**喺粒鍵正中（見 `ime/ToolIcons.kt` 嘅 `PadFunc.toolIcon`）。
  *
  * ## enum 個名唔可以亂改
  *
@@ -95,6 +95,8 @@ enum class PadFunc(
     BAR_SWITCH("轉換工具列", "⇄", FuncPlace.SIDE_ONLY, required = true),
     IME_NEXT("下一個輸入法", ""),
     IME_PICKER("彈出輸入法選擇表", ""),
+    /** 收起成個鍵盤（`requestHideSelf`）。闊 screen 非浮動時 chrome 會強加一粒。 */
+    HIDE_KEYBOARD("收起鍵盤", ""),
     NEXT_PAGE("下頁", "下頁"),
     PREV_PAGE("上頁", "上頁"),
 
@@ -111,6 +113,13 @@ enum class PadFunc(
 
     /** 撳一下轉顯示方式、喺粒掣度直接拖就拉大細（所以擺唔入九宮格，見 [FuncPlace]） */
     ALIGN("改變大小", "", FuncPlace.TOOL_ONLY),
+
+    /**
+     * 入浮動鍵盤。闊 screen 非浮動時 chrome 會強加一粒，所以工具列原位會收起。
+     * 已經浮動嗰陣呢粒改做「取消浮動」：功能表開住就插喺工具列最左，
+     * 冇開就喺底列。唔再經「改變大小」循環。
+     */
+    FLOAT("浮動鍵盤", "", FuncPlace.TOOL_ONLY),
 
     /**
      * 轉返中文九宮格。英文／符號／純數字鍵盤本身一律已經有粒寫死嘅「中」
